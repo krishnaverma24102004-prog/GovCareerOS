@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from govcareeros.backend.parsing.upsc_advertisement import words_to_number
 
-ENGINE_VERSION = "hard_eligibility/1"
+ENGINE_VERSION = "hard_eligibility/2"
 
 # ---------- plain inputs ----------
 
@@ -50,6 +50,13 @@ class ProfileSnapshot:
     education: List[EducationEntry] = field(default_factory=list)
     experience: List[ExperienceEntry] = field(default_factory=list)
     certifications: List[str] = field(default_factory=list)
+    disability_percentage: Optional[int] = None
+    disability_types: List[str] = field(default_factory=list)
+    citizenship_status: Optional[str] = None
+    is_ex_serviceman: Optional[bool] = None
+    armed_forces_service_months: Optional[int] = None
+    is_central_govt_employee: Optional[bool] = None
+    central_govt_service_start: Optional[date] = None
 
 @dataclass
 class Requirement:
@@ -118,18 +125,139 @@ def check_age(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Op
     if age <= max_age:
         return [RuleOutcome("AGE", "MET", f"age {age} <= {max_age}", req_text, evidence, limit.id, limit.source_page)]
 
-    pwbd = next((r for r in reqs if r.req_type == "AGE_RELAXATION" and r.value["category"] == "PwBD"), None)
-    if pwbd and age <= max_age + pwbd.value["years"]:
-        relaxed = f"{req_text} (+{pwbd.value['years']} for PwBD)"
-        if profile.is_pwbd is True:
-            return [RuleOutcome("AGE", "CONDITIONAL", f"age {age} within PwBD-relaxed limit {max_age + pwbd.value['years']}",
-                                relaxed, evidence + ", PwBD: yes", limit.id, limit.source_page,
-                                note="PwBD relaxation applies only with a valid disability certificate for a suitable category")]
-        if profile.is_pwbd is None:
-            return [RuleOutcome("AGE", "UNKNOWN", f"age {age} exceeds {max_age}; PwBD relaxation possible but PwBD status not stated",
-                                relaxed, evidence + ", PwBD: not stated", limit.id, limit.source_page)]
-    return [RuleOutcome("AGE", "NOT_MET", f"age {age} > {max_age}", req_text, evidence, limit.id, limit.source_page,
-                        note="other relaxations (ex-servicemen, government servants) in the general instructions are not evaluated")]
+    options = relaxation_options(profile, reqs, category, crucial, age)
+    fitting = [o for o in options if o.status != "NO" and age <= max_age + o.years]
+    usable = [o for o in fitting if o.status == "OK"]
+    if usable:
+        best = max(usable, key=lambda o: o.years)
+        return [RuleOutcome("AGE", "CONDITIONAL", f"age {age} within {best.basis}-relaxed limit {max_age + best.years}",
+                            f"{req_text} (+{best.years} {best.basis}, p.{best.page})", f"{evidence}; {best.evidence}",
+                            limit.id, limit.source_page, note=best.note)]
+    if fitting:
+        missing = "; ".join(f"{o.basis}: {o.evidence}" for o in fitting)
+        return [RuleOutcome("AGE", "UNKNOWN", f"age {age} > {max_age}; a relaxation could apply but the profile doesn't settle it",
+                            req_text, f"{evidence}; {missing}", limit.id, limit.source_page)]
+    open_options = [o for o in options if o.status != "NO"]
+    if len(open_options) > 1 and age <= max_age + sum(o.years for o in open_options):
+        return [RuleOutcome("AGE", "UNKNOWN", f"age {age} fits only if relaxations {[o.basis for o in open_options]} are combined",
+                            req_text, evidence, limit.id, limit.source_page,
+                            note="the notification does not state whether these relaxations are cumulative")]
+    ruled_out = "; ".join(f"{o.basis}: {o.evidence}" for o in options) or "no relaxation rules found"
+    return [RuleOutcome("AGE", "NOT_MET", f"age {age} > {max_age} and no applicable relaxation", req_text,
+                        f"{evidence}; {ruled_out}", limit.id, limit.source_page)]
+
+@dataclass
+class RelaxationOption:
+    basis: str
+    years: int
+    status: str  # OK (profile qualifies, certificate still needed), UNKNOWN (profile silent), NO
+    evidence: str
+    page: Optional[int]
+    note: Optional[str] = None
+
+def _service_years(start: Optional[date], until: date) -> Optional[float]:
+    return None if start is None else (until - start).days / 365.25
+
+def relaxation_options(profile: ProfileSnapshot, reqs: Sequence[Requirement], category: str,
+                       crucial: date, age: int) -> List[RelaxationOption]:
+    """Age relaxations stated in the notification (vacancy block + General Instructions), each judged separately."""
+    general = {r.value.get("basis"): r for r in reqs if r.req_type == "AGE_RELAXATION_RULE"}
+    options: List[RelaxationOption] = []
+
+    # PwBD: years from the vacancy block if stated there, otherwise from the General Instructions
+    vac_pwbd = next((r for r in reqs if r.req_type == "AGE_RELAXATION" and r.value.get("category") == "PwBD"), None)
+    gen_pwbd = general.get("PWBD")
+    if vac_pwbd or gen_pwbd:
+        years = (vac_pwbd or gen_pwbd).value["years"]
+        page = (vac_pwbd or gen_pwbd).source_page
+        rule = gen_pwbd.value if gen_pwbd else {}
+        suitability = next((r.value for r in reqs if r.req_type == "PWBD_SUITABILITY"), None)
+        if profile.is_pwbd is False:
+            options.append(RelaxationOption("PwBD", years, "NO", "profile: not PwBD", page))
+        elif profile.is_pwbd is None:
+            options.append(RelaxationOption("PwBD", years, "UNKNOWN", "PwBD status not stated", page))
+        elif rule.get("max_age") and age > rule["max_age"]:
+            options.append(RelaxationOption("PwBD", years, "NO", f"age {age} above PwBD cap {rule['max_age']}", gen_pwbd.source_page))
+        elif profile.disability_percentage is None:
+            options.append(RelaxationOption("PwBD", years, "UNKNOWN", "disability percentage not stated", page))
+        elif profile.disability_percentage < rule.get("min_disability_percent", 40):
+            options.append(RelaxationOption("PwBD", years, "NO",
+                                            f"disability {profile.disability_percentage}% < {rule.get('min_disability_percent', 40)}%", page))
+        elif suitability and not profile.disability_types:
+            options.append(RelaxationOption("PwBD", years, "UNKNOWN", "disability sub-category not stated; post suitability depends on it", page))
+        elif suitability:
+            ok = [t for t in profile.disability_types if suitability.get(t, {}).get("suitable")]
+            if ok:
+                options.append(RelaxationOption("PwBD", years, "OK", f"PwBD {profile.disability_percentage}%, {','.join(ok)} suitable for this post", page,
+                                                "needs a disability certificate in the prescribed format"))
+            else:
+                options.append(RelaxationOption("PwBD", years, "NO",
+                                                f"sub-category {','.join(profile.disability_types)} not identified suitable for this post", page))
+        else:
+            options.append(RelaxationOption("PwBD", years, "OK", f"PwBD {profile.disability_percentage}%", page,
+                                            "post suitability table not extracted; confirm the sub-category is suitable"))
+
+    exsm = general.get("EX_SERVICEMEN")
+    if exsm:
+        need = exsm.value.get("min_service_months_after_attestation")
+        if profile.is_ex_serviceman is False:
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO", "profile: not an ex-serviceman", exsm.source_page))
+        elif profile.is_ex_serviceman is None:
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "ex-serviceman status not stated", exsm.source_page))
+        elif need and profile.armed_forces_service_months is None:
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "armed forces service months not stated", exsm.source_page))
+        elif need and profile.armed_forces_service_months < need:
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO",
+                                            f"{profile.armed_forces_service_months} months service < {need}", exsm.source_page))
+        else:
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "OK",
+                                            f"ex-serviceman, {profile.armed_forces_service_months} months service", exsm.source_page,
+                                            "needs a release certificate from the Defence Forces"))
+
+    cgs = general.get("CENTRAL_GOVT_SERVANT")
+    if cgs:
+        reserved_for_me = any(r.req_type == "RESERVATION" and r.value.get("category") == category and r.value.get("vacancies", 0) > 0 for r in reqs)
+        years = cgs.value.get("years_if_post_reserved_for", {}).get(category, cgs.value["years"]) if reserved_for_me else cgs.value["years"]
+        need = cgs.value.get("min_continuous_service_years")
+        served = _service_years(profile.central_govt_service_start, crucial)
+        if profile.is_central_govt_employee is False:
+            options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "NO", "profile: not a Central Govt servant", cgs.source_page))
+        elif profile.is_central_govt_employee is None:
+            options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "UNKNOWN", "Central Govt service status not stated", cgs.source_page))
+        elif need and served is None:
+            options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "UNKNOWN", "Central Govt service start date not stated", cgs.source_page))
+        elif need and served < need:
+            options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "NO", f"{served:.1f} years continuous service < {need}", cgs.source_page))
+        else:
+            options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "OK", f"{served:.1f} years Central Govt service", cgs.source_page,
+                                            "only for posts in the same line/allied cadre; decision rests with the Commission"))
+
+    # "whichever may be more beneficial": PwBD and Central Govt servant are alternatives, never added
+    return options
+
+# ---------- citizenship ----------
+
+def check_citizenship(profile: ProfileSnapshot, reqs: Sequence[Requirement]) -> List[RuleOutcome]:
+    req = next((r for r in reqs if r.req_type == "CITIZENSHIP"), None)
+    if req is None:
+        return [RuleOutcome("CITIZENSHIP", "NOT_EVALUATED", "citizenship conditions not extracted for this vacancy", "-", "-")]
+    accepted = req.value.get("accepted", [])
+    needs_cert = req.value.get("certificate_of_eligibility_required", [])
+    status = profile.citizenship_status
+    derived = ""
+    if status is None and profile.nationality and re.fullmatch(r"\s*indian?\s*", profile.nationality, re.I):
+        status, derived = "INDIAN_CITIZEN", " (from nationality field)"
+    requirement = f"accepted: {', '.join(accepted)}"
+    if status is None:
+        return [RuleOutcome("CITIZENSHIP", "UNKNOWN", "citizenship status not stated", requirement,
+                            f"nationality: {profile.nationality!r}", req.id, req.source_page)]
+    evidence = f"citizenship: {status}{derived}"
+    if status not in accepted:
+        return [RuleOutcome("CITIZENSHIP", "NOT_MET", f"{status} is not an accepted category", requirement, evidence, req.id, req.source_page)]
+    if status in needs_cert:
+        return [RuleOutcome("CITIZENSHIP", "CONDITIONAL", f"{status} accepted", requirement, evidence, req.id, req.source_page,
+                            note="requires a certificate of eligibility issued by the Government of India")]
+    return [RuleOutcome("CITIZENSHIP", "MET", f"{status} accepted", requirement, evidence, req.id, req.source_page)]
 
 # ---------- education ----------
 
@@ -236,6 +364,7 @@ def check_education(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruci
 
 _YEARS_RE = re.compile(r"([A-Za-z]+|\d+)\s*(?:\(\s*\d+\s*\))?\s*years?['’]?\s+(?:of\s+)?(?:[\w-]+\s+){0,4}?experience", re.I)
 _DOMAIN_RE = re.compile(r"experience\s+(?:in|of)\s+(?:the\s+)?(?:field\s+of\s+)?([A-Za-z][A-Za-z\s&/-]{2,60})", re.I)
+_POST_QUALIFICATION_RE = re.compile(r"after\s+obtaining\s+(?:the\s+)?(post[\s-]?graduate\s+)?(?:degree|qualification)", re.I)
 _STOPWORDS = {"the", "work", "working", "field", "of", "in", "and", "or", "as", "a", "an", "concerned", "teaching", "research", "advisory", "govt", "office"}
 
 def _years_between(start: date, end: date) -> float:
@@ -253,10 +382,28 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
             continue
         required = min(years)  # alternatives joined by "Or": the smallest is the most lenient
         until = crucial or date.today()
-        spans = [(e, _years_between(e.start_date, min(e.end_date or until, until))) for e in profile.experience if e.start_date]
+        # "... after obtaining the post graduate degree": only experience after that qualification counts
+        after = _POST_QUALIFICATION_RE.search(text)
+        counted_from: Optional[date] = None
+        if after:
+            level = 3 if after.group(1) else 2
+            dated = [e.end_date for e in profile.education if _degree_level(e) >= level and e.end_date]
+            if not dated:
+                what = "post-graduate degree" if level == 3 else "qualifying degree"
+                out.append(RuleOutcome("EXPERIENCE", "UNKNOWN", f"only experience after the {what} counts, but its completion date is not in the profile",
+                                       short, "-", req.id, req.source_page))
+                continue
+            counted_from = min(dated)
+        spans = []
+        for e in profile.experience:
+            if e.start_date:
+                start = max(e.start_date, counted_from) if counted_from else e.start_date
+                spans.append((e, _years_between(start, min(e.end_date or until, until))))
         total = sum(y for _, y in spans)
         undated = [e for e in profile.experience if not e.start_date]
-        evidence = f"{total:.1f} years dated experience up to {until.isoformat()}" + (f"; {len(undated)} undated entries" if undated else "")
+        evidence = (f"{total:.1f} years dated experience"
+                    + (f" counted from {counted_from.isoformat()} (after qualification)" if counted_from else "")
+                    + f" up to {until.isoformat()}" + (f"; {len(undated)} undated entries" if undated else ""))
 
         if total < required and not undated:
             out.append(RuleOutcome("EXPERIENCE", "NOT_MET", f"{total:.1f} years < {required} years required (all domains counted)",
@@ -272,8 +419,6 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
                     if keywords and any(k in f"{e.designation} {e.domain or ''} {e.responsibilities or ''}".lower() for k in keywords)]
         relevant_years = sum(y for _, y in relevant)
         notes = []
-        if re.search(r"after\s+obtaining|post[\s-]?qualification", text, re.I):
-            notes.append("only experience gained after the qualifying degree counts; not separated in this check")
         if keywords and relevant_years >= required:
             names = ", ".join(f"{e.designation} @ {e.organization}" for e, _ in relevant)
             outcome = "CONDITIONAL" if notes else "MET"
@@ -287,12 +432,9 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
 
 # ---------- combination ----------
 
-def not_evaluated_criteria() -> List[RuleOutcome]:
-    return [RuleOutcome("NATIONALITY", "NOT_EVALUATED", "nationality conditions are in the general instructions, which are not extracted", "-", "-")]
-
 def evaluate(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Optional[date]) -> List[RuleOutcome]:
     return check_age(profile, reqs, crucial) + check_education(profile, reqs, crucial) + \
-        check_experience(profile, reqs, crucial) + not_evaluated_criteria()
+        check_experience(profile, reqs, crucial) + check_citizenship(profile, reqs)
 
 def overall_status(outcomes: Sequence[RuleOutcome]) -> Tuple[str, float]:
     decisive = [o for o in outcomes if o.outcome != "NOT_EVALUATED"]

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
+from govcareeros.backend.eligibility.rules import ENGINE_VERSION
 from govcareeros.backend.models import Vacancy
 from govcareeros.backend.services.document_ingestion import get_or_create_source, ingest_pdf_bytes
 from govcareeros.backend.sources import upsc
@@ -53,7 +54,7 @@ async def test_real_upsc_eligibility_is_explained_and_reproducible(api, login, d
     # --- Law Officer: every hard check is met, each with evidence and the PDF page
     first = await evaluate(v1, law_officer)
     assert first["status"] == "ELIGIBLE", first
-    assert first["engine_version"] == "hard_eligibility/1"
+    assert first["engine_version"] == ENGINE_VERSION
     assert first["profile_version_id"] == v1
     c = _checks(first)
     assert c["AGE"]["outcome"] == "MET" and "age 31 on crucial date 2026-10-16" in c["AGE"]["profile_evidence"]
@@ -61,7 +62,9 @@ async def test_real_upsc_eligibility_is_explained_and_reproducible(api, login, d
     assert (c["EDUCATION"]["outcome"], c["EDUCATION"]["match_type"]) == ("MET", "EXACT_MATCH")
     assert c["EDUCATION"]["requirement"] == "Degree in Law from a recognized Institute/University."
     assert c["EXPERIENCE"]["outcome"] == "MET" and "Legal Associate @ Rao & Associates" in c["EXPERIENCE"]["profile_evidence"]
-    assert c["NATIONALITY"]["outcome"] == "NOT_EVALUATED"
+    # Citizenship rule comes from the advertisement's General Instructions (p.14 of Advt 12/2026)
+    assert c["CITIZENSHIP"]["outcome"] == "MET" and c["CITIZENSHIP"]["source_page"] == "14"
+    assert "INDIAN_CITIZEN" in c["CITIZENSHIP"]["profile_evidence"]
 
     # --- Science/Engineering post: a law degree is a mismatch, never assumed equivalent
     jto_result = await evaluate(v1, jto)
@@ -111,3 +114,33 @@ async def test_eligibility_requires_own_explicit_profile_version(api, login, db_
     detail = (await api.get(f"/vacancies/{vacancy_id}", headers=ravi)).json()
     assert detail["post_name"] == "Law Officer"
     assert any(p["field_name"] == "application_deadline" and p["page"] == 13 for p in detail["provenance"])
+
+@pytest.mark.asyncio
+async def test_reparse_keeps_evidence_of_past_decisions(api, login, db_session):
+    """Regression: re-parsing a vacancy used to delete requirement rows that eligibility evidence points to."""
+    from govcareeros.backend.models import EligibilityEvidence, VacancyRequirement
+
+    vacancies = await _ingest_real_upsc(db_session)
+    law_officer = vacancies["26091203226"]
+    h = await login("asha@example.com")
+    v1 = (await api.put("/profile", json=LAW_GRAD, headers=h)).json()["version"]["id"]
+    before = (await api.post("/eligibility", json={"profile_version_id": v1, "vacancy_id": str(law_officer.id)}, headers=h)).json()
+
+    # Simulate rows written by an older parser, then ingest the same official PDFs again
+    for v in vacancies.values():
+        v.parser_version = "upsc_advertisement/0"
+    await db_session.commit()
+    await _ingest_real_upsc(db_session)
+
+    cited = (await db_session.execute(
+        select(EligibilityEvidence.requirement_id).where(EligibilityEvidence.requirement_id.is_not(None)))).scalars().all()
+    assert cited and all([await db_session.get(VacancyRequirement, rid) for rid in cited])
+    stored = (await api.get(f"/eligibility/{before['id']}", headers=h)).json()
+    assert _fingerprint(stored) == _fingerprint(before)
+
+    # New evaluations read only the active (non-superseded) requirement rows
+    after = (await api.post("/eligibility", json={"profile_version_id": v1, "vacancy_id": str(law_officer.id)}, headers=h)).json()
+    assert after["status"] == "ELIGIBLE"
+    active = (await db_session.execute(select(VacancyRequirement).where(
+        VacancyRequirement.vacancy_id == law_officer.id, VacancyRequirement.superseded_at.is_(None)))).scalars().all()
+    assert {str(r.id) for r in active} >= {e["requirement_id"] for e in after["evidence"] if e["requirement_id"]}

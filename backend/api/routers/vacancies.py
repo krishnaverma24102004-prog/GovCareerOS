@@ -33,4 +33,7 @@ async def get_vacancy(vacancy_id: uuid.UUID, session: AsyncSession = Depends(get
     vacancy = res.scalar_one_or_none()
     if vacancy is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "vacancy not found")
-    return vacancy
+    # Filter on the response, never on the ORM relationship (that would detach rows on commit)
+    detail = VacancyDetail.model_validate(vacancy)
+    active = {r.id for r in vacancy.requirements if r.superseded_at is None}
+    return detail.model_copy(update={"requirements": [r for r in detail.requirements if r.id in active]})

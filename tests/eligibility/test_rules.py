@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 
 from govcareeros.backend.eligibility.rules import (
-    EducationEntry, ExperienceEntry, ProfileSnapshot, Requirement, age_on, check_age, check_education,
+    check_citizenship, EducationEntry, ExperienceEntry, ProfileSnapshot, Requirement, age_on, check_age, check_education,
     check_experience, overall_status, RuleOutcome,
 )
 
@@ -42,7 +42,9 @@ def test_age_over_limit_is_not_met():
 
 def test_pwbd_relaxation_requires_stated_status():
     over = date(1985, 1, 1)  # 41: over 33, within 43
-    assert outcome(check_age(profile(date_of_birth=over, is_pwbd=True), AGE, CRUCIAL)).outcome == "CONDITIONAL"
+    assert outcome(check_age(profile(date_of_birth=over, is_pwbd=True, disability_percentage=45), AGE, CRUCIAL)).outcome == "CONDITIONAL"
+    # The General Instructions require at least 40% disability; without a percentage it can't be settled
+    assert outcome(check_age(profile(date_of_birth=over, is_pwbd=True), AGE, CRUCIAL)).outcome == "UNKNOWN"
     assert outcome(check_age(profile(date_of_birth=over, is_pwbd=None), AGE, CRUCIAL)).outcome == "UNKNOWN"
     assert outcome(check_age(profile(date_of_birth=over, is_pwbd=False), AGE, CRUCIAL)).outcome == "NOT_MET"
 
@@ -137,3 +139,79 @@ def test_long_but_unrelated_experience_needs_review():
 ])
 def test_overall_status(outcomes, status):
     assert overall_status([RuleOutcome("X", o, "", "", "") for o in outcomes])[0] == status
+
+# ---------- General Instructions relaxations (values as extracted from UPSC Advt 12/2026, pp.14, 21-22) ----------
+
+GENERAL = [
+    Requirement("g1", "AGE_RELAXATION_RULE", {"basis": "EX_SERVICEMEN", "years": 5, "min_service_months_after_attestation": 6}, 21),
+    Requirement("g2", "AGE_RELAXATION_RULE", {"basis": "CENTRAL_GOVT_SERVANT", "years": 5,
+                                              "years_if_post_reserved_for": {"SC": 10, "ST": 10, "OBC": 8},
+                                              "min_continuous_service_years": 3, "decided_by_commission": True}, 22),
+    Requirement("g3", "AGE_RELAXATION_RULE", {"basis": "PWBD", "years": 10, "max_age": 56, "min_disability_percent": 40,
+                                              "requires_post_suitability": True, "not_cumulative_with": ["CENTRAL_GOVT_SERVANT"]}, 22),
+    Requirement("g4", "CITIZENSHIP", {"accepted": ["INDIAN_CITIZEN", "NEPAL_SUBJECT", "BHUTAN_SUBJECT", "TIBETAN_REFUGEE_PRE_1962", "PIO_MIGRANT"],
+                                      "certificate_of_eligibility_required": ["NEPAL_SUBJECT", "BHUTAN_SUBJECT", "TIBETAN_REFUGEE_PRE_1962", "PIO_MIGRANT"]}, 14),
+]
+OBC_ONLY = [Requirement("a", "AGE_MAX", {"category": "OBC", "max_age": 38}, 2),
+            Requirement("r", "RESERVATION", {"category": "OBC", "vacancies": 1}, 1),
+            Requirement("p", "PWBD_SUITABILITY", {"OL": {"suitable": True, "reserved": False}, "LV": {"suitable": False, "reserved": False}}, 1)]
+OVER_BY_3 = date(1985, 1, 1)   # 41 on 2026-10-16, limit 38
+
+def settled(**kw):
+    """A profile that has answered every relaxation question (unanswered ones stay open, correctly, as UNKNOWN)."""
+    base = dict(is_pwbd=False, is_ex_serviceman=False, is_central_govt_employee=False)
+    base.update(kw)
+    return profile(**base)
+
+def test_ex_serviceman_relaxation_needs_six_months_service():
+    ok = outcome(check_age(settled(date_of_birth=OVER_BY_3, is_ex_serviceman=True, armed_forces_service_months=60), OBC_ONLY + GENERAL, CRUCIAL))
+    assert ok.outcome == "CONDITIONAL" and "EX_SERVICEMEN" in ok.rule and "p.21" in ok.requirement
+    short = outcome(check_age(settled(date_of_birth=OVER_BY_3, is_ex_serviceman=True, armed_forces_service_months=4), OBC_ONLY + GENERAL, CRUCIAL))
+    assert short.outcome == "NOT_MET"
+    unknown = outcome(check_age(settled(date_of_birth=OVER_BY_3, is_ex_serviceman=True), OBC_ONLY + GENERAL, CRUCIAL))
+    assert unknown.outcome == "UNKNOWN"
+
+def test_central_govt_servant_gets_8_years_on_post_reserved_for_obc():
+    p = settled(date_of_birth=date(1980, 1, 1), is_central_govt_employee=True, central_govt_service_start=date(2015, 4, 1))  # 46
+    o = outcome(check_age(p, OBC_ONLY + GENERAL, CRUCIAL))
+    assert o.outcome == "CONDITIONAL" and "+8 CENTRAL_GOVT_SERVANT" in o.requirement
+    new_joiner = settled(date_of_birth=OVER_BY_3, is_central_govt_employee=True, central_govt_service_start=date(2025, 1, 1))
+    assert outcome(check_age(new_joiner, OBC_ONLY + GENERAL, CRUCIAL)).outcome == "NOT_MET"  # < 3 years service
+
+def test_pwbd_relaxation_follows_post_suitability_and_age_cap():
+    suitable = settled(date_of_birth=OVER_BY_3, is_pwbd=True, disability_percentage=50, disability_types=["OL"])
+    assert outcome(check_age(suitable, OBC_ONLY + GENERAL, CRUCIAL)).outcome == "CONDITIONAL"
+    unsuitable = settled(date_of_birth=OVER_BY_3, is_pwbd=True, disability_percentage=50, disability_types=["LV"])
+    assert outcome(check_age(unsuitable, OBC_ONLY + GENERAL, CRUCIAL)).outcome == "NOT_MET"
+    low = settled(date_of_birth=OVER_BY_3, is_pwbd=True, disability_percentage=30, disability_types=["OL"])
+    assert outcome(check_age(low, OBC_ONLY + GENERAL, CRUCIAL)).outcome == "NOT_MET"
+    over_cap = settled(date_of_birth=date(1969, 1, 1), is_pwbd=True, disability_percentage=50, disability_types=["OL"])  # 57
+    assert outcome(check_age(over_cap, OBC_ONLY + GENERAL, CRUCIAL)).outcome == "NOT_MET"
+
+def test_relaxations_are_not_silently_added_together():
+    # 50: needs +12; PwBD (10) or govt service (8) alone is not enough, and the text makes them alternatives
+    p = settled(date_of_birth=date(1976, 1, 1), is_pwbd=True, disability_percentage=50, disability_types=["OL"],
+                is_central_govt_employee=True, central_govt_service_start=date(2010, 1, 1), is_ex_serviceman=False)
+    o = outcome(check_age(p, OBC_ONLY + GENERAL, CRUCIAL))
+    assert o.outcome == "UNKNOWN" and "combined" in o.rule
+
+@pytest.mark.parametrize("status,nationality,expected", [
+    ("INDIAN_CITIZEN", None, "MET"),
+    (None, "Indian", "MET"),
+    ("NEPAL_SUBJECT", None, "CONDITIONAL"),
+    ("OTHER", None, "NOT_MET"),
+    (None, None, "UNKNOWN"),
+])
+def test_citizenship(status, nationality, expected):
+    assert outcome(check_citizenship(profile(citizenship_status=status, nationality=nationality), GENERAL)).outcome == expected
+
+def test_experience_after_postgraduate_degree_only():
+    req = [Requirement("x", "EXPERIENCE", "Three years’ experience in the concerned speciality after obtaining the post graduate degree.", 10)]
+    p = profile(education=[EducationEntry("MBBS", end_date=date(2018, 3, 1)), EducationEntry("MD (Cardiology)", education_level="MASTERS", end_date=date(2024, 6, 1))],
+                experience=[ExperienceEntry("AIIMS", "Senior Resident Cardiology", "Cardiology", None, date(2019, 1, 1), None)])
+    o = outcome(check_experience(p, req, CRUCIAL))
+    # 7.8 years in total, but only 2.4 after the MD: not enough
+    assert o.outcome == "NOT_MET" and "counted from 2024-06-01" in o.profile_evidence
+    no_pg_date = profile(education=[EducationEntry("MD (Cardiology)", education_level="MASTERS")],
+                         experience=[ExperienceEntry("AIIMS", "Senior Resident", "Cardiology", None, date(2019, 1, 1), None)])
+    assert outcome(check_experience(no_pg_date, req, CRUCIAL)).outcome == "UNKNOWN"

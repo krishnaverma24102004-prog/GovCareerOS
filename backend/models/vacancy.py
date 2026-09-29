@@ -52,6 +52,8 @@ class VacancyRequirement(Base, TimestampMixin):
     source_page: Mapped[Optional[int]] = mapped_column(Integer)
     source_section: Mapped[Optional[str]] = mapped_column(String(255))
     source_excerpt: Mapped[Optional[str]] = mapped_column(Text)
+    # Set when a re-parse replaces this row; kept because eligibility evidence may reference it
+    superseded_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime(), index=True)
 
     vacancy: Mapped['Vacancy'] = relationship(back_populates='requirements')
 

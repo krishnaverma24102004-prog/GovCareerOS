@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -16,6 +16,14 @@ class PersonalInfoIn(_In):
     gender: Optional[str] = None
     category: Optional[str] = Field(None, description="UR/GEN, EWS, OBC, SC, ST")
     is_pwbd: Optional[bool] = None
+    disability_percentage: Optional[int] = Field(None, ge=0, le=100)
+    disability_types: Optional[str] = Field(None, description="notification sub-category codes, e.g. 'OL' or 'LV,HH'")
+    citizenship_status: Optional[Literal["INDIAN_CITIZEN", "NEPAL_SUBJECT", "BHUTAN_SUBJECT", "TIBETAN_REFUGEE_PRE_1962", "PIO_MIGRANT", "OTHER"]] = None
+    is_ex_serviceman: Optional[bool] = None
+    armed_forces_service_months: Optional[int] = Field(None, ge=0)
+    is_central_govt_employee: Optional[bool] = None
+    central_govt_service_start: Optional[date] = None
+    career_interests: Optional[str] = None
     nationality: Optional[str] = None
     contact: Optional[str] = None
     address: Optional[str] = None
@@ -96,7 +104,7 @@ class ProfileIn(_In):
 class PersonalInfoOut(PersonalInfoIn, _Out):
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
-    @field_validator("date_of_birth", mode="before")
+    @field_validator("date_of_birth", "central_govt_service_start", mode="before")
     @classmethod
     def _dt_to_date(cls, v):
         return v.date() if isinstance(v, datetime) else v

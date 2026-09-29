@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.config.settings import settings
@@ -154,9 +154,14 @@ async def ingest_advertisement(
             confidence=_confidence(fields, req_types),
         )
         if existing is not None:
-            # Same document, newer parser: replace the derived rows, keep the vacancy id stable
+            # Same document, newer parser: keep the vacancy id stable. Old requirement rows are superseded,
+            # not deleted, because past eligibility decisions cite them as evidence.
             await session.execute(delete(VacancyFieldProvenance).where(VacancyFieldProvenance.vacancy_id == existing.id))
-            await session.execute(delete(VacancyRequirement).where(VacancyRequirement.vacancy_id == existing.id))
+            await session.execute(
+                update(VacancyRequirement)
+                .where(VacancyRequirement.vacancy_id == existing.id, VacancyRequirement.superseded_at.is_(None))
+                .values(superseded_at=datetime.now(timezone.utc))
+            )
             for key, val in values.items():
                 setattr(existing, key, val)
             vacancy = existing
@@ -172,7 +177,8 @@ async def ingest_advertisement(
                 vacancy_id=vacancy.id, field_name=name, value=_as_text(pf.value), raw_document_id=raw.id,
                 page=pf.provenance.page, section=pf.provenance.section, excerpt=pf.provenance.excerpt,
             ))
-        for req in pv.requirements:
+        # Vacancy-specific requirements plus the advertisement's general rules (citizenship, relaxations)
+        for req in pv.requirements + parsed.general_requirements:
             session.add(VacancyRequirement(
                 vacancy_id=vacancy.id, req_type=req.req_type, value=_as_text(req.value), is_mandatory=req.is_mandatory,
                 raw_document_id=raw.id, source_page=req.provenance.page,
@@ -205,9 +211,11 @@ async def run_upsc_pipeline(session: AsyncSession, client: Optional[httpx.AsyncC
         for link in links:
             try:
                 doc = await upsc.download_pdf(client, link.url)
-                run.documents.append(await ingest_pdf_bytes(
-                    session, source, doc.url, doc.body, doc.status, doc.content_type, source_url=upsc.LISTING_URL,
-                ))
+                # Savepoint per document: a failure rolls back only this PDF's rows
+                async with session.begin_nested():
+                    run.documents.append(await ingest_pdf_bytes(
+                        session, source, doc.url, doc.body, doc.status, doc.content_type, source_url=upsc.LISTING_URL,
+                    ))
             except upsc.AccessRestricted:
                 raise
             except Exception as e:  # one bad PDF must not abort the others

@@ -43,6 +43,17 @@ class PersonalInfo(Base, TimestampMixin):
     category: Mapped[Optional[str]] = mapped_column(String(100))
     # None = not stated; eligibility then cannot apply or rule out PwBD relaxation
     is_pwbd: Mapped[Optional[bool]] = mapped_column(Boolean)
+    disability_percentage: Mapped[Optional[int]] = mapped_column(Integer)
+    # Comma-separated sub-category codes as used in notifications, e.g. "OL" or "LV,HH"
+    disability_types: Mapped[Optional[str]] = mapped_column(String(100))
+    # INDIAN_CITIZEN, NEPAL_SUBJECT, BHUTAN_SUBJECT, TIBETAN_REFUGEE_PRE_1962, PIO_MIGRANT, OTHER
+    citizenship_status: Mapped[Optional[str]] = mapped_column(String(50))
+    is_ex_serviceman: Mapped[Optional[bool]] = mapped_column(Boolean)
+    armed_forces_service_months: Mapped[Optional[int]] = mapped_column(Integer)
+    is_central_govt_employee: Mapped[Optional[bool]] = mapped_column(Boolean)
+    central_govt_service_start: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    # Free text the candidate writes: posts/departments/fields they want (used only for relevance, never eligibility)
+    career_interests: Mapped[Optional[str]] = mapped_column(Text)
     nationality: Mapped[Optional[str]] = mapped_column(String(100))
     contact: Mapped[Optional[str]] = mapped_column(String(255))
     address: Mapped[Optional[str]] = mapped_column(Text)

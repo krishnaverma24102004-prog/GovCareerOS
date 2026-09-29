@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from govcareeros.backend.documents.pdf_text import PageText
 
-PARSER_VERSION = "upsc_advertisement/2"
+PARSER_VERSION = "upsc_advertisement/3"
 IST = timezone(timedelta(hours=5, minutes=30))
 
 _UNITS = {
@@ -113,6 +113,8 @@ class ParsedAdvertisement:
     fields: Dict[str, ParsedField]
     vacancies: List[ParsedVacancy]
     warnings: List[str]
+    # Advertisement-wide rules (citizenship, general age relaxations) that apply to every vacancy
+    general_requirements: List[ParsedRequirement] = field(default_factory=list)
 
 def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
@@ -205,7 +207,77 @@ def parse_advertisement(pages: List[PageText]) -> ParsedAdvertisement:
         block = re.sub(r"\n\s*\d+\.\s*$", "", text[start:end])
         vacancies.append(_parse_vacancy(doc, start, block, warnings))
 
-    return ParsedAdvertisement(PARSER_VERSION, ad_fields, vacancies, warnings)
+    general = _parse_general_rules(doc, warnings)
+    return ParsedAdvertisement(PARSER_VERSION, ad_fields, vacancies, warnings, general)
+
+# ---------- advertisement-wide rules from the General Instructions ----------
+
+_CITIZENSHIP_SECTION_RE = re.compile(r"CITIZENSHIP\s*:(.*?)AGE\s+LIMITS", re.S | re.I)
+_CITIZENSHIP_CLAUSES = [
+    ("INDIAN_CITIZEN", re.compile(r"a\s+citizen\s+of\s+India", re.I)),
+    ("NEPAL_SUBJECT", re.compile(r"a\s+subject\s+of\s+Nepal", re.I)),
+    ("BHUTAN_SUBJECT", re.compile(r"a\s+subject\s+of\s+Bhutan", re.I)),
+    ("TIBETAN_REFUGEE_PRE_1962", re.compile(r"Tibetan\s+refugee\s+who\s+came\s+over\s+to\s+India\s+before\s+1st\s+January,?\s+1962", re.I)),
+    ("PIO_MIGRANT", re.compile(r"person\s+of\s+Indian\s+origin\s+who\s+has\s+migrated", re.I)),
+]
+_EXSM_RE = re.compile(
+    r"upper\s+age\s+limit\s+in\s+case\s+of\s+Ex-Servicemen.*?shall\s+be\s+relaxed\s+by\s+(\w+)\s+years.*?"
+    r"not\s+less\s+than\s+(\w+)\s+months\s+after\s+attestation", re.S | re.I)
+_CGS_RE = re.compile(
+    r"relaxable\s+for\s+Central/U\.?T\.?\s+Govt\.?\s+Servants\s+up\s*to\s+(\d+)\s+years.*?"
+    r"\((\d+)\s+years\s+for\s+persons\s+belonging\s+to\s+Scheduled\s+Castes/Scheduled\s+Tribes\s+and\s+(\d+)\s+years\s+for\s+"
+    r"persons\s+belonging\s+to\s+other\s+Backward\s+Classes.*?Government\s+servants\s+with\s+(\w+)\s+years\s+continuous\s+service",
+    re.S | re.I)
+_PWBD_GENERAL_RE = re.compile(
+    r"Age\s+relaxation\s+to\s+Persons\s+with\s+Benchmark\s+Disabilities.*?Age\s+relaxation\s+of\s+(\d+)\s+years.*?"
+    r"maximum\s+age\s+of\s+the\s+applicant\s+on\s+the\s+closing\s+date\s+shall\s+not\s+exceed\s+(\d+)\s+years.*?"
+    r"minimum\s+of\s+(\d+)%\s+disability", re.S | re.I)
+_MORE_BENEFICIAL_RE = re.compile(r"as\s+a\s+.person\s+with\s+disability.\s+or\s+as\s+a\s+.Central\s+Government\s+employee.\s+whichever\s+may\s+be\s+more\s+beneficial", re.S | re.I)
+
+def _parse_general_rules(doc: _PagedText, warnings: List[str]) -> List[ParsedRequirement]:
+    text = doc.text
+    rules: List[ParsedRequirement] = []
+
+    m = _CITIZENSHIP_SECTION_RE.search(text)
+    if m:
+        body = m.group(1)
+        accepted = [name for name, rx in _CITIZENSHIP_CLAUSES if rx.search(body)]
+        needs_cert = accepted[1:] if re.search(r"certificate\s+of\s+eligibility", body, re.I) else []
+        rules.append(ParsedRequirement("CITIZENSHIP", {"accepted": accepted, "certificate_of_eligibility_required": needs_cert},
+                                       True, doc.prov(m.start(), m.end(), "Citizenship")))
+    else:
+        warnings.append("citizenship section not found")
+
+    m = _EXSM_RE.search(text)
+    if m:
+        rules.append(ParsedRequirement("AGE_RELAXATION_RULE", {
+            "basis": "EX_SERVICEMEN", "years": words_to_number(m.group(1)),
+            "min_service_months_after_attestation": words_to_number(m.group(2)),
+        }, False, doc.prov(m.start(), m.end(), "Concessions & Relaxations")))
+    else:
+        warnings.append("ex-servicemen age relaxation not found")
+
+    m = _CGS_RE.search(text)
+    if m:
+        rules.append(ParsedRequirement("AGE_RELAXATION_RULE", {
+            "basis": "CENTRAL_GOVT_SERVANT", "years": int(m.group(1)),
+            "years_if_post_reserved_for": {"SC": int(m.group(2)), "ST": int(m.group(2)), "OBC": int(m.group(3))},
+            "min_continuous_service_years": words_to_number(m.group(4)),
+            "decided_by_commission": True,
+        }, False, doc.prov(m.start(), m.end(), "Concessions & Relaxations")))
+    else:
+        warnings.append("central government servant age relaxation not found")
+
+    m = _PWBD_GENERAL_RE.search(text)
+    if m:
+        rules.append(ParsedRequirement("AGE_RELAXATION_RULE", {
+            "basis": "PWBD", "years": int(m.group(1)), "max_age": int(m.group(2)), "min_disability_percent": int(m.group(3)),
+            "requires_post_suitability": True,
+            "not_cumulative_with": ["CENTRAL_GOVT_SERVANT"] if _MORE_BENEFICIAL_RE.search(text) else [],
+        }, False, doc.prov(m.start(), m.end(), "Concessions & Relaxations")))
+    else:
+        warnings.append("PwBD age relaxation not found")
+    return rules
 
 def _parse_vacancy(doc: _PagedText, block_start: int, block: str, warnings: List[str]) -> ParsedVacancy:
     sections = list(_SECTION_RE.finditer(block))
@@ -258,6 +330,9 @@ def _apply_section(vac: ParsedVacancy, name: str, body: str, prov: Provenance) -
     if name == "RESERVATION POSITION":
         for cat, n in _RESERVATION_RE.findall(clean.split("Category-wise")[0]):
             vac.requirements.append(ParsedRequirement("RESERVATION", {"category": cat, "vacancies": int(n)}, False, prov))
+        suitability = _parse_pwbd_table(clean)
+        if suitability:
+            vac.requirements.append(ParsedRequirement("PWBD_SUITABILITY", suitability, False, prov))
     elif name == "PAY SCALE":
         vac.fields["pay_scale"] = ParsedField(clean, prov)
     elif name == "AGE":
@@ -275,10 +350,24 @@ def _apply_section(vac: ParsedVacancy, name: str, body: str, prov: Provenance) -
             vac.requirements.append(ParsedRequirement("EXPERIENCE", exp, True, prov))
     elif name == "DESIRABLE QUALIFICATIONS":
         vac.requirements.append(ParsedRequirement("DESIRABLE", clean, False, prov))
+    elif name == "DUTIES":
+        vac.requirements.append(ParsedRequirement("DUTIES", clean, False, prov))
     elif name == "HEADQUARTERS":
         vac.fields["headquarters"] = ParsedField(clean, prov)
     elif name == "OTHER DETAILS":
         vac.fields["service_classification"] = ParsedField(clean, prov)
+
+# PwBD sub-category codes as printed in UPSC suitability tables; longest first so "BLOA" wins over "BL"
+_PWBD_CODES = ["BLOA", "BLA", "OLA", "AAV", "MDy", "ASD", "SLD", "BL", "BA", "BH", "OL", "OA", "CP", "LC", "DW", "SD", "SI",
+               "LV", "HH", "ID", "MI", "MD", "B", "D"]
+_PWBD_ROW_RE = re.compile(r"\b(" + "|".join(_PWBD_CODES) + r")\s*-\s*(.*?)\b(Yes|No)\s+(Yes|No)\b", re.S)
+
+def _parse_pwbd_table(clean: str) -> Dict[str, Dict[str, bool]]:
+    """{'OL': {'suitable': True, 'reserved': False}, ...} from the 'Suitability / Reservation' table."""
+    table: Dict[str, Dict[str, bool]] = {}
+    for code, _desc, suitable, reserved in _PWBD_ROW_RE.findall(clean):
+        table.setdefault(code, {"suitable": suitable == "Yes", "reserved": reserved == "Yes"})
+    return table
 
 def _split_education_experience(clean: str) -> Tuple[str, Optional[str]]:
     # "(A) EDUCATIONAL ... (B) EXPERIENCE: ..." — text kept verbatim, only split

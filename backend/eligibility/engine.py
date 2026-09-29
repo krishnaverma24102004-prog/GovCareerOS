@@ -18,6 +18,9 @@ from govcareeros.backend.models.user import Certification, Education, Experience
 from govcareeros.backend.models.vacancy import Vacancy, VacancyRequirement
 from govcareeros.backend.parsing.upsc_advertisement import IST
 
+# Requirement types whose value column holds JSON
+JSON_REQUIREMENTS = {"AGE_MAX", "AGE_RELAXATION", "RESERVATION", "AGE_RELAXATION_RULE", "CITIZENSHIP", "PWBD_SUITABILITY"}
+
 class EligibilityInputError(ValueError):
     pass
 
@@ -37,6 +40,13 @@ async def load_profile_snapshot(session: AsyncSession, profile_version_id: uuid.
         category=info.category if info else None,
         is_pwbd=info.is_pwbd if info else None,
         nationality=info.nationality if info else None,
+        disability_percentage=info.disability_percentage if info else None,
+        disability_types=[t.strip() for t in (info.disability_types or "").split(",") if t.strip()] if info else [],
+        citizenship_status=info.citizenship_status if info else None,
+        is_ex_serviceman=info.is_ex_serviceman if info else None,
+        armed_forces_service_months=info.armed_forces_service_months if info else None,
+        is_central_govt_employee=info.is_central_govt_employee if info else None,
+        central_govt_service_start=rules.to_date(info.central_govt_service_start) if info else None,
         education=[rules.EducationEntry(e.degree, e.specialization, e.education_level, rules.to_date(e.end_date), e.equivalence)
                    for e in await rows(Education)],
         experience=[rules.ExperienceEntry(e.organization, e.designation, e.domain, e.responsibilities,
@@ -46,11 +56,12 @@ async def load_profile_snapshot(session: AsyncSession, profile_version_id: uuid.
     )
 
 async def load_requirements(session: AsyncSession, vacancy_id: uuid.UUID) -> List[rules.Requirement]:
-    res = await session.execute(select(VacancyRequirement).where(VacancyRequirement.vacancy_id == vacancy_id))
+    res = await session.execute(select(VacancyRequirement).where(
+        VacancyRequirement.vacancy_id == vacancy_id, VacancyRequirement.superseded_at.is_(None)))
     out = []
     for r in res.scalars():
         try:
-            value = json.loads(r.value) if r.req_type in ("AGE_MAX", "AGE_RELAXATION", "RESERVATION") else r.value
+            value = json.loads(r.value) if r.req_type in JSON_REQUIREMENTS else r.value
         except (json.JSONDecodeError, TypeError):
             value = r.value
         out.append(rules.Requirement(r.id, r.req_type, value, r.source_page))
