@@ -42,6 +42,7 @@ class DocumentIngestionResult:
 class PipelineRunResult:
     source_health: str
     documents: List[DocumentIngestionResult] = field(default_factory=list)
+    notices: List[Any] = field(default_factory=list)  # NoticeApplication
     errors: List[str] = field(default_factory=list)
 
 async def get_or_create_source(session: AsyncSession, spec: Dict[str, Any]) -> GovernmentSource:
@@ -159,7 +160,9 @@ async def ingest_advertisement(
             await session.execute(delete(VacancyFieldProvenance).where(VacancyFieldProvenance.vacancy_id == existing.id))
             await session.execute(
                 update(VacancyRequirement)
-                .where(VacancyRequirement.vacancy_id == existing.id, VacancyRequirement.superseded_at.is_(None))
+                .where(VacancyRequirement.vacancy_id == existing.id, VacancyRequirement.superseded_at.is_(None),
+                       # conditions added by later official notices are not part of the advertisement parse
+                       VacancyRequirement.req_type != "NOTICE_CONDITION")
                 .values(superseded_at=datetime.now(timezone.utc))
             )
             for key, val in values.items():
@@ -220,6 +223,17 @@ async def run_upsc_pipeline(session: AsyncSession, client: Optional[httpx.AsyncC
                 raise
             except Exception as e:  # one bad PDF must not abort the others
                 run.errors.append(f"{link.url}: {type(e).__name__}: {e}")
+        # Official notices (clarifications, corrigenda, extensions) are applied after the advertisements
+        from govcareeros.backend.services.notice_ingestion import ingest_notice_pdf
+        for notice in await upsc.discover_notices(client):
+            try:
+                doc = await upsc.download_pdf(client, notice.url)
+                async with session.begin_nested():
+                    run.notices.append(await ingest_notice_pdf(session, source, doc.url, doc.body, notice.title, doc.status, doc.content_type))
+            except upsc.AccessRestricted:
+                raise
+            except Exception as e:
+                run.errors.append(f"{notice.url}: {type(e).__name__}: {e}")
         run.source_health = "HEALTHY" if links and not run.errors else "DEGRADED"
         source.last_success = now
     except upsc.AccessRestricted as e:

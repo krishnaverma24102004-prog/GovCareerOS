@@ -436,9 +436,35 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
 
 # ---------- combination ----------
 
+# ---------- conditions added by later official notices ----------
+
+_NOTICE_CATEGORY_RE = {
+    "OBC": r"\bOBC\b", "SC": r"\bSC\b|scheduled\s+caste", "ST": r"\bST\b|scheduled\s+tribe",
+    "EWS": r"\bEWS\b", "UR": r"\bUR\b|unreserved",
+}
+
+def check_notice_conditions(profile: ProfileSnapshot, reqs: Sequence[Requirement]) -> List[RuleOutcome]:
+    conds = [r for r in reqs if r.req_type == "NOTICE_CONDITION"]
+    if not conds:
+        return []
+    category = normalize_category(profile.category)
+    mine = []
+    for r in conds:
+        text = str(r.value)
+        hit = bool(category and re.search(_NOTICE_CATEGORY_RE.get(category, "$^"), text, re.I))
+        hit = hit or bool(profile.is_pwbd and re.search(r"PwBD|disabilit", text, re.I))
+        hit = hit or bool(profile.is_ex_serviceman and re.search(r"ex-?servicem", text, re.I))
+        if hit:
+            mine.append(r)
+    if not mine:
+        return [RuleOutcome("NOTICE", "NOT_EVALUATED", f"{len(conds)} notice condition(s) do not mention your category", "-", "-")]
+    return [RuleOutcome("NOTICE", "CONDITIONAL", "an official notice adds a condition for your category", str(r.value)[:300],
+                        f"category {category}" + (", PwBD" if profile.is_pwbd else ""), r.id, r.source_page,
+                        note=str(r.value)[:300]) for r in mine]
+
 def evaluate(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Optional[date]) -> List[RuleOutcome]:
     return check_age(profile, reqs, crucial) + check_education(profile, reqs, crucial) + \
-        check_experience(profile, reqs, crucial) + check_citizenship(profile, reqs)
+        check_experience(profile, reqs, crucial) + check_citizenship(profile, reqs) + check_notice_conditions(profile, reqs)
 
 def overall_status(outcomes: Sequence[RuleOutcome]) -> Tuple[str, float]:
     decisive = [o for o in outcomes if o.outcome != "NOT_EVALUATED"]

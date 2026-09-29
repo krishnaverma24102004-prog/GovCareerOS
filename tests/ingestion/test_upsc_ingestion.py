@@ -19,6 +19,9 @@ UPSC = Path(__file__).parents[1] / "fixtures" / "upsc"
 PDFS = {
     "https://www.upsc.gov.in/sites/default/files/AdvtNo-12-2026-Engl-250926_0.pdf": UPSC / "AdvtNo-12-2026-Engl-250926_0.pdf",
     "https://www.upsc.gov.in/sites/default/files/AdvtNo-11-2026-Engl-100926.pdf": UPSC / "AdvtNo-11-2026-Engl-100926.pdf",
+    # Scanned notices linked from the UPSC homepage (captured 29-09-2026)
+    "https://www.upsc.gov.in/sites/default/files/AssttPublProseGNCTD-Notice-Engl-170926Rev.pdf": UPSC / "notices" / "AssttPublProseGNCTD-Notice-Engl-170926Rev.pdf",
+    "https://www.upsc.gov.in/sites/default/files/NoticeCancellation-06-Posts-Advt-13-25-Engl-200826.pdf": UPSC / "notices" / "NoticeCancellation-06-Posts-Advt-13-25-Engl-200826.pdf",
 }
 
 def _portal(status_override=None):
@@ -28,6 +31,8 @@ def _portal(status_override=None):
         url = str(request.url)
         if url == upsc.LISTING_URL:
             return httpx.Response(200, text=(UPSC / "recruitment-advertisement.html").read_text(encoding="utf-8"))
+        if url == upsc.HOME_URL:
+            return httpx.Response(200, text=(UPSC / "home.html").read_text(encoding="utf-8"))
         if url in PDFS:
             return httpx.Response(200, content=PDFS[url].read_bytes(), headers={"content-type": "application/pdf"})
         return httpx.Response(404)
@@ -46,7 +51,9 @@ async def test_pipeline_persists_vacancies_with_provenance(db_session):
     assert run.errors == []
     assert [d.advertisement_number for d in run.documents] == ["12/2026", "11/2026"]
     assert all(d.warnings == [] for d in run.documents)
-    assert await _count(db_session, RawDocument) == 2
+    # 2 advertisements + 2 scanned notices from the homepage
+    raws = (await db_session.execute(select(RawDocument))).scalars().all()
+    assert sorted(r.discovery_method for r in raws) == ["OCR", "OCR", "PDF", "PDF"]
     assert await _count(db_session, Vacancy) == 11
 
     raw = (await db_session.execute(select(RawDocument).where(RawDocument.url.like("%AdvtNo-12%")))).scalar_one()

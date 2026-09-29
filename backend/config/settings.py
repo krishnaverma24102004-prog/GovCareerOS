@@ -24,6 +24,8 @@ class Settings(BaseSettings):
 
     STORAGE_PATH: str = str(PROJECT_ROOT / "storage")
     PLAYWRIGHT_HEADLESS: bool = True
+    # Folder containing eng.traineddata; defaults to the standard Windows Tesseract install
+    TESSDATA_DIR: Optional[str] = None
 
     @property
     def storage_dir(self) -> Path:

@@ -76,11 +76,17 @@ class VacancyFieldProvenance(Base, TimestampMixin):
     vacancy: Mapped['Vacancy'] = relationship(back_populates='provenance')
 
 class VacancyVersion(Base, TimestampMixin):
+    """One official change to a vacancy (clarification, corrigendum, extension, cancellation), with its source document."""
     __tablename__ = 'vacancy_versions'
-    
+    __table_args__ = (UniqueConstraint('vacancy_id', 'raw_document_id', name='uq_vacancy_versions_vacancy_document'),)
+
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     vacancy_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('vacancies.id'), index=True)
     version_hash: Mapped[str] = mapped_column(String(255))
     change_log: Mapped[Optional[str]] = mapped_column(Text)
+    raw_document_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey('raw_documents.id', name='fk_vacancy_versions_raw_document_id'), index=True)
+    change_type: Mapped[Optional[str]] = mapped_column(String(200))  # e.g. "CLARIFICATION", "DATE_EXTENSION,CORRIGENDUM"
+    notice_date: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
+    details: Mapped[Optional[str]] = mapped_column(Text)  # JSON: old/new values, conditions, cited sentences
     
     vacancy: Mapped['Vacancy'] = relationship(back_populates='versions')

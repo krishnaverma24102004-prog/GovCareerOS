@@ -72,3 +72,33 @@ async def download_pdf(client: httpx.AsyncClient, url: str) -> DownloadedDocumen
     if "pdf" not in content_type.lower() and not response.content.startswith(b"%PDF"):
         raise ValueError(f"{url} is not a PDF (content-type {content_type!r})")
     return DownloadedDocument(url=str(response.url), status=response.status_code, content_type=content_type, body=response.content)
+
+HOME_URL = "https://www.upsc.gov.in/"
+# PDFs that modify an earlier advertisement; advertisements themselves (AdvtNo-*) are handled separately
+_NOTICE_HINT_RE = re.compile(r"advt|vacanc|corrigend|addend|clarif|extension|cancel|notice", re.I)
+_ANCHOR_RE = re.compile(r'<a[^>]+href="([^"]+\.pdf)"[^>]*>(.*?)</a>', re.I | re.S)
+
+@dataclass
+class NoticeLink:
+    url: str
+    title: str
+
+def parse_notice_links(html: str, base_url: str) -> List[NoticeLink]:
+    links, seen = [], set()
+    for href, inner in _ANCHOR_RE.findall(html):
+        title = re.sub(r"<[^>]+>|\s+", " ", inner).strip()
+        url = urljoin(base_url, href)
+        name = url.rsplit("/", 1)[-1]
+        if "AdvtNo-" in name or url in seen or not _NOTICE_HINT_RE.search(f"{title} {name}"):
+            continue
+        seen.add(url)
+        links.append(NoticeLink(url=url, title=title))
+    return links
+
+async def discover_notices(client: httpx.AsyncClient) -> List[NoticeLink]:
+    links: List[NoticeLink] = []
+    for page in (HOME_URL, LISTING_URL):
+        response = await client.get(page)
+        _check(response)
+        links += [l for l in parse_notice_links(response.text, str(response.url)) if l.url not in {x.url for x in links}]
+    return links
