@@ -35,6 +35,8 @@ class Vacancy(Base, TimestampMixin):
     parser_version: Mapped[Optional[str]] = mapped_column(String(100))
 
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    # ACTIVE, CANCELLED (set only from an official notice, recorded in vacancy_versions)
+    status: Mapped[str] = mapped_column(String(30), default="ACTIVE", server_default="ACTIVE", index=True)
 
     requirements: Mapped[List['VacancyRequirement']] = relationship(back_populates='vacancy')
     provenance: Mapped[List['VacancyFieldProvenance']] = relationship(back_populates='vacancy')

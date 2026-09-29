@@ -42,7 +42,10 @@ class MatchScore(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('users.id'), index=True)
     vacancy_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('vacancies.id'), index=True)
-    score: Mapped[float] = mapped_column(Float)
+    profile_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey('profile_versions.id', name='fk_match_scores_profile_version_id'), index=True)
+    engine_version: Mapped[Optional[str]] = mapped_column(String(100))
+    score: Mapped[float] = mapped_column(Float)  # 0-100
+    # JSON: [{"name", "score", "weight", "evidence": [...]}, ...] plus the configured weights
     explanation: Mapped[Optional[str]] = mapped_column(Text)
 
 class SkillGap(Base, TimestampMixin):

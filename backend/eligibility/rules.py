@@ -76,6 +76,7 @@ class RuleOutcome:
     source_page: Optional[int] = None
     match_type: Optional[str] = None
     note: Optional[str] = None
+    data: Dict[str, object] = field(default_factory=dict)  # structured facts behind the rule, e.g. years
 
 # ---------- categories ----------
 
@@ -407,7 +408,8 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
 
         if total < required and not undated:
             out.append(RuleOutcome("EXPERIENCE", "NOT_MET", f"{total:.1f} years < {required} years required (all domains counted)",
-                                   short, evidence, req.id, req.source_page))
+                                   short, evidence, req.id, req.source_page,
+                                   data={"years": round(total, 2), "required": required, "relevance_confirmed": False}))
             continue
         if total < required:
             out.append(RuleOutcome("EXPERIENCE", "UNKNOWN", "dated experience is short; undated entries may cover the gap", short, evidence, req.id, req.source_page))
@@ -423,11 +425,13 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
             names = ", ".join(f"{e.designation} @ {e.organization}" for e, _ in relevant)
             outcome = "CONDITIONAL" if notes else "MET"
             out.append(RuleOutcome("EXPERIENCE", outcome, f"{relevant_years:.1f} years matching {sorted(keywords)} >= {required}",
-                                   short, f"{names}; {evidence}", req.id, req.source_page, note="; ".join(notes) or None))
+                                   short, f"{names}; {evidence}", req.id, req.source_page, note="; ".join(notes) or None,
+                                   data={"years": round(relevant_years, 2), "required": required, "relevance_confirmed": True}))
         else:
             out.append(RuleOutcome("EXPERIENCE", "UNKNOWN",
                                    f"{total:.1f} years total >= {required}, but relevance to the required field could not be confirmed",
-                                   short, evidence, req.id, req.source_page, note="; ".join(notes) or None))
+                                   short, evidence, req.id, req.source_page, note="; ".join(notes) or None,
+                                   data={"years": round(relevant_years, 2), "total_years": round(total, 2), "required": required, "relevance_confirmed": False}))
     return out
 
 # ---------- combination ----------
