@@ -1,0 +1,46 @@
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from govcareeros.backend.api.deps import current_user, get_session
+from govcareeros.backend.api.security import hash_password, new_token, token_hash, verify_password
+from govcareeros.backend.models.auth_token import AuthToken
+from govcareeros.backend.models.user import User
+from govcareeros.backend.schemas.api import LoginIn, RegisterIn, TokenOut, UserOut
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+async def register(body: RegisterIn, session: AsyncSession = Depends(get_session)):
+    if (await session.execute(select(User).where(User.email == body.email))).scalar_one_or_none():
+        raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")
+    user = User(email=body.email, hashed_password=hash_password(body.password), full_name=body.full_name)
+    session.add(user)
+    await session.flush()
+    return user
+
+@router.post("/login", response_model=TokenOut)
+async def login(body: LoginIn, session: AsyncSession = Depends(get_session)):
+    user = (await session.execute(select(User).where(User.email == body.email.strip().lower()))).scalar_one_or_none()
+    if user is None or not user.is_active or not verify_password(body.password, user.hashed_password):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid email or password")
+    token, digest, expires_at = new_token()
+    session.add(AuthToken(user_id=user.id, token_hash=digest, expires_at=expires_at))
+    await session.flush()
+    return TokenOut(access_token=token, expires_at=expires_at)
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    creds: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    token = (await session.execute(select(AuthToken).where(AuthToken.token_hash == token_hash(creds.credentials)))).scalar_one()
+    token.revoked_at = datetime.now(timezone.utc)
+
+@router.get("/me", response_model=UserOut)
+async def me(user: User = Depends(current_user)):
+    return user

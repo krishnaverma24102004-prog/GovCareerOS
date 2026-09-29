@@ -1,0 +1,19 @@
+ {
+  "data": {
+    "vacancies": {
+      "edges": [
+        {
+          "node": {
+            "id": "v1",
+            "title": "Software Engineer",
+            "organization": "Gov Tech"
+          }
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": true,
+        "endCursor": "YXJyYXltYWRpbmci
+      }
+    }
+  }
+}

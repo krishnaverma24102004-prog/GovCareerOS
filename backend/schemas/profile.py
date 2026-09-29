@@ -1,0 +1,173 @@
+import uuid
+from datetime import date, datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+class _In(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+class _Out(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+class PersonalInfoIn(_In):
+    full_name: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    category: Optional[str] = Field(None, description="UR/GEN, EWS, OBC, SC, ST")
+    is_pwbd: Optional[bool] = None
+    nationality: Optional[str] = None
+    contact: Optional[str] = None
+    address: Optional[str] = None
+    preferred_locations: Optional[str] = None
+
+class EducationIn(_In):
+    degree: str
+    institution: str
+    university: Optional[str] = None
+    specialization: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    percentage: Optional[float] = None
+    cgpa: Optional[float] = None
+    education_level: Optional[str] = Field(None, description="DIPLOMA, BACHELORS, MASTERS, DOCTORATE")
+    subjects: Optional[str] = None
+    equivalence: Optional[str] = None
+
+class ExperienceIn(_In):
+    organization: str
+    designation: str
+    employment_type: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    responsibilities: Optional[str] = None
+    skills_used: Optional[str] = None
+    domain: Optional[str] = None
+
+class ProjectIn(_In):
+    project_name: str
+    description: Optional[str] = None
+    role: Optional[str] = None
+    technologies: Optional[str] = None
+    domain: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+
+class SkillIn(_In):
+    skill_name: str
+    skill_type: str
+    proficiency: Optional[str] = None
+
+class CertificationIn(_In):
+    name: str
+    issuer: str
+    issue_date: Optional[date] = None
+    expiry_date: Optional[date] = None
+    credential_id: Optional[str] = None
+    verification_url: Optional[str] = None
+
+class LanguageIn(_In):
+    language: str
+    proficiency: str
+
+class AchievementIn(_In):
+    title: str
+    description: Optional[str] = None
+    date: Optional[date] = None
+    evidence: Optional[str] = None
+
+class UserDocumentIn(_In):
+    document_type: str
+    file_path: str
+
+class ProfileIn(_In):
+    """Sections left as null are carried over on PATCH and cleared on PUT."""
+    change_summary: Optional[str] = None
+    personal_info: Optional[PersonalInfoIn] = None
+    education: Optional[List[EducationIn]] = None
+    experience: Optional[List[ExperienceIn]] = None
+    projects: Optional[List[ProjectIn]] = None
+    skills: Optional[List[SkillIn]] = None
+    certifications: Optional[List[CertificationIn]] = None
+    languages: Optional[List[LanguageIn]] = None
+    achievements: Optional[List[AchievementIn]] = None
+    documents: Optional[List[UserDocumentIn]] = None
+
+class PersonalInfoOut(PersonalInfoIn, _Out):
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
+
+    @field_validator("date_of_birth", mode="before")
+    @classmethod
+    def _dt_to_date(cls, v):
+        return v.date() if isinstance(v, datetime) else v
+
+def _out(model):
+    class Out(model):
+        model_config = ConfigDict(from_attributes=True, extra="ignore")
+        id: uuid.UUID
+
+        @field_validator("*", mode="before")
+        @classmethod
+        def _dt_to_date(cls, v, info):
+            ann = cls.model_fields[info.field_name].annotation
+            if isinstance(v, datetime) and ann in (date, Optional[date]):
+                return v.date()
+            return v
+    Out.__name__ = model.__name__.replace("In", "Out")
+    return Out
+
+EducationOut = _out(EducationIn)
+ExperienceOut = _out(ExperienceIn)
+ProjectOut = _out(ProjectIn)
+SkillOut = _out(SkillIn)
+CertificationOut = _out(CertificationIn)
+LanguageOut = _out(LanguageIn)
+AchievementOut = _out(AchievementIn)
+UserDocumentOut = _out(UserDocumentIn)
+
+class ProfileVersionSummary(_Out):
+    id: uuid.UUID
+    version_number: int
+    change_summary: Optional[str]
+    created_at: datetime
+
+class ProfileOut(BaseModel):
+    version: ProfileVersionSummary
+    personal_info: Optional[PersonalInfoOut] = None
+    education: List[EducationOut] = []
+    experience: List[ExperienceOut] = []
+    projects: List[ProjectOut] = []
+    skills: List[SkillOut] = []
+    certifications: List[CertificationOut] = []
+    languages: List[LanguageOut] = []
+    achievements: List[AchievementOut] = []
+    documents: List[UserDocumentOut] = []
+
+class FactIn(_In):
+    subject: str
+    predicate: str
+    value: str
+
+class FactOut(_Out):
+    id: uuid.UUID
+    profile_version_id: uuid.UUID
+    subject: str
+    predicate: str
+    value: str
+    status: str
+    created_at: datetime
+
+class EvidenceIn(_In):
+    evidence_type: str = Field(description="DOCUMENT, USER_ATTESTED, APPROVED")
+    source: Optional[str] = None
+    raw_document_id: Optional[uuid.UUID] = None
+
+class EvidenceOut(_Out):
+    id: uuid.UUID
+    fact_id: uuid.UUID
+    evidence_type: str
+    source: Optional[str]
+    artifact_id: Optional[uuid.UUID]
+    artifact_content_hash: Optional[str] = None
+    artifact_url: Optional[str] = None
+    created_at: datetime

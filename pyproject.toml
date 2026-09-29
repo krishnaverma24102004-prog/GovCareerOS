@@ -1,0 +1,16 @@
+[project]
+name = "govcareeros"
+version = "0.1.0"
+description = "Local-first Government Jobs + Government Exams Career Operating System"
+requires-python = ">=3.12"
+# Runtime dependencies live in requirements.txt (pip install -r requirements.txt)
+
+[tool.pytest.ini_options]
+# Code imports itself as `govcareeros.backend...`, so the parent directory must be on sys.path
+pythonpath = [".."]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+markers = [
+    "postgres: needs a reachable PostgreSQL (TEST_DATABASE_URL); skipped otherwise",
+    "live: hits a real government website over the network",
+]

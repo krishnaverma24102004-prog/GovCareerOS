@@ -1,0 +1,14 @@
+[
+  {
+    "advertisement_number": "MOCK-2026-003",
+    "organization": "Mock Gov Org",
+    "department": "HR",
+    "post_name": "Admin Officer",
+    "vacancy_count": 2,
+    "qualification": "MBA",
+    "application_start": "2026-09-05",
+    "application_deadline": "2026-10-05",
+    "notification_url": "http://127.0.0.1:8000/notif3.pdf",
+    "application_url": "http://127.0.0.1:8000/apply3"
+  }
+]

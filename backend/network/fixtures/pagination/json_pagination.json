@@ -1,0 +1,11 @@
+ {
+  "data": [
+    {"id": 1, "post": "Job A"},
+    {"id": 2, "post": "Job B"}
+  ],
+  "pagination": {
+    "page": 2,
+    "pageSize": 20,
+    "totalPages": 8
+  }
+}

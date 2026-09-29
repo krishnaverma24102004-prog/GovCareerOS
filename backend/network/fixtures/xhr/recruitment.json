@@ -1,0 +1,28 @@
+ [
+  {
+    "advertisement_number": "ADV-2026-001",
+    "post_name": "Assistant Engineer",
+    "department": "Public Works Department",
+    "organization": "State Gov",
+    "vacancy_count": 45,
+    "qualification": "B.E./B.Tech in Civil Engineering",
+    "experience": "0-2 years",
+    "application_start": "2026-09-01T00:00:00Z",
+    "application_deadline": "2026-10-15T23:59:59Z",
+    "notification_url": "https://example.gov.in/notif/001.pdf",
+    "application_url": "https://example.gov.in/apply/001"
+  },
+  {
+    "advertisement_number": "ADV-2026-002",
+    "post_name": "Junior Engineer",
+    "department": "Water Resources",
+    "organization": "State Gov",
+    "vacancy_count": 120,
+    "qualification": "Diploma in Civil Engineering",
+    "experience": "Freshers",
+    "application_start": "2026-09-05T00:00:00Z",
+    "application_deadline": "2026-10-20T23:59:59Z",
+    "notification_url": "https://example.gov.in/notif/002.pdf",
+    "application_url": "https://example.gov.in/apply/002"
+  }
+]

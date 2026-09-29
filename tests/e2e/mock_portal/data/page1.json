@@ -1,0 +1,26 @@
+[
+  {
+    "advertisement_number": "MOCK-2026-001",
+    "organization": "Mock Gov Org",
+    "department": "Digital Services",
+    "post_name": "Software Engineer",
+    "vacancy_count": 10,
+    "qualification": "B.Tech CS",
+    "application_start": "2026-09-01",
+    "application_deadline": "2026-10-01",
+    "notification_url": "http://127.0.0.1:8000/notif1.pdf",
+    "application_url": "http://127.0.0.1:8000/apply1"
+  },
+  {
+    "advertisement_number": "MOCK-2026-002",
+    "organization": "Mock Gov Org",
+    "department": "Digital Services",
+    "post_name": "Data Analyst",
+    "vacancy_count": 5,
+    "qualification": "B.Sc Statistics",
+    "application_start": "2026-09-01",
+    "application_deadline": "2026-10-01",
+    "notification_url": "http://127.0.0.1:8000/notif2.pdf",
+    "application_url": "http://127.0.0.1:8000/apply2"
+  }
+]
