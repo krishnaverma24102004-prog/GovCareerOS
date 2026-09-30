@@ -22,6 +22,8 @@ from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.user import User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance, VacancyRequirement
 from govcareeros.backend.services.document_ingestion import store_raw_document
+from govcareeros.backend.services.source_discovery import source_policy
+from govcareeros.backend.sources.url_guard import UrlRefused
 
 class DraftError(ValueError):
     pass
@@ -155,10 +157,16 @@ async def draft_pending_notices(session: AsyncSession, fetcher, provider, limit:
         stmt = stmt.where(GovernmentSource.name.in_(source_names))
     drafts = []
     for notice, source in (await session.execute(stmt)).all():
-        if not await fetcher.robots_allows(notice.url):
-            notice.review_status = "ROBOTS_DISALLOWED"
+        policy = source_policy(source)
+        try:
+            if not await fetcher.robots_allows(notice.url, policy):
+                notice.review_status = "ROBOTS_DISALLOWED"
+                continue
+            r = await fetcher.get(notice.url, policy)
+        except UrlRefused:
+            # Off-domain, non-https or non-public link (or redirect): never fetched, never evidence
+            notice.review_status = "URL_REFUSED"
             continue
-        r = await fetcher.client.get(notice.url)
         if r.status_code != 200 or not r.content.startswith(b"%PDF"):
             notice.review_status = f"FETCH_FAILED_{r.status_code}"
             continue
