@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.api.deps import current_user, get_session
@@ -90,6 +91,8 @@ async def approve(draft_id: uuid.UUID, body: ApproveIn, user: User = Depends(cur
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     except extraction_drafts.DraftError as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except IntegrityError:  # a concurrent approval already created this vacancy
+        raise HTTPException(status.HTTP_409_CONFLICT, "vacancy already approved")
     return _detail(draft, source, title, url)
 
 @router.post("/drafts/{draft_id}/reject", response_model=DraftDetail)
