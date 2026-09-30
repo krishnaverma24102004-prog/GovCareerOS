@@ -70,6 +70,8 @@ async def apply_notice(session: AsyncSession, source: GovernmentSource, raw_docu
         if parsed.new_closing:
             details["deadline_change"] = {"old": vacancy.application_deadline.isoformat() if vacancy.application_deadline else None,
                                           "new": parsed.new_closing.isoformat()}
+            if parsed.new_closing_finding:
+                details["deadline_change"].update(sentence=parsed.new_closing_finding.text, page=parsed.new_closing_finding.page)
         if parsed.category_conditions:
             details["conditions"] = [{"text": c.text, "page": c.page} for c in parsed.category_conditions]
             for c in parsed.category_conditions:
