@@ -40,7 +40,8 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("UPSC-EXAMS", "Union Public Service Commission", COMMISSION, "https://www.upsc.gov.in/examinations/active-exams"),
     SourceSpec("SSC", "Staff Selection Commission", COMMISSION, "https://ssc.gov.in/"),
     SourceSpec("IBPS", "Institute of Banking Personnel Selection", COMMISSION, "https://www.ibps.in/"),
-    SourceSpec("RRB-CDG", "Railway Recruitment Board Chandigarh", COMMISSION, "https://rrbcdg.gov.in/"),
+    # rrbcdg.gov.in redirects here; the board's pages now live on the Indian Railways domain
+    SourceSpec("RRB-CDG", "Railway Recruitment Board Chandigarh", COMMISSION, "https://rrb.indianrailways.gov.in/chandigarh"),
     SourceSpec("NTA", "National Testing Agency", COMMISSION, "https://nta.ac.in/"),
 
     # Official aggregators covering all ministries

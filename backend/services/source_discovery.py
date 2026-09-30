@@ -55,13 +55,15 @@ async def sync_registry(session: AsyncSession, specs: Iterable[SourceSpec] = SOU
             session.add(source)
         else:
             source.recruitment_url = spec.recruitment_url
+            # The fetch policy is derived from the domain, so it must follow the registry
+            source.official_domain = spec.official_domain
             source.adapter_name = spec.parser or source.adapter_name
         by_name[spec.name] = source
     await session.flush()
     return by_name
 
 def source_policy(source: GovernmentSource) -> UrlPolicy:
-    return UrlPolicy.for_source(source.official_domain, source.recruitment_url)
+    return UrlPolicy.for_source(source.official_domain, source.recruitment_url, source.category)
 
 def _probe_url(source: GovernmentSource) -> str:
     # Reuse a page the locator found earlier, so we don't re-search every run (never an off-domain one)

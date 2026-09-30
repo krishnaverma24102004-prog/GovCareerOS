@@ -160,3 +160,15 @@ async def test_upsc_pdf_redirected_offdomain_is_not_stored(db_session):
     assert "http://127.0.0.1/x.pdf" not in seen
     raws = (await db_session.execute(select(RawDocument.url))).scalars().all()
     assert all(u.startswith("https://www.upsc.gov.in/") for u in raws) and advt not in raws
+
+def test_official_aggregators_may_link_other_government_domains():
+    from govcareeros.backend.sources.url_guard import UrlPolicy
+    ncs = UrlPolicy.for_source("ncs.gov.in", "https://www.ncs.gov.in/", "OFFICIAL_AGGREGATOR")
+    # NCS lists DRDO vacancy PDFs (seen live on 29-09-2026)
+    assert ncs.allows("https://drdo.gov.in/drdo/sites/default/files/vacancy/advtLRDE07092026.pdf")
+    assert ncs.allows("https://recruitment.itbpolice.nic.in/noticeboards/downloadpdf/359.pdf")
+    assert not ncs.allows("https://example.com/job.pdf")
+    assert not ncs.allows("http://drdo.gov.in/x.pdf")          # still https only
+    assert not ncs.allows("https://127.0.0.1/x.pdf")           # still never non-public
+    ministry = UrlPolicy.for_source("mha.gov.in", "https://www.mha.gov.in/en/notifications/vacancies", "MINISTRY")
+    assert not ministry.allows("https://drdo.gov.in/x.pdf")    # other sources stay on their own domain

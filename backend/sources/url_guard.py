@@ -42,14 +42,19 @@ def literal_non_public(url: str) -> bool:
     except ValueError:
         return False
 
+# Official aggregators (NCS, Employment News) link notices hosted on other government domains
+GOVERNMENT_SUFFIXES = ("gov.in", "nic.in")
+
 @dataclass(frozen=True)
 class UrlPolicy:
     domain: str
     allow_http: bool = False
+    extra_suffixes: tuple = ()  # further domains allowed besides `domain` (and their subdomains)
 
     @classmethod
-    def for_source(cls, official_domain: str, recruitment_url: str) -> "UrlPolicy":
-        return cls(site(official_domain), urlparse(recruitment_url).scheme == "http")
+    def for_source(cls, official_domain: str, recruitment_url: str, category: Optional[str] = None) -> "UrlPolicy":
+        extra = GOVERNMENT_SUFFIXES if category == "OFFICIAL_AGGREGATOR" else ()
+        return cls(site(official_domain), urlparse(recruitment_url).scheme == "http", extra)
 
     @classmethod
     def from_url(cls, url: str) -> "UrlPolicy":
@@ -62,8 +67,9 @@ class UrlPolicy:
             return f"scheme {scheme or 'none'!r} not allowed"
         if literal_non_public(url):  # names are checked after DNS resolution by GuardedTransport
             return f"non-public address {host}"
-        if not self.domain or not (host == self.domain or host.endswith("." + self.domain)):
-            return f"host {host!r} is outside {self.domain!r}"
+        allowed = [d for d in (self.domain, *self.extra_suffixes) if d]
+        if not any(host == d or host.endswith("." + d) for d in allowed):
+            return f"host {host!r} is outside {' / '.join(allowed) or 'no domain'!r}"
         return None
 
     def allows(self, url: str) -> bool:
