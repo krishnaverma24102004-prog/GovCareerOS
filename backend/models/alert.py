@@ -12,7 +12,7 @@ class UserAlert(Base, TimestampMixin):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    # NEW_MATCH, DEADLINE_SOON, AGE_HEADROOM, VACANCY_UPDATED, VACANCY_CANCELLED
+    # NEW_MATCH, DEADLINE_SOON, AGE_HEADROOM, VACANCY_UPDATED, VACANCY_CANCELLED, APPLICATION_UPDATE
     kind: Mapped[str] = mapped_column(String(40), index=True)
     dedupe_key: Mapped[str] = mapped_column(String(200))
     title: Mapped[str] = mapped_column(Text)

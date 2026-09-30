@@ -22,6 +22,7 @@ from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance, VacancyRequirement, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import ParsedAdvertisement, ParsedField, parse_advertisement
+from govcareeros.backend.services.application_prep import store_application_requirements
 from govcareeros.backend.sources import upsc
 
 # Fields whose presence makes a parsed vacancy usable for eligibility
@@ -225,8 +226,12 @@ async def ingest_pdf_bytes(
     status: int = 200, content_type: str = "application/pdf", source_url: Optional[str] = None,
 ) -> DocumentIngestionResult:
     raw, created = await store_raw_document(session, source, url, body, status, content_type)
-    parsed = parse_advertisement(extract_pages(body))
+    pages = extract_pages(body)
+    parsed = parse_advertisement(pages)
     result = await ingest_advertisement(session, source, raw, parsed, source_url=source_url)
+    # Documents, fee and how-to-apply instructions from the same advertisement (backend/services/application_prep.py)
+    app_info = await store_application_requirements(session, source, raw, pages, result.advertisement_number)
+    result.warnings += [f"application instructions: {w}" for w in app_info.warnings]
     result.raw_document_created = created
     return result
 
