@@ -82,7 +82,11 @@ def find_quote(quote: str, pages: List[PageText], hint_page: Optional[int]) -> O
             if ratio > best:
                 best, best_at = ratio, (start, window)
         if best >= OCR_MIN_RATIO:
-            return p.page_number, " ".join(best_at[1]), f"OCR_FUZZY({best:.2f})"
+            # Return the page's own text for the matched window, not the normalised tokens
+            flat = re.sub(r"\s+", " ", p.text).strip()
+            m = re.compile(r"[^a-z0-9]*".join(re.escape(t) for t in best_at[1])).search(_norm(flat))
+            doc_text = flat[m.start():m.end()] if m else " ".join(best_at[1])
+            return p.page_number, doc_text, f"OCR_FUZZY({best:.2f})"
     return None
 
 _DATE_PATTERNS = [

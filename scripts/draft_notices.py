@@ -18,7 +18,7 @@ async def main(args) -> int:
     provider = get_provider(args.provider, args.model)
     async with AsyncSessionLocal() as session:
         async with PageFetcher(allow_browser=False) as fetcher:
-            drafts = await draft_pending_notices(session, fetcher, provider, args.limit, args.sources)
+            drafts = await draft_pending_notices(session, fetcher, provider, args.limit, args.sources, commit_each=True)
         await session.commit()
         print(f"{len(drafts)} draft(s) with {provider.name}:{provider.model}")
         for d in drafts:

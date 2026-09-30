@@ -145,7 +145,7 @@ async def reject(session: AsyncSession, draft: ExtractionDraft, reviewer: User, 
     return draft
 
 async def draft_pending_notices(session: AsyncSession, fetcher, provider, limit: int = 5,
-                                source_names: Optional[List[str]] = None) -> List[ExtractionDraft]:
+                                source_names: Optional[List[str]] = None, commit_each: bool = False) -> List[ExtractionDraft]:
     """Create drafts for VACANCY PDF notices of sources without a deterministic parser."""
     stmt = (select(RecruitmentNotice, GovernmentSource).join(GovernmentSource, GovernmentSource.id == RecruitmentNotice.source_id)
             .where(RecruitmentNotice.notice_kind == "VACANCY", RecruitmentNotice.document_type == "PDF",
@@ -164,5 +164,8 @@ async def draft_pending_notices(session: AsyncSession, fetcher, provider, limit:
             continue
         async with session.begin_nested():
             drafts.append(await create_draft(session, source, str(r.url), r.content, provider, notice))
+        if commit_each:
+            # LLM calls take minutes: keep finished drafts even if a later notice fails
+            await session.commit()
     await session.flush()
     return drafts
