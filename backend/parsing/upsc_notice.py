@@ -52,6 +52,7 @@ class ParsedNotice:
     category_conditions: List[NoticeFinding] = field(default_factory=list)
     used_ocr: bool = False
     title: Optional[str] = None
+    new_closing_finding: Optional[NoticeFinding] = None  # page + matched text stating the new closing date
 
 def _norm_year(y: str) -> str:
     return y if len(y) == 4 else f"20{y}"
@@ -95,9 +96,16 @@ def parse_notice(pages: List[PageText], title: Optional[str] = None) -> ParsedNo
     if m:
         hhmm = m.group(1) or "2359"
         new_closing = datetime(int(m.group(5)), int(m.group(4)), int(m.group(3)), int(hhmm[:2]), int(hhmm[2:]), tzinfo=IST)
+    closing_finding = None
+    for p in pages:
+        pm = _NEW_CLOSING_RE.search(re.sub(r"\s+", " ", p.text))
+        if pm:
+            closing_finding = NoticeFinding(pm.group(0), p.page_number)
+            break
 
     conditions = [NoticeFinding(s, pg) for pg, s in _sentences(pages)
                   if _CATEGORY_RE.search(s) and re.search(r"reservation|certificate|considered\s+as|eligib|relax", s, re.I)]
 
     return ParsedNotice(PARSER_VERSION, kinds or ["NOTICE"], advts, vacancies, notice_date, new_closing,
-                        cancellation is not None, cancellation, conditions, any(p.ocr for p in pages), title)
+                        cancellation is not None, cancellation, conditions, any(p.ocr for p in pages), title,
+                        closing_finding if new_closing else None)
