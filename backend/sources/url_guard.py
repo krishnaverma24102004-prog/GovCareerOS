@@ -141,3 +141,10 @@ class Robots:
             self._cache[key] = parser
         parser = self._cache[key]
         return parser is None or parser.can_fetch(self.user_agent, url)
+
+    async def sitemaps(self, url: str, policy: Optional[UrlPolicy] = None) -> List[str]:
+        """`Sitemap:` lines of the host's robots.txt (loaded through `allows`)."""
+        await self.allows(url, policy)
+        parts = urlparse(url)
+        parser = self._cache.get(f"{parts.scheme}://{parts.netloc}")
+        return list(parser.site_maps() or []) if parser else []

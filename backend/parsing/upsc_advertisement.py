@@ -13,8 +13,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from govcareeros.backend.documents.pdf_text import PageText
+from govcareeros.backend.parsing.recruitment_mode import detect_recruitment_mode, govt_service_requirement
 
-PARSER_VERSION = "upsc_advertisement/3"
+PARSER_VERSION = "upsc_advertisement/4"
 IST = timezone(timedelta(hours=5, minutes=30))
 
 _UNITS = {
@@ -73,6 +74,8 @@ _CRUCIAL_DATE_RE = re.compile(
     re.I,
 )
 _APPLICATION_URL_RE = re.compile(r"https://upsconline\.nic\.in", re.I)
+# General Instructions header: the mode of every post in the advertisement unless its own block states one
+_DIRECT_AD_RE = re.compile(r"APPLICATIONS\s+ARE\s+INVITED\s+FOR\s+DIRECT\s+RECRUITMENT", re.I)
 _GENERAL_INSTRUCTIONS_RE = re.compile(r"\(IMPORTANT\)")
 _AGE_LIMIT_RE = re.compile(r"(\d{2})\s+years\s+for\s+([A-Za-z/]+)")
 _AGE_RELAXATION_RE = re.compile(r"relaxable\s+up\s*to\s+(\d{1,2})\s+years\s+for\s+([A-Za-z]+)", re.I)
@@ -207,6 +210,11 @@ def parse_advertisement(pages: List[PageText]) -> ParsedAdvertisement:
         block = re.sub(r"\n\s*\d+\.\s*$", "", text[start:end])
         vacancies.append(_parse_vacancy(doc, start, block, warnings))
 
+    m = _DIRECT_AD_RE.search(text)
+    for vac in vacancies:
+        if "recruitment_mode" not in vac.fields and m:
+            vac.fields["recruitment_mode"] = ParsedField("DIRECT", doc.prov(m.start(), m.end() + 60, "General Instructions"))
+
     general = _parse_general_rules(doc, warnings)
     return ParsedAdvertisement(PARSER_VERSION, ad_fields, vacancies, warnings, general)
 
@@ -314,6 +322,16 @@ def _parse_vacancy(doc: _PagedText, block_start: int, block: str, warnings: List
             continue
         seen.add(name)
         _apply_section(vac, name, body, prov)
+
+    mode = detect_recruitment_mode(block)
+    if mode:
+        mprov = Provenance(page=doc.page_at(block_start + mode.start), section="Recruitment Mode", excerpt=mode.excerpt)
+        vac.fields["recruitment_mode"] = ParsedField(mode.mode, mprov)
+        if mode.mode == "UNKNOWN":
+            warnings.append(f"vacancy {ref}: several recruitment modes stated {sorted(mode.signals)}; mode left UNKNOWN")
+        service = govt_service_requirement(mode)
+        if service:
+            vac.requirements.append(ParsedRequirement("GOVT_SERVICE", service, True, mprov))
 
     # Cross-check: category-wise reservation (excluding the PwBD overlay) must add up to the stated count
     split = [r.value["vacancies"] for r in vac.requirements if r.req_type == "RESERVATION" and r.value["category"] != "PwBD"]

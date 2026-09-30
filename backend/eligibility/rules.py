@@ -11,6 +11,9 @@ Each check returns a RuleOutcome with one of:
 Education equivalence is never assumed: BCA is not B.Tech/BE, and a degree family only
 matches when the requirement text names it (EXACT_MATCH) or explicitly declares the
 candidate's qualification equivalent (EXPLICIT_EQUIVALENCE).
+
+A deputation-only post (GOVT_SERVICE requirement, or Vacancy.recruitment_mode DEPUTATION) needs a
+serving government officer: NOT_MET only when the profile explicitly says the candidate is not one.
 """
 import re
 from dataclasses import dataclass, field
@@ -19,7 +22,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from govcareeros.backend.parsing.upsc_advertisement import words_to_number
 
-ENGINE_VERSION = "hard_eligibility/2"
+ENGINE_VERSION = "hard_eligibility/3"
 
 # ---------- plain inputs ----------
 
@@ -57,6 +60,7 @@ class ProfileSnapshot:
     armed_forces_service_months: Optional[int] = None
     is_central_govt_employee: Optional[bool] = None
     central_govt_service_start: Optional[date] = None
+    is_state_govt_employee: Optional[bool] = None
 
 @dataclass
 class Requirement:
@@ -499,9 +503,42 @@ def check_notice_conditions(profile: ProfileSnapshot, reqs: Sequence[Requirement
                         f"category {category}" + (", PwBD" if profile.is_pwbd else ""), r.id, r.source_page,
                         note=str(r.value)[:300]) for r in mine]
 
-def evaluate(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Optional[date]) -> List[RuleOutcome]:
+# ---------- government service (deputation) ----------
+
+_GOVT_LABEL = {"CENTRAL": "Central Government", "STATE": "State Government"}
+
+def check_govt_service(profile: ProfileSnapshot, reqs: Sequence[Requirement], recruitment_mode: Optional[str] = None) -> List[RuleOutcome]:
+    req = next((r for r in reqs if r.req_type == "GOVT_SERVICE" and isinstance(r.value, dict)), None)
+    if req is None and recruitment_mode != "DEPUTATION":
+        return []
+    # A mode set without its requirement row does not say whose officers may apply
+    open_to = list(req.value.get("open_to") or []) if req else []
+    rid, page = (req.id, req.source_page) if req else (None, None)
+    flags = {"CENTRAL": profile.is_central_govt_employee, "STATE": profile.is_state_govt_employee}
+    counted = open_to or ["CENTRAL", "STATE"]
+    requirement = "deputation: " + (" or ".join(_GOVT_LABEL[g] for g in open_to) + " officers only" if open_to
+                                    else "serving government officers (the notice does not say which governments)")
+    evidence = "; ".join(f"{_GOVT_LABEL[g]} employee: {'not stated' if v is None else v}" for g, v in flags.items())
+    note = "must hold an analogous post or the grade/service the notice states, and apply through the cadre controlling authority"
+    serving = [g for g in counted if flags[g]]
+    if serving and (open_to or "CENTRAL" in serving):
+        return [RuleOutcome("GOVT_SERVICE", "CONDITIONAL", f"serving {_GOVT_LABEL[serving[0]]} employee", requirement, evidence,
+                            rid, page, note=note)]
+    if serving:
+        # Only a State Government employee, and the notice is silent on State officers
+        return [RuleOutcome("GOVT_SERVICE", "UNKNOWN", "the notice does not say whether State Government employees may apply",
+                            requirement, evidence, rid, page)]
+    if all(flags[g] is False for g in counted):
+        excluded = [g for g in flags if g not in counted and flags[g]]
+        why = f"{_GOVT_LABEL[excluded[0]]} employees are not eligible for this post" if excluded else "profile: not a government employee"
+        return [RuleOutcome("GOVT_SERVICE", "NOT_MET", why, requirement, evidence, rid, page)]
+    return [RuleOutcome("GOVT_SERVICE", "UNKNOWN", "government employment not stated in profile", requirement, evidence, rid, page)]
+
+def evaluate(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Optional[date],
+             recruitment_mode: Optional[str] = None) -> List[RuleOutcome]:
     return check_age(profile, reqs, crucial) + check_education(profile, reqs, crucial) + \
-        check_experience(profile, reqs, crucial) + check_citizenship(profile, reqs) + check_notice_conditions(profile, reqs)
+        check_experience(profile, reqs, crucial) + check_citizenship(profile, reqs) + check_notice_conditions(profile, reqs) + \
+        check_govt_service(profile, reqs, recruitment_mode)
 
 def overall_status(outcomes: Sequence[RuleOutcome]) -> Tuple[str, float]:
     decisive = [o for o in outcomes if o.outcome != "NOT_EVALUATED"]

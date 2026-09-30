@@ -1,0 +1,21 @@
+{
+ "nabard.org.sitemap.xml": {
+  "source_url": "https://www.nabard.org/sitemap.xml",
+  "captured_at": "2026-09-30",
+  "sha256": "dd5f00000479c6f829aafef7133572f6c1ec5f1d8544b9174e79cade4ee96c4c",
+  "fetched_via": "PageFetcher (robots.txt allowed, url_guard policy)"
+ },
+ "meity.gov.in.sitemap.xml": {
+  "source_url": "https://www.meity.gov.in/sitemap.xml",
+  "captured_at": "2026-09-30",
+  "sha256": "b52b4b87017ce53975f5214a829cbda7a00b73d81aa90aa6641f9444e6081b50",
+  "fetched_via": "PageFetcher (robots.txt allowed, url_guard policy)"
+ },
+ "nabard.org.careers-notices1.cid693.html": {
+  "source_url": "https://www.nabard.org/careers-notices1.aspx?cid=693&id=26",
+  "captured_at": "2026-09-30",
+  "sha256": "eb94cc7b0ddbb140fffa13eb9cb7d0fbbbe9c582b7482ffcb555ce752a01e430",
+  "fetched_via": "PageFetcher (robots.txt allowed, url_guard policy)",
+  "note": "listing page the sitemap locator found for NABARD"
+ }
+}

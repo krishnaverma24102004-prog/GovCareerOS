@@ -3,24 +3,29 @@ Notice PDF -> RawDocument -> LLM-located + validator-checked draft -> human revi
 
 Only fields the validator accepted can reach the database, and they are stored as the
 document's own words (verified quote) or values parsed from those words by fixed rules.
+The recruitment mode (parsing/recruitment_mode.py) is read by fixed rules from the verified
+quotes, else from the notice's own text layer, and stored with the deciding sentence.
 """
 import json
+import os
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from govcareeros.backend.documents.pdf_text import extract_pages
+from govcareeros.backend.documents.pdf_text import PageText, extract_pages
 from govcareeros.backend.extraction.llm_extractor import ExtractionResult, extract
 from govcareeros.backend.extraction.validator import ALL_FIELDS, FieldVerdict
+from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.extraction import ExtractionDraft
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.user import User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance, VacancyRequirement
+from govcareeros.backend.parsing.recruitment_mode import ModeDetection, detect_in_pages, detect_recruitment_mode, govt_service_requirement
 from govcareeros.backend.services.document_ingestion import store_raw_document
 from govcareeros.backend.services.source_discovery import source_policy
 from govcareeros.backend.sources.url_guard import UrlRefused
@@ -69,6 +74,28 @@ def _accepted(fields: Dict[str, Dict[str, Any]], name: str) -> Optional[Dict[str
     f = fields.get(name)
     return f if f and f.get("accepted") else None
 
+# Verified quotes that can state how a post is filled, most specific first
+_MODE_QUOTE_FIELDS = ("mode_of_selection", "post_name", "essential_qualification", "experience", "how_to_apply")
+
+def _document_pages(raw: Optional[RawDocument]) -> List[PageText]:
+    if raw is None or not raw.storage_path or not os.path.isfile(raw.storage_path):
+        return []
+    with open(raw.storage_path, "rb") as fh:
+        # Text layer only: OCR takes minutes and approval is a request; scanned notices still get
+        # their mode from the verified quotes
+        return extract_pages(fh.read(), ocr=False)
+
+def recruitment_mode(fields: Dict[str, Dict[str, Any]], doc_pages: List[PageText]) -> Optional[Tuple[ModeDetection, str]]:
+    """Mode from the vacancy's own verified quotes, else from the whole notice; with where it was read."""
+    for name in _MODE_QUOTE_FIELDS:
+        f = _accepted(fields, name)
+        found = detect_recruitment_mode(f["quote"]) if f and f.get("quote") else None
+        if found:
+            found.page = f["page"]
+            return found, f"LLM-located quote ({name}), reviewer-approved; mode read by fixed rules"
+    found = detect_in_pages(doc_pages) if doc_pages else None
+    return (found, "notice text, mode read by fixed rules") if found else None
+
 def _undecided(payload: Dict[str, Any]) -> List[int]:
     return [i for i, v in enumerate(payload["vacancies"]) if not v.get("decision")]
 
@@ -103,6 +130,7 @@ async def approve(session: AsyncSession, draft: ExtractionDraft, reviewer: User,
         if _accepted(payload["vacancies"][i]["fields"], "post_name") is None:
             raise DraftError(f"vacancy {i} has no verified post name and cannot be approved")
     created: List[Vacancy] = []
+    doc_pages = _document_pages(await session.get(RawDocument, draft.raw_document_id))
     for i in indexes:
         fields = payload["vacancies"][i]["fields"]
         post = _accepted(fields, "post_name")
@@ -111,7 +139,9 @@ async def approve(session: AsyncSession, draft: ExtractionDraft, reviewer: User,
         pay = _accepted(fields, "pay_level")
         org = _accepted(fields, "organization")
         n_accepted = sum(1 for n in ALL_FIELDS if _accepted(fields, n))
+        mode = recruitment_mode(fields, doc_pages)
         vacancy = Vacancy(
+            recruitment_mode=mode[0].mode if mode else "UNKNOWN",
             id=uuid.uuid4(), organization=source.organization, department=(org["value"][:255] if org else None),
             post_name=post["value"][:255], vacancy_count=count["value"] if count else None,
             external_ref=f"draft:{draft.id}:{i}", pay_scale=pay["value"] if pay else None,
@@ -128,6 +158,19 @@ async def approve(session: AsyncSession, draft: ExtractionDraft, reviewer: User,
                 session.add(VacancyFieldProvenance(
                     vacancy_id=vacancy.id, field_name=name, value=str(f["value"]), raw_document_id=draft.raw_document_id,
                     page=f["page"], section=f"LLM-located ({f['match']}), reviewer-approved", excerpt=f["quote"][:2000],
+                ))
+        if mode:
+            found, section = mode
+            session.add(VacancyFieldProvenance(
+                vacancy_id=vacancy.id, field_name="recruitment_mode", value=found.mode, raw_document_id=draft.raw_document_id,
+                page=found.page, section=section, excerpt=found.excerpt,
+            ))
+            service = govt_service_requirement(found)
+            if service:
+                session.add(VacancyRequirement(
+                    vacancy_id=vacancy.id, req_type="GOVT_SERVICE", value=json.dumps(service), is_mandatory=True,
+                    raw_document_id=draft.raw_document_id, source_page=found.page, source_section=section,
+                    source_excerpt=found.excerpt[:400],
                 ))
         reqs = []
         for name, req_type, mandatory in (("essential_qualification", "EDUCATION", True), ("experience", "EXPERIENCE", True),

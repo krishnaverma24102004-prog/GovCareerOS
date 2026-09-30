@@ -180,6 +180,7 @@ async def ingest_advertisement(
             raw_document_id=raw.id,
             parser_version=parsed.parser_version,
             confidence=_confidence(fields, req_types),
+            recruitment_mode=pv.value("recruitment_mode") or "UNKNOWN",
         )
         if existing is not None:
             # Same document, newer parser: keep the vacancy id stable. Old requirement rows are superseded,

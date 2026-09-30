@@ -21,7 +21,7 @@ from govcareeros.backend.models.vacancy import Vacancy, VacancyRequirement
 from govcareeros.backend.parsing.upsc_advertisement import IST
 
 # Requirement types whose value column holds JSON
-JSON_REQUIREMENTS = {"AGE_MAX", "AGE_RELAXATION", "RESERVATION", "AGE_RELAXATION_RULE", "CITIZENSHIP", "PWBD_SUITABILITY"}
+JSON_REQUIREMENTS = {"AGE_MAX", "AGE_RELAXATION", "RESERVATION", "AGE_RELAXATION_RULE", "CITIZENSHIP", "PWBD_SUITABILITY", "GOVT_SERVICE"}
 
 class EligibilityInputError(ValueError):
     pass
@@ -49,6 +49,7 @@ async def load_profile_snapshot(session: AsyncSession, profile_version_id: uuid.
         armed_forces_service_months=info.armed_forces_service_months if info else None,
         is_central_govt_employee=info.is_central_govt_employee if info else None,
         central_govt_service_start=rules.to_date(info.central_govt_service_start) if info else None,
+        is_state_govt_employee=info.is_state_govt_employee if info else None,
         education=[rules.EducationEntry(e.degree, e.specialization, e.education_level, rules.to_date(e.end_date), e.equivalence)
                    for e in await rows(Education)],
         experience=[rules.ExperienceEntry(e.organization, e.designation, e.domain, e.responsibilities,
@@ -72,7 +73,8 @@ async def load_requirements(session: AsyncSession, vacancy_id: uuid.UUID) -> Lis
 def input_fingerprint(vacancy: Vacancy, reqs: List[rules.Requirement]) -> str:
     """Identifies the vacancy-side inputs of a decision; requirement rows are never edited in place, only superseded."""
     crucial_dt = vacancy.eligibility_crucial_date or vacancy.application_deadline
-    parts = [rules.ENGINE_VERSION, crucial_dt.astimezone(timezone.utc).isoformat() if crucial_dt else "-", *sorted(str(r.id) for r in reqs)]
+    parts = [rules.ENGINE_VERSION, crucial_dt.astimezone(timezone.utc).isoformat() if crucial_dt else "-",
+             vacancy.recruitment_mode or "UNKNOWN", *sorted(str(r.id) for r in reqs)]
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
 async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id: uuid.UUID, vacancy_id: uuid.UUID) -> EligibilityResult:
@@ -89,7 +91,7 @@ async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id
     crucial_dt = vacancy.eligibility_crucial_date or vacancy.application_deadline
     crucial = crucial_dt.astimezone(IST).date() if crucial_dt else None
 
-    outcomes = rules.evaluate(snapshot, reqs, crucial)
+    outcomes = rules.evaluate(snapshot, reqs, crucial, vacancy.recruitment_mode)
     if vacancy.eligibility_crucial_date is None and vacancy.application_deadline is not None:
         outcomes.append(rules.RuleOutcome("CRUCIAL_DATE", "NOT_EVALUATED",
                                           "the notice text used does not state a crucial date; the closing date was used for age and experience",

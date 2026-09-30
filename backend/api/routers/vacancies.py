@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -16,10 +16,13 @@ router = APIRouter(prefix="/vacancies", tags=["vacancies"], dependencies=[Depend
 @router.get("", response_model=List[VacancySummary])
 async def list_vacancies(
     q: Optional[str] = Query(None, description="substring of post name, ministry or department"),
+    recruitment_mode: Optional[Literal["DIRECT", "DEPUTATION", "CONTRACT", "WALK_IN", "UNKNOWN"]] = None,
     limit: int = Query(50, le=200), offset: int = 0,
     session: AsyncSession = Depends(get_session),
 ):
     stmt = select(Vacancy).order_by(Vacancy.application_deadline.desc().nulls_last(), Vacancy.post_name)
+    if recruitment_mode:
+        stmt = stmt.where(Vacancy.recruitment_mode == recruitment_mode)
     if q:
         like = f"%{q}%"
         stmt = stmt.where(Vacancy.post_name.ilike(like) | Vacancy.ministry.ilike(like) | Vacancy.department.ilike(like))

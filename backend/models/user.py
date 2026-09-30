@@ -55,6 +55,8 @@ class PersonalInfo(Base, TimestampMixin):
     armed_forces_service_months: Mapped[Optional[int]] = mapped_column(Integer)
     is_central_govt_employee: Mapped[Optional[bool]] = mapped_column(Boolean)
     central_govt_service_start: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    # Deputation posts are open only to serving government officers; None = not stated
+    is_state_govt_employee: Mapped[Optional[bool]] = mapped_column(Boolean)
     # Free text the candidate writes: posts/departments/fields they want (used only for relevance, never eligibility)
     career_interests: Mapped[Optional[str]] = mapped_column(Text)
     nationality: Mapped[Optional[str]] = mapped_column(String(100))
