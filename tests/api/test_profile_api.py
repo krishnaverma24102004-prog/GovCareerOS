@@ -2,9 +2,11 @@
 Profile API, called over HTTP (ASGI) against SQLite and PostgreSQL:
 versioning, historical snapshots, facts -> evidence -> RawDocument, and cross-user authorization.
 """
+import asyncio
 from datetime import datetime, timezone
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import func, select
 
 from govcareeros.backend.models import AuthToken, GovernmentSource, RawDocument, User
@@ -87,6 +89,68 @@ async def test_unknown_fields_are_rejected(api, login):
     h = await login("asha@example.com")
     r = await api.put("/profile", json={"education": [{"degree": "BCA", "institution": "U", "is_btech": True}]}, headers=h)
     assert r.status_code == 422
+
+@pytest.mark.asyncio
+async def test_impossible_date_of_birth_is_rejected(api, login):
+    h = await login("asha@example.com")
+    for dob in ("2030-01-01", "1900-01-01"):
+        bad = {"personal_info": {**V1["personal_info"], "date_of_birth": dob}}
+        assert (await api.put("/profile", json=bad, headers=h)).status_code == 422
+        assert (await api.patch("/profile", json=bad, headers=h)).status_code == 422
+    assert (await api.get("/profile", headers=h)).status_code == 404
+
+@pytest_asyncio.fixture
+async def api_per_request_session(db_session, tmp_path):
+    """Like `api`, but each request gets its own session and connection, as in production, so requests can race.
+    The shared in-memory SQLite has a single connection, so SQLite runs on a file here."""
+    import httpx
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    from govcareeros.backend.api.deps import get_session
+    from govcareeros.backend.api.main import create_app
+    from govcareeros.backend.models.base import Base
+
+    engine = db_session.bind
+    if engine.dialect.name == "sqlite":
+        engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'concurrent.db'}")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    sessions = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+    async def _session():
+        async with sessions() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app = create_app()
+    app.dependency_overrides[get_session] = _session
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        yield client
+    if engine is not db_session.bind:
+        await engine.dispose()
+
+@pytest.mark.asyncio
+async def test_concurrent_saves_get_distinct_version_numbers(api_per_request_session):
+    api = api_per_request_session
+    await api.post("/auth/register", json={"email": "asha@example.com", "password": "correct-horse-battery"})
+    token = (await api.post("/auth/login", json={"email": "asha@example.com", "password": "correct-horse-battery"})).json()["access_token"]
+    h = {"Authorization": f"Bearer {token}"}
+    assert (await api.put("/profile", json=V1, headers=h)).status_code == 201
+    # Five tabs saving at once
+    responses = await asyncio.gather(*[
+        api.patch("/profile", json={"change_summary": f"tab {i}", "skills": [{"skill_name": f"S{i}", "skill_type": "Technical"}]}, headers=h)
+        for i in range(5)])
+    assert [r.status_code for r in responses] == [201] * 5, [r.text for r in responses]
+    assert sorted(r.json()["version"]["version_number"] for r in responses) == [2, 3, 4, 5, 6]
+    for r in responses:  # each version holds its own skills and the carried-over education
+        body = r.json()
+        assert [s["skill_name"] for s in body["skills"]] == ["S" + body["version"]["change_summary"][-1]]
+        assert [e["degree"] for e in body["education"]] == ["BCA"]
+    assert [v["version_number"] for v in (await api.get("/profile/versions", headers=h)).json()] == [1, 2, 3, 4, 5, 6]
+    assert (await api.get("/profile", headers=h)).json()["version"]["version_number"] == 6
 
 @pytest.mark.asyncio
 async def test_fact_evidence_raw_document_chain(api, login, db_session):

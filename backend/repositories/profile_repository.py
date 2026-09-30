@@ -1,7 +1,7 @@
 import uuid
 from typing import Any, Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, delete, func, update
 from govcareeros.backend.models.user import User, ProfileVersion, Education, Experience, Skill, Project, Certification, Language, Achievement, PersonalInfo, UserDocument
 from govcareeros.backend.models.fact import Fact, Evidence
 
@@ -34,6 +34,11 @@ class ProfileRepository:
     async def get_profile_version(self, version_id: uuid.UUID) -> Optional[ProfileVersion]:
         return await self.session.get(ProfileVersion, version_id)
 
+    async def lock_user(self, user_id: uuid.UUID) -> None:
+        """Serialise a user's profile saves until commit (row lock on PostgreSQL, write lock on SQLite), so a save
+        reads the latest *committed* version to carry over; SELECT ... FOR UPDATE would be a no-op on SQLite."""
+        await self.session.execute(update(User).where(User.id == user_id).values(updated_at=func.now()))
+
     async def next_version_number(self, user_id: uuid.UUID) -> int:
         res = await self.session.execute(
             select(func.max(ProfileVersion.version_number)).where(ProfileVersion.user_id == user_id)
@@ -55,7 +60,7 @@ class ProfileRepository:
     async def latest_version(self, user_id: uuid.UUID) -> Optional[ProfileVersion]:
         res = await self.session.execute(
             select(ProfileVersion).where(ProfileVersion.user_id == user_id)
-            .order_by(ProfileVersion.version_number.desc()).limit(1)
+            .order_by(ProfileVersion.version_number.desc(), ProfileVersion.created_at.desc()).limit(1)
         )
         return res.scalar_one_or_none()
 
