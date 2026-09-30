@@ -20,7 +20,7 @@ from govcareeros.backend.config.settings import settings
 from govcareeros.backend.documents.pdf_text import extract_pages
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.source import GovernmentSource
-from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance, VacancyRequirement
+from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance, VacancyRequirement, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import ParsedAdvertisement, ParsedField, parse_advertisement
 from govcareeros.backend.sources import upsc
 
@@ -100,6 +100,32 @@ def _confidence(fields: Dict[str, ParsedField], req_types: set) -> float:
     present = sum(1 for f in _CORE_FIELDS if fields.get(f) and fields[f].value is not None)
     present += sum(1 for r in _CORE_REQUIREMENTS if r in req_types)
     return round(present / (len(_CORE_FIELDS) + len(_CORE_REQUIREMENTS)), 2)
+
+async def apply_official_notices(session: AsyncSession, vacancy: Vacancy) -> None:
+    """Sets the vacancy's deadline and status to what the latest official notice says.
+
+    Recomputed from the advertisement's own closing date plus every VacancyVersion, ordered by notice
+    date then by when the notice was retrieved, so neither a reparse nor the order notices are found in
+    decides the result. Undated notices count as older than dated ones.
+    """
+    base = (await session.execute(select(VacancyFieldProvenance.value).where(
+        VacancyFieldProvenance.vacancy_id == vacancy.id, VacancyFieldProvenance.raw_document_id == vacancy.raw_document_id,
+        VacancyFieldProvenance.field_name == "application_deadline"))).scalar_one_or_none()
+    rows = (await session.execute(
+        select(VacancyVersion.notice_date, VacancyVersion.details, RawDocument.retrieved_at)
+        .outerjoin(RawDocument, RawDocument.id == VacancyVersion.raw_document_id)
+        .where(VacancyVersion.vacancy_id == vacancy.id)
+    )).all()
+    oldest = datetime.min.replace(tzinfo=timezone.utc)
+    deadline = datetime.fromisoformat(base) if base else vacancy.application_deadline
+    for _, details, _ in sorted(rows, key=lambda r: (r.notice_date or oldest, r.retrieved_at or oldest)):
+        details = json.loads(details or "{}")
+        if details.get("deadline_change", {}).get("new"):
+            deadline = datetime.fromisoformat(details["deadline_change"]["new"])
+        if "cancellation" in details:
+            vacancy.status = "CANCELLED"
+    vacancy.application_deadline = deadline
+    await session.flush()
 
 async def ingest_advertisement(
     session: AsyncSession, source: GovernmentSource, raw: RawDocument, parsed: ParsedAdvertisement,
@@ -188,6 +214,9 @@ async def ingest_advertisement(
                 source_section=req.provenance.section, source_excerpt=req.provenance.excerpt,
             ))
         await session.flush()
+        if existing is not None:
+            # The parse restored the advertisement's own dates; notices already applied still stand
+            await apply_official_notices(session, vacancy)
 
     return result
 

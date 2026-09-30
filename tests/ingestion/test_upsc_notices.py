@@ -4,6 +4,7 @@ Official UPSC notices (scanned; read via OCR) captured from upsc.gov.in on 29-09
  - Change of recruitment process for six posts of Advt 13/2025 (scrutiny cancelled, not the posts)
 """
 import json
+from datetime import date, datetime
 from pathlib import Path
 
 import httpx
@@ -12,8 +13,10 @@ from sqlalchemy import select
 
 from govcareeros.backend.documents.pdf_text import extract_pages, tessdata_dir
 from govcareeros.backend.models import RecruitmentNotice, Vacancy, VacancyRequirement, VacancyVersion
+from govcareeros.backend.parsing import upsc_advertisement
+from govcareeros.backend.parsing.upsc_advertisement import IST
 from govcareeros.backend.parsing.upsc_notice import parse_notice
-from govcareeros.backend.services.document_ingestion import run_upsc_pipeline
+from govcareeros.backend.services.document_ingestion import get_or_create_source, ingest_pdf_bytes, run_upsc_pipeline
 from govcareeros.backend.sources import upsc
 
 UPSC = Path(__file__).parents[1] / "fixtures" / "upsc"
@@ -127,3 +130,33 @@ async def test_notice_condition_reaches_eligibility_for_obc_only(api, login, db_
     sc = (await api.put("/profile", json=profile, headers=h)).json()["version"]["id"]
     res = (await api.post("/eligibility", json={"profile_version_id": sc, "vacancy_id": app_id}, headers=h)).json()
     assert [e["outcome"] for e in res["evidence"] if e["check_name"] == "NOTICE"] == ["NOT_EVALUATED"]
+
+@pytest.mark.asyncio
+async def test_latest_notice_decides_deadline_across_order_and_reparse(db_session, monkeypatch, apply_extension):
+    source = await get_or_create_source(db_session, upsc.UPSC_SOURCE)
+    advt = UPSC / "AdvtNo-11-2026-Engl-100926.pdf"
+    advt_url = f"https://www.upsc.gov.in/sites/default/files/{advt.name}"
+    await ingest_pdf_bytes(db_session, source, advt_url, advt.read_bytes())
+    app = (await db_session.execute(select(Vacancy).where(Vacancy.external_ref == "26091106212"))).scalar_one()
+    stated = app.application_deadline
+    assert stated == datetime(2026, 10, 2, 18, 0, tzinfo=IST)
+
+    # The newer notice is found first; the older one arriving later must not pull the date back
+    newer, older = datetime(2026, 10, 30, 23, 59, tzinfo=IST), datetime(2026, 10, 20, 23, 59, tzinfo=IST)
+    await apply_extension(source, APP_NOTICE, "26091106212", date(2026, 10, 5), newer)
+    await apply_extension(source, PROCESS_NOTICE, "26091106212", date(2026, 10, 1), older)
+    await db_session.commit()
+    assert app.application_deadline == newer
+
+    # A parser upgrade re-reads the advertisement (which still says 02-10-2026); the extension stands
+    monkeypatch.setattr(upsc_advertisement, "PARSER_VERSION", "upsc_advertisement/99")
+    res = await ingest_pdf_bytes(db_session, source, advt_url, advt.read_bytes())
+    await db_session.commit()
+    assert app.id in res.reparsed_vacancy_ids and app.parser_version == "upsc_advertisement/99"
+    await db_session.refresh(app)
+    assert app.application_deadline == newer
+    again = await apply_extension(source, APP_NOTICE, "26091106212", date(2026, 10, 5), newer)
+    assert again.already_applied_vacancy_ids == [app.id] and app.application_deadline == newer
+    # Other vacancies of the advertisement keep the advertisement's date
+    other = (await db_session.execute(select(Vacancy).where(Vacancy.advertisement_number == "11/2026", Vacancy.id != app.id))).scalars().first()
+    assert other.application_deadline == stated

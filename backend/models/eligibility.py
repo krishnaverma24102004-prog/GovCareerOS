@@ -17,6 +17,9 @@ class EligibilityResult(Base, TimestampMixin):
     crucial_date: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
     status: Mapped[str] = mapped_column(String(100))  # ELIGIBLE, INELIGIBLE, CONDITIONAL, MANUAL_REVIEW
     confidence: Mapped[float] = mapped_column(Float)
+    # Hash of the vacancy inputs the decision used (active requirement ids, crucial date, engine version);
+    # a different value means the vacancy changed since and the result is stale
+    input_fingerprint: Mapped[Optional[str]] = mapped_column(String(64))
 
     evidence: Mapped[List['EligibilityEvidence']] = relationship(back_populates='result')
 

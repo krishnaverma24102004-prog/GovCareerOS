@@ -3,7 +3,7 @@ LLM draft -> validator -> review queue -> Vacancy, on a real BSF walk-in notice 
 real output nvidia/nemotron-3-super-120b-a12b produced for it on 30-09-2026 (replayed, not generated).
 """
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -13,8 +13,9 @@ from govcareeros.backend.documents.pdf_text import extract_pages, tessdata_dir
 from govcareeros.backend.extraction.llm_extractor import extract
 from govcareeros.backend.extraction.validator import IST
 from govcareeros.backend.llm.provider import LLMResponse
-from govcareeros.backend.models import User, Vacancy, VacancyFieldProvenance, VacancyRequirement
+from govcareeros.backend.models import User, UserAlert, Vacancy, VacancyFieldProvenance, VacancyRequirement
 from govcareeros.backend.services.extraction_drafts import create_draft
+from govcareeros.backend.services.radar import run_radar
 from govcareeros.backend.services.source_discovery import sync_registry
 from govcareeros.backend.sources.registry import SOURCES
 
@@ -115,3 +116,25 @@ async def test_reject_leaves_no_vacancy(api, login, db_session):
     assert (await api.post(f"/review/drafts/{draft_id}/reject", json={"note": "walk-in already held"}, headers=h)).json()["status"] == "REJECTED"
     assert (await db_session.execute(select(Vacancy))).scalars().all() == []
     assert (await api.get("/review/drafts", headers=h)).json() == []
+
+@pytest.mark.asyncio
+async def test_single_all_category_limit_drives_age_headroom(api, login, db_session):
+    # BSF states one limit for everyone ("Not more than 67 years"), stored as category ALL
+    draft = await _draft(db_session)
+    draft_id = draft.id
+    h = await login("reviewer@example.com")
+    (await db_session.execute(select(User).where(User.email == "reviewer@example.com"))).scalar_one().is_reviewer = True
+    await db_session.commit()
+    assert (await api.post(f"/review/drafts/{draft_id}/approve", json={"vacancy_indexes": [0]}, headers=h)).status_code == 200
+
+    # 66 on the closing date 03-09-2025: one year of headroom under 67
+    profile = {"personal_info": {"date_of_birth": "1959-01-15", "category": "OBC", "citizenship_status": "INDIAN_CITIZEN",
+                                 "is_pwbd": False, "is_ex_serviceman": False, "is_central_govt_employee": False},
+               "education": [{"degree": "MBBS", "institution": "AIIMS", "end_date": "1983-06-30"}]}
+    await api.put("/profile", json=profile, headers=h)
+    run = await run_radar(db_session, now=datetime(2025, 9, 1, 6, 0, tzinfo=timezone.utc))
+    await db_session.commit()
+    # The OCR'd experience clause ("1% years") keeps the verdict at MANUAL_REVIEW; the age limit still binds
+    assert run.alerts_created.get("AGE_HEADROOM") == 1
+    alert = (await db_session.execute(select(UserAlert).where(UserAlert.kind == "AGE_HEADROOM"))).scalar_one()
+    assert "You are 66" in alert.body and "the ALL limit for this post is 67" in alert.body and "from 15 Jan 2027" in alert.body

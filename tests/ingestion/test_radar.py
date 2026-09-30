@@ -2,7 +2,7 @@
 Eligibility radar over the real UPSC data captured on 29-09-2026 (Advt 11/2026, 12/2026 and the
 scanned notices). "now" is pinned to that date so deadline windows stay meaningful.
 """
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -10,12 +10,15 @@ import pytest
 from sqlalchemy import select
 
 from govcareeros.backend.documents.pdf_text import tessdata_dir
-from govcareeros.backend.models import UserAlert, Vacancy
-from govcareeros.backend.services.document_ingestion import run_upsc_pipeline
+from govcareeros.backend.models import EligibilityEvidence, EligibilityResult, UserAlert, Vacancy
+from govcareeros.backend.parsing.upsc_advertisement import IST
+from govcareeros.backend.services.document_ingestion import get_or_create_source, ingest_pdf_bytes, run_upsc_pipeline
+from govcareeros.backend.services.notice_ingestion import ingest_notice_pdf
 from govcareeros.backend.services.radar import age_out_date, run_radar
 from govcareeros.backend.sources import upsc
 
 UPSC = Path(__file__).parents[1] / "fixtures" / "upsc"
+NOTICE_DIR = UPSC / "notices"
 NOW = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
 
 pytestmark = pytest.mark.skipif(tessdata_dir() is None, reason="scanned notices need Tesseract")
@@ -121,3 +124,53 @@ async def test_new_profile_version_is_rechecked(api, login, db_session):
     assert "DEADLINE_SOON" not in second.alerts_created  # deadline alerts are per vacancy, not repeated per version
     rows = (await db_session.execute(select(UserAlert).where(UserAlert.kind == "NEW_MATCH"))).scalars().all()
     assert len({r.profile_version_id for r in rows}) == 2
+
+@pytest.mark.asyncio
+async def test_vacancy_changes_are_rechecked_and_realerted(api, login, db_session, apply_extension):
+    source = await get_or_create_source(db_session, upsc.UPSC_SOURCE)
+    advt = UPSC / "AdvtNo-11-2026-Engl-100926.pdf"
+    await ingest_pdf_bytes(db_session, source, f"https://www.upsc.gov.in/sites/default/files/{advt.name}", advt.read_bytes())
+    await db_session.commit()
+    app = (await db_session.execute(select(Vacancy).where(Vacancy.external_ref == "26091106212"))).scalar_one()
+    h = await login("asha@example.com")
+    await api.put("/profile", json=law_profile("1995-03-10"), headers=h)
+
+    async def results():
+        return (await db_session.execute(select(EligibilityResult).where(EligibilityResult.vacancy_id == app.id))).scalars().all()
+
+    async def deadline_alerts():
+        return (await db_session.execute(select(UserAlert).where(
+            UserAlert.kind == "DEADLINE_SOON", UserAlert.vacancy_id == app.id))).scalars().all()
+
+    await run_radar(db_session, now=NOW)
+    await db_session.commit()
+    async def notice_checks(result):
+        return (await db_session.execute(select(EligibilityEvidence).where(
+            EligibilityEvidence.result_id == result.id, EligibilityEvidence.check_name == "NOTICE"))).scalars().all()
+
+    # "Three years' experience at the bar" names no field the engine can confirm, so this post stays MANUAL_REVIEW
+    [before] = await results()
+    assert before.status == "MANUAL_REVIEW" and await notice_checks(before) == [] and len(await deadline_alerts()) == 1
+
+    # The real GNCTD clarification adds OBC conditions to this vacancy: the stored verdict no longer covers them
+    notice = NOTICE_DIR / "AssttPublProseGNCTD-Notice-Engl-170926Rev.pdf"
+    await ingest_notice_pdf(db_session, source, f"https://www.upsc.gov.in/sites/default/files/{notice.name}", notice.read_bytes(),
+                            "Clarification for the post of Assistant Public Prosecutor in Delhi, vide Advt. No. 11 - 2026")
+    await db_session.commit()
+    run = await run_radar(db_session, now=NOW)
+    await db_session.commit()
+    [after] = [r for r in await results() if r.id != before.id]
+    assert run.evaluations == 1
+    checks = await notice_checks(after)
+    assert checks and all(c.outcome == "CONDITIONAL" for c in checks) and any("GNCTD" in c.rule for c in checks)
+
+    # An extension (hand-built, see the fixture) moves the closing date: a new deadline alert with the new date
+    await apply_extension(source, "NoticeCancellation-06-Posts-Advt-13-25-Engl-200826.pdf", "26091106212",
+                          date(2026, 9, 28), datetime(2026, 10, 5, 18, 0, tzinfo=IST))
+    await db_session.commit()
+    run = await run_radar(db_session, now=NOW)
+    await db_session.commit()
+    # Advt 11 states its own crucial date, so the verdict itself stands; only the deadline alert is new
+    assert run.evaluations == 0 and run.alerts_created.get("DEADLINE_SOON") == 1
+    alerts = await deadline_alerts()
+    assert len(alerts) == 2 and any("05 Oct 2026 18:00 IST" in a.body for a in alerts)

@@ -6,6 +6,8 @@ Effects are applied only for what the text states:
   CANCELLATION     -> Vacancy.status = CANCELLED
   DATE_EXTENSION   -> new application_deadline (old value kept in the version details)
   category clauses -> NOTICE_CONDITION requirement, surfaced by eligibility as a condition
+Deadline and status are then recomputed from all of the vacancy's notices (apply_official_notices),
+so the notice with the latest notice date wins whatever order the notices were found in.
 Vacancy numbers not in the database are reported, not guessed.
 """
 import json
@@ -23,7 +25,7 @@ from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.vacancy import Vacancy, VacancyRequirement, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
 from govcareeros.backend.parsing.upsc_notice import ParsedNotice, parse_notice
-from govcareeros.backend.services.document_ingestion import store_raw_document
+from govcareeros.backend.services.document_ingestion import apply_official_notices, store_raw_document
 from govcareeros.backend.services.source_discovery import url_hash
 
 @dataclass
@@ -65,11 +67,9 @@ async def apply_notice(session: AsyncSession, source: GovernmentSource, raw_docu
         if parsed.cancels_vacancies:
             details["cancellation"] = {"sentence": parsed.cancellation.text, "page": parsed.cancellation.page,
                                        "previous_status": vacancy.status}
-            vacancy.status = "CANCELLED"
         if parsed.new_closing:
             details["deadline_change"] = {"old": vacancy.application_deadline.isoformat() if vacancy.application_deadline else None,
                                           "new": parsed.new_closing.isoformat()}
-            vacancy.application_deadline = parsed.new_closing
         if parsed.category_conditions:
             details["conditions"] = [{"text": c.text, "page": c.page} for c in parsed.category_conditions]
             for c in parsed.category_conditions:
@@ -84,6 +84,8 @@ async def apply_notice(session: AsyncSession, source: GovernmentSource, raw_docu
         ))
         result.applied_vacancy_ids.append(vacancy.id)
     await session.flush()
+    for vacancy in targets:
+        await apply_official_notices(session, vacancy)
     return result
 
 async def ingest_notice_pdf(session: AsyncSession, source: GovernmentSource, url: str, body: bytes, title: Optional[str],
