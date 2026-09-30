@@ -1,7 +1,7 @@
 """truth locked resumes
 
 Revision ID: 509507289c4a
-Revises: 33dc3ded2525
+Revises: 40a4330a751f
 Create Date: 2026-09-30 14:15:55.295154
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '509507289c4a'
-down_revision: Union[str, Sequence[str], None] = '33dc3ded2525'
+down_revision: Union[str, Sequence[str], None] = '40a4330a751f'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

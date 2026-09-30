@@ -183,7 +183,8 @@ class FactOut(_Out):
     created_at: datetime
 
 class EvidenceIn(_In):
-    evidence_type: str = Field(description="DOCUMENT, USER_ATTESTED, APPROVED")
+    # APPROVED is not user-settable: approval belongs to a reviewer, never to the candidate
+    evidence_type: Literal["DOCUMENT", "USER_ATTESTED"] = Field(description="DOCUMENT or USER_ATTESTED")
     source: Optional[str] = None
     raw_document_id: Optional[uuid.UUID] = None
 

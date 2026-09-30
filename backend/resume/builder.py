@@ -8,7 +8,7 @@ Rules:
 - Every claim links to a Fact of the same profile version, matched on (subject = profile section, predicate = column,
   value). A value without a Fact gets one created (UNVERIFIED) with USER_ATTESTED evidence naming the profile row.
   A value whose only matching Facts are REJECTED is left out of the resume.
-- A claim is verified when its Fact is VERIFIED or has DOCUMENT/APPROVED evidence attached to a stored RawDocument;
+- A claim is verified only when its Fact is VERIFIED (reviewer decision); attached evidence is shown but does not verify;
   every other claim is rendered with a visible "unverified" mark.
 - Tailoring to a vacancy is deterministic: items and sections are ordered by how many relevance terms
   (relevance.scoring.terms) they share with the vacancy's post name, department, duties, desirable and
@@ -49,7 +49,6 @@ _SECTIONS: Dict[str, Tuple[type, Tuple[str, ...]]] = {
     "achievements": (Achievement, ("title", "date", "description")),
 }
 MEETS = "meets_requirement"
-VERIFYING_EVIDENCE = {"DOCUMENT", "APPROVED"}
 
 class ResumeInputError(ValueError):
     pass
@@ -113,8 +112,9 @@ class _Facts:
         return fact
 
     def verified(self, fact: Fact) -> bool:
-        return fact.status == "VERIFIED" or any(
-            e.evidence_type in VERIFYING_EVIDENCE and e.artifact_id is not None for e in self.evidence.get(fact.id, []))
+        # Only a reviewer-verified fact counts. Evidence the candidate attaches (even a stored document) is shown
+        # in the claim chain but does not verify it: the RawDocument may be a public notice, not their certificate.
+        return fact.status == "VERIFIED"
 
 def vacancy_terms(vacancy: Vacancy, reqs: Sequence[VacancyRequirement]) -> set:
     text = [vacancy.post_name, vacancy.department or "", vacancy.ministry or ""]

@@ -45,7 +45,8 @@ from govcareeros.backend.services import run_log
 
 STEPS = ("discover", "upsc", "drafts", "radar", "digest")
 _DIGEST_MODULE = "govcareeros.backend.services.digest"
-_DIGEST_FUNCS = ("run_weekly_digest", "generate_weekly_digests", "run_digest")
+# backend.services.digest.run_all writes digest files only; emailing stays an explicit send_digests.py --send
+_DIGEST_FUNCS = ("run_all", "run_weekly_digest", "generate_weekly_digests", "run_digest")
 
 class Skipped(Exception):
     """Raised by a step that decided not to run; the message is logged as the reason."""

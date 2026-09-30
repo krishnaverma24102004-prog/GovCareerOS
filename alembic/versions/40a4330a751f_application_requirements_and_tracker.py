@@ -1,7 +1,7 @@
 """application requirements and tracker
 
 Revision ID: 40a4330a751f
-Revises: 33dc3ded2525
+Revises: 5b2e7d19c4a1
 Create Date: 2026-09-30 14:09:38.667930
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '40a4330a751f'
-down_revision: Union[str, Sequence[str], None] = '33dc3ded2525'
+down_revision: Union[str, Sequence[str], None] = '5b2e7d19c4a1'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

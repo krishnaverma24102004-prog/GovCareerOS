@@ -201,12 +201,17 @@ class ObservedEndpoint:
 async def observe_json_endpoints(page_url: str = HOME_URL, policy: UrlPolicy = SSC_POLICY, timeout_ms: int = 45000) -> List[ObservedEndpoint]:
     """Load a public page in unmodified headless Chromium and list the JSON calls it makes to the source's own domain.
 
-    Same gate as PageFetcher.fetch_browser: navigations must stay inside the policy, nothing goes to a
-    non-public address. No login, no cookies carried over, no user-agent change.
+    Same gate as PageFetcher.fetch_browser: robots.txt is checked first, navigations must stay inside the policy,
+    nothing goes to a non-public address. No login, no cookies carried over, no user-agent change.
     """
     from playwright.async_api import async_playwright
+    from govcareeros.backend.sources.generic_notices import PageFetcher
 
     policy.check(page_url)
+    # robots.txt is honoured here too, exactly as for every other SSC fetch
+    async with PageFetcher(allow_browser=False) as fetcher:
+        if not await fetcher.robots_allows(page_url, policy):
+            raise RobotsDisallowed(f"robots.txt disallows {page_url}")
     seen: List[ObservedEndpoint] = []
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)

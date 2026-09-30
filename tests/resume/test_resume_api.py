@@ -1,3 +1,4 @@
+import uuid
 """
 Truth-locked resume over the API, tailored to the real UPSC Law Officer vacancy (Advt 12/2026, official PDF fixture).
 
@@ -12,7 +13,7 @@ import pytest
 from docx import Document
 from sqlalchemy import select
 
-from govcareeros.backend.models import RawDocument, Vacancy
+from govcareeros.backend.models import Fact, RawDocument, Vacancy
 from govcareeros.backend.services.document_ingestion import get_or_create_source, ingest_pdf_bytes
 from govcareeros.backend.sources import upsc
 
@@ -46,6 +47,10 @@ async def _setup(api, login, db_session):
     r = await api.post(f"/profile/facts/{fact['id']}/evidence",
                        json={"evidence_type": "DOCUMENT", "source": "LL.B. degree", "raw_document_id": str(doc.id)}, headers=h)
     assert r.status_code == 201, r.text
+    # Candidate-attached evidence never verifies a claim by itself; a reviewer marks the fact VERIFIED.
+    # There is no reviewer endpoint for facts yet, so the reviewer's decision is written directly here.
+    (await db_session.get(Fact, uuid.UUID(fact["id"]))).status = "VERIFIED"
+    await db_session.commit()
     return h, version, fact["id"], law_officer, doc
 
 def _heads(claims, section):
@@ -134,3 +139,18 @@ async def test_tailored_to_law_officer_puts_legal_first_and_quotes_requirements(
     html = (await api.get(f"/resume/{resume['id']}/download?format=html", headers=h)).text
     assert "Degree in Law from a recognized Institute/University.” (notification page 8)" in html
     assert html.index("Legal Associate") < html.index("Software Developer")
+
+
+@pytest.mark.asyncio
+async def test_candidate_evidence_alone_does_not_verify(api, login, db_session):
+    h = await login("asha@example.com")
+    version = (await api.put("/profile", json=PROFILE, headers=h)).json()["version"]["id"]
+    fact = (await api.post("/profile/facts", json={"subject": "education", "predicate": "degree", "value": "LL.B."}, headers=h)).json()
+    # A candidate cannot self-approve evidence
+    r = await api.post(f"/profile/facts/{fact['id']}/evidence", json={"evidence_type": "APPROVED", "source": "self"}, headers=h)
+    assert r.status_code == 422
+    assert (await api.post(f"/profile/facts/{fact['id']}/evidence", json={"evidence_type": "DOCUMENT", "source": "LL.B. degree"},
+                           headers=h)).status_code == 201
+    claims = (await api.post("/resume", json={"profile_version_id": version}, headers=h)).json()["claims"]
+    degree = next(c for c in claims if c["field"] == "degree")
+    assert degree["fact"]["id"] == fact["id"] and degree["verified"] is False

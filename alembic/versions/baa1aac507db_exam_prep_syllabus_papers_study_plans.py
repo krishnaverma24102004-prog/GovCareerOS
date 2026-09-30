@@ -1,7 +1,7 @@
 """exam prep syllabus papers study plans
 
 Revision ID: baa1aac507db
-Revises: 33dc3ded2525
+Revises: cb4fe9abe6c8
 Create Date: 2026-09-30 14:03:47.215533
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'baa1aac507db'
-down_revision: Union[str, Sequence[str], None] = '33dc3ded2525'
+down_revision: Union[str, Sequence[str], None] = 'cb4fe9abe6c8'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

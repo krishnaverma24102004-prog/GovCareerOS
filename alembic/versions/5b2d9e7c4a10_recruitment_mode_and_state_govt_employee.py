@@ -1,7 +1,7 @@
 """vacancy recruitment mode and state government employee flag
 
 Revision ID: 5b2d9e7c4a10
-Revises: 33dc3ded2525
+Revises: 509507289c4a
 Create Date: 2026-09-30 14:30:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '5b2d9e7c4a10'
-down_revision: Union[str, Sequence[str], None] = '33dc3ded2525'
+down_revision: Union[str, Sequence[str], None] = '509507289c4a'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

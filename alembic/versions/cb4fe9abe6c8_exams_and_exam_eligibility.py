@@ -1,7 +1,7 @@
 """exams and exam eligibility
 
 Revision ID: cb4fe9abe6c8
-Revises: 33dc3ded2525
+Revises: 44cc22e21df4
 Create Date: 2026-09-30 14:14:49.596555
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'cb4fe9abe6c8'
-down_revision: Union[str, Sequence[str], None] = '33dc3ded2525'
+down_revision: Union[str, Sequence[str], None] = '44cc22e21df4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

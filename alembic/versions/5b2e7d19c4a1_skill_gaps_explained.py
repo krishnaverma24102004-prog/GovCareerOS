@@ -1,7 +1,7 @@
 """skill gaps explained: pinned to profile version + eligibility result, cited, with next step
 
 Revision ID: 5b2e7d19c4a1
-Revises: 33dc3ded2525
+Revises: baa1aac507db
 Create Date: 2026-09-30 18:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '5b2e7d19c4a1'
-down_revision: Union[str, Sequence[str], None] = '33dc3ded2525'
+down_revision: Union[str, Sequence[str], None] = 'baa1aac507db'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -96,6 +96,7 @@ class Digest:
     age_headroom: List[DigestItem] = field(default_factory=list)
     notices: List[DigestItem] = field(default_factory=list)
     omitted: List[str] = field(default_factory=list)
+    reported_keys: List[str] = field(default_factory=list)  # results/notices considered new in this digest
 
     def items(self) -> List[DigestItem]:
         return self.matches + self.deadlines + self.age_headroom + self.notices
@@ -214,10 +215,17 @@ async def build_digest(session: AsyncSession, user_id: uuid.UUID, now: Optional[
         prev = await previous_run(session, user_id)
         since = prev.period_end if prev and prev.period_end < now else now - DEFAULT_PERIOD
         reported_until = prev.created_at if prev else None
+        already = set(json.loads(prev.reported_keys or "[]")) if prev else set()
+    else:
+        already = set()
 
-    def is_new(recorded: datetime) -> bool:
-        # Same-transaction rows share the run's timestamp on PostgreSQL (now() is per transaction): strictly after
-        return recorded > reported_until if reported_until else recorded >= since
+    def is_new(key: str, recorded: datetime) -> bool:
+        # Timestamps alone can't decide: SQLite stores whole seconds and PostgreSQL gives one now() per transaction.
+        # Include the boundary second and skip anything the previous digest already reported by key.
+        new = key not in already and (recorded >= reported_until if reported_until else recorded >= since)
+        if new:
+            digest.reported_keys.append(key)
+        return new
 
     version = await latest_profile_version(session, user_id)
     name = (await session.execute(select(PersonalInfo.full_name).where(PersonalInfo.profile_version_id == version.id))).scalar_one_or_none() \
@@ -252,7 +260,7 @@ async def build_digest(session: AsyncSession, user_id: uuid.UUID, now: Optional[
         if v.application_deadline and not deadline_cit:
             digest.omitted.append(f"{v.post_name}: closing date not shown (no citation)")
 
-        if is_new(result.created_at):
+        if is_new(f"result:{result.id}", result.created_at):
             earlier = (await session.execute(select(func.count()).select_from(EligibilityResult).where(
                 EligibilityResult.user_id == user.id, EligibilityResult.vacancy_id == v.id, EligibilityResult.id != result.id))).scalar_one()
             checks = await _open_checks(ctx, v, result, rows, digest.omitted)
@@ -298,7 +306,7 @@ async def build_digest(session: AsyncSession, user_id: uuid.UUID, now: Optional[
     rows = (await session.execute(select(VacancyVersion, Vacancy).join(Vacancy, Vacancy.id == VacancyVersion.vacancy_id)
                                   .where(VacancyVersion.vacancy_id.in_(assessed)).order_by(VacancyVersion.notice_date))).all()
     for vv, v in rows:
-        if not is_new(vv.created_at):
+        if not is_new(f"notice:{vv.id}", vv.created_at):
             continue
         details = json.loads(vv.details or "{}")
         url = details.get("url") or await ctx.url(vv.raw_document_id)
@@ -420,7 +428,8 @@ async def generate(session: AsyncSession, user: User, now: Optional[datetime] = 
     path.with_suffix(".json").write_text(json.dumps(digest.to_dict(), ensure_ascii=False, indent=1), encoding="utf-8")
     run = DigestRun(user_id=user.id, profile_version_id=uuid.UUID(digest.profile_version_id) if digest.profile_version_id else None,
                     period_start=digest.period_start, period_end=digest.period_end, file_path=rel.as_posix(),
-                    item_count=len(digest.items()), item_counts=json.dumps(digest.counts()), omitted_count=len(digest.omitted))
+                    item_count=len(digest.items()), item_counts=json.dumps(digest.counts()), omitted_count=len(digest.omitted),
+                    reported_keys=json.dumps(digest.reported_keys))
     session.add(run)
     await session.flush()
     return digest, run

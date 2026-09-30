@@ -19,5 +19,6 @@ class DigestRun(Base, TimestampMixin):
     item_count: Mapped[int] = mapped_column(Integer, default=0)
     item_counts: Mapped[Optional[str]] = mapped_column(Text)  # JSON: {"matches": n, "deadlines": n, ...}
     omitted_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # facts left out for lack of a citation
+    reported_keys: Mapped[Optional[str]] = mapped_column(Text)  # JSON list: "result:<id>" / "notice:<id>" shown in this digest
     sent_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
     sent_to: Mapped[Optional[str]] = mapped_column(String(255))

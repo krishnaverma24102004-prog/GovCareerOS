@@ -73,7 +73,8 @@ async def test_daily_job_radar_step_over_real_upsc_data(api, login, db_session):
     assert [s["name"] for s in record["steps"]] == list(daily_job.STEPS)
     assert steps["radar"]["status"] == "ok" and steps["radar"]["counts"]["evaluations"] == 11
     assert steps["radar"]["counts"]["alerts_created"]["NEW_MATCH"] >= 1
-    assert steps["digest"]["status"] == "skipped" and "not present" in steps["digest"]["reason"]
+    # The digest module is present: the step writes digest files (never emails)
+    assert steps["digest"]["status"] == "ok"
     assert all(steps[s]["reason"] == "not selected" for s in ("discover", "upsc", "drafts"))
     assert not run_log.lock_path().exists()
 
