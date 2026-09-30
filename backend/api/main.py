@@ -6,11 +6,11 @@ GovCareerOS API.
 """
 from fastapi import FastAPI
 
-from govcareeros.backend.api.routers import alerts, auth, eligibility, profile, relevance, review, vacancies
+from govcareeros.backend.api.routers import alerts, auth, eligibility, prep, profile, relevance, review, vacancies
 
 def create_app() -> FastAPI:
     app = FastAPI(title="GovCareerOS", version="0.1.0")
-    for router in (auth.router, profile.router, vacancies.router, eligibility.router, relevance.router, alerts.router, review.router):
+    for router in (auth.router, profile.router, vacancies.router, eligibility.router, relevance.router, alerts.router, review.router, prep.router):
         app.include_router(router)
 
     @app.get("/health", tags=["meta"])

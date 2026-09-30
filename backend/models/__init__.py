@@ -12,3 +12,4 @@ from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.auth_token import AuthToken
 from govcareeros.backend.models.alert import UserAlert
 from govcareeros.backend.models.extraction import ExtractionDraft
+from govcareeros.backend.models.exam_prep import Syllabus, QuestionPaper, StudyPlan, StudyPlanItem
