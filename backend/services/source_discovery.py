@@ -18,6 +18,7 @@ from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.sources.generic_notices import PageFetcher, ProbeResult
 from govcareeros.backend.sources.notice_classifier import classify_notice
 from govcareeros.backend.sources.registry import SOURCES, SourceSpec
+from govcareeros.backend.sources.url_guard import UrlPolicy
 
 @dataclass
 class SourceDiscoverySummary:
@@ -59,21 +60,25 @@ async def sync_registry(session: AsyncSession, specs: Iterable[SourceSpec] = SOU
     await session.flush()
     return by_name
 
+def source_policy(source: GovernmentSource) -> UrlPolicy:
+    return UrlPolicy.for_source(source.official_domain, source.recruitment_url)
+
 def _probe_url(source: GovernmentSource) -> str:
-    # Reuse a page the locator found earlier, so we don't re-search every run
-    return _config(source).get("resolved_url") or source.recruitment_url
+    # Reuse a page the locator found earlier, so we don't re-search every run (never an off-domain one)
+    resolved = _config(source).get("resolved_url")
+    return resolved if resolved and source_policy(source).allows(resolved) else source.recruitment_url
 
 async def probe_sources(fetcher: PageFetcher, sources: List[GovernmentSource], concurrency: int = 6) -> List[ProbeResult]:
     sem = asyncio.Semaphore(concurrency)
 
-    async def one(url: str) -> ProbeResult:
+    async def one(source: GovernmentSource) -> ProbeResult:
         async with sem:
             try:
-                return await fetcher.discover(url)
+                return await fetcher.discover(_probe_url(source), source_policy(source))
             except Exception as e:  # one broken site must not stop the sweep
                 return ProbeResult("UNREACHABLE", detail=f"{type(e).__name__}: {str(e)[:200]}")
 
-    return await asyncio.gather(*(one(_probe_url(s)) for s in sources))
+    return await asyncio.gather(*(one(s) for s in sources))
 
 async def record_probe(session: AsyncSession, source: GovernmentSource, result: ProbeResult, now: datetime) -> SourceDiscoverySummary:
     source.health_status = "HEALTHY" if result.status == "OK" else result.status
@@ -87,8 +92,10 @@ async def record_probe(session: AsyncSession, source: GovernmentSource, result: 
         "last_probe_status": result.status, "http_status": result.http_status,
         "fetch_mode": result.fetch_mode, "detail": result.detail,
     })
-    if result.status == "OK" and result.final_url:
+    if result.status == "OK" and result.final_url and source_policy(source).allows(result.final_url):
         config["resolved_url"] = result.final_url
+    elif config.get("resolved_url") and not source_policy(source).allows(config["resolved_url"]):
+        del config["resolved_url"]
     source.configuration = json.dumps(config)
 
     new = new_vacancy = 0

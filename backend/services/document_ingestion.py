@@ -269,6 +269,10 @@ async def run_upsc_pipeline(session: AsyncSession, client: Optional[httpx.AsyncC
         run.source_health = "ACCESS_RESTRICTED"
         run.errors.append(str(e))
         source.last_failure = now
+    except upsc.RobotsDisallowed as e:
+        run.source_health = "ROBOTS_DISALLOWED"
+        run.errors.append(str(e))
+        source.last_failure = now
     except httpx.HTTPError as e:
         run.source_health = "UNREACHABLE"
         run.errors.append(f"{type(e).__name__}: {e}")
