@@ -177,6 +177,7 @@ class RelaxationOption:
     evidence: str
     page: Optional[int]
     note: Optional[str] = None
+    missing: Optional[str] = None  # profile field that would settle an UNKNOWN option
 
 def _service_years(start: Optional[date], until: date) -> Optional[float]:
     return None if start is None else (until - start).days / 365.25
@@ -198,16 +199,17 @@ def relaxation_options(profile: ProfileSnapshot, reqs: Sequence[Requirement], ca
         if profile.is_pwbd is False:
             options.append(RelaxationOption("PwBD", years, "NO", "profile: not PwBD", page))
         elif profile.is_pwbd is None:
-            options.append(RelaxationOption("PwBD", years, "UNKNOWN", "PwBD status not stated", page))
+            options.append(RelaxationOption("PwBD", years, "UNKNOWN", "PwBD status not stated", page, missing="is_pwbd"))
         elif rule.get("max_age") and age > rule["max_age"]:
             options.append(RelaxationOption("PwBD", years, "NO", f"age {age} above PwBD cap {rule['max_age']}", gen_pwbd.source_page))
         elif profile.disability_percentage is None:
-            options.append(RelaxationOption("PwBD", years, "UNKNOWN", "disability percentage not stated", page))
+            options.append(RelaxationOption("PwBD", years, "UNKNOWN", "disability percentage not stated", page, missing="disability_percentage"))
         elif profile.disability_percentage < rule.get("min_disability_percent", 40):
             options.append(RelaxationOption("PwBD", years, "NO",
                                             f"disability {profile.disability_percentage}% < {rule.get('min_disability_percent', 40)}%", page))
         elif suitability and not profile.disability_types:
-            options.append(RelaxationOption("PwBD", years, "UNKNOWN", "disability sub-category not stated; post suitability depends on it", page))
+            options.append(RelaxationOption("PwBD", years, "UNKNOWN", "disability sub-category not stated; post suitability depends on it", page,
+                                            missing="disability_types"))
         elif suitability:
             ok = [t for t in profile.disability_types if suitability.get(t, {}).get("suitable")]
             if ok:
@@ -226,9 +228,11 @@ def relaxation_options(profile: ProfileSnapshot, reqs: Sequence[Requirement], ca
         if profile.is_ex_serviceman is False:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO", "profile: not an ex-serviceman", exsm.source_page))
         elif profile.is_ex_serviceman is None:
-            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "ex-serviceman status not stated", exsm.source_page))
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "ex-serviceman status not stated", exsm.source_page,
+                                            missing="is_ex_serviceman"))
         elif need and profile.armed_forces_service_months is None:
-            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "armed forces service months not stated", exsm.source_page))
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "armed forces service months not stated", exsm.source_page,
+                                            missing="armed_forces_service_months"))
         elif need and profile.armed_forces_service_months < need:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO",
                                             f"{profile.armed_forces_service_months} months service < {need}", exsm.source_page))
@@ -246,9 +250,11 @@ def relaxation_options(profile: ProfileSnapshot, reqs: Sequence[Requirement], ca
         if profile.is_central_govt_employee is False:
             options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "NO", "profile: not a Central Govt servant", cgs.source_page))
         elif profile.is_central_govt_employee is None:
-            options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "UNKNOWN", "Central Govt service status not stated", cgs.source_page))
+            options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "UNKNOWN", "Central Govt service status not stated", cgs.source_page,
+                                            missing="is_central_govt_employee"))
         elif need and served is None:
-            options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "UNKNOWN", "Central Govt service start date not stated", cgs.source_page))
+            options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "UNKNOWN", "Central Govt service start date not stated", cgs.source_page,
+                                            missing="central_govt_service_start"))
         elif need and served < need:
             options.append(RelaxationOption("CENTRAL_GOVT_SERVANT", years, "NO", f"{served:.1f} years continuous service < {need}", cgs.source_page))
         else:
@@ -335,7 +341,7 @@ def check_education(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruci
         short = text[:300]
         if not profile.education:
             out.append(RuleOutcome("EDUCATION", "NOT_MET", "profile has no education entries", short, "education: none",
-                                   req.id, req.source_page, "MISMATCH"))
+                                   req.id, req.source_page, "MISMATCH", data={"reason": "NO_EDUCATION"}))
             continue
 
         required = {name for name, (_, req_re) in _FAMILIES.items() if re.search(req_re, text, re.I)}
@@ -343,30 +349,34 @@ def check_education(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruci
         needs_masters = bool(_MASTERS_RE.search(text[:120]))  # a Master's requirement is stated up front
         extra = _EXTRA_CLAUSE_RE.search(text)
 
-        best: Optional[Tuple[int, str, EducationEntry, str]] = None  # (rank, match_type, entry, why)
+        best: Optional[Tuple[int, str, EducationEntry, str, str]] = None  # (rank, match_type, entry, why, reason code)
         for e in profile.education:
             fams = degree_families(f"{e.degree} {e.specialization or ''}")
             completed = e.end_date is None or crucial is None or e.end_date <= crucial
             if not completed:
-                cand = (1, "MISMATCH", e, f"{e.degree} completes {e.end_date} after crucial date {crucial}")
+                cand = (1, "MISMATCH", e, f"{e.degree} completes {e.end_date} after crucial date {crucial}", "NOT_COMPLETED")
             elif needs_masters and _degree_level(e) < 3:
-                cand = (1, "MISMATCH", e, f"{e.degree} is below the Master's level required")
+                cand = (1, "MISMATCH", e, f"{e.degree} is below the Master's level required", "BELOW_MASTERS")
             elif re.search(_abbrev_pattern(e.degree) + r".{0,60}\bequivalent\b|\bequivalent\b.{0,60}" + _abbrev_pattern(e.degree), text, re.I) and len(re.sub(r"[^A-Za-z]", "", e.degree)) >= 2:
-                cand = (4, "EXPLICIT_EQUIVALENCE", e, f"notification text declares {e.degree} equivalent")
+                cand = (4, "EXPLICIT_EQUIVALENCE", e, f"notification text declares {e.degree} equivalent", "EQUIVALENT")
             elif any_degree and _degree_level(e) >= 2:
-                cand = (5, "EXACT_MATCH", e, f"{e.degree} is a degree; requirement accepts any discipline")
+                cand = (5, "EXACT_MATCH", e, f"{e.degree} is a degree; requirement accepts any discipline", "MATCH")
             elif fams & required:
-                cand = (5, "EXACT_MATCH", e, f"{e.degree} is in required family {sorted(fams & required)}")
+                cand = (5, "EXACT_MATCH", e, f"{e.degree} is in required family {sorted(fams & required)}", "MATCH")
             elif not required and not any_degree:
-                cand = (2, "UNKNOWN_EQUIVALENCE", e, "requirement text does not name a recognisable degree family")
+                cand = (2, "UNKNOWN_EQUIVALENCE", e, "requirement text does not name a recognisable degree family", "UNRECOGNISED_REQUIREMENT")
             elif any(frozenset({f, r}) in _ADJACENT for f in fams for r in required):
-                cand = (2, "UNKNOWN_EQUIVALENCE", e, f"{e.degree} ({sorted(fams)}) is not named; equivalence to {sorted(required)} is not stated")
+                cand = (2, "UNKNOWN_EQUIVALENCE", e, f"{e.degree} ({sorted(fams)}) is not named; equivalence to {sorted(required)} is not stated",
+                        "EQUIVALENCE_NOT_STATED")
             else:
-                cand = (1, "MISMATCH", e, f"{e.degree} ({sorted(fams) or 'unrecognised'}) not in required {sorted(required) or ['any degree']}")
+                cand = (1, "MISMATCH", e, f"{e.degree} ({sorted(fams) or 'unrecognised'}) not in required {sorted(required) or ['any degree']}",
+                        "WRONG_FAMILY")
             if best is None or cand[0] > best[0]:
                 best = cand
 
-        rank, match_type, entry, why = best
+        rank, match_type, entry, why, reason = best
+        data = {"reason": reason, "degree": entry.degree, "end_date": entry.end_date, "required_families": sorted(required),
+                "extra_clause": extra.group(0) if extra else None}
         evidence = f"{entry.degree}" + (f" ({entry.specialization})" if entry.specialization else "") + \
                    (f", completed {entry.end_date}" if entry.end_date else ", completion date not recorded")
         if match_type in ("EXACT_MATCH", "EXPLICIT_EQUIVALENCE"):
@@ -376,11 +386,11 @@ def check_education(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruci
             if entry.end_date is None:
                 notes.append("degree completion date not recorded in profile")
             outcome = "CONDITIONAL" if notes else "MET"
-            out.append(RuleOutcome("EDUCATION", outcome, why, short, evidence, req.id, req.source_page, match_type, "; ".join(notes) or None))
+            out.append(RuleOutcome("EDUCATION", outcome, why, short, evidence, req.id, req.source_page, match_type, "; ".join(notes) or None, data))
         elif match_type == "UNKNOWN_EQUIVALENCE":
-            out.append(RuleOutcome("EDUCATION", "UNKNOWN", why, short, evidence, req.id, req.source_page, match_type))
+            out.append(RuleOutcome("EDUCATION", "UNKNOWN", why, short, evidence, req.id, req.source_page, match_type, data=data))
         else:
-            out.append(RuleOutcome("EDUCATION", "NOT_MET", why, short, evidence, req.id, req.source_page, match_type))
+            out.append(RuleOutcome("EDUCATION", "NOT_MET", why, short, evidence, req.id, req.source_page, match_type, data=data))
     return out
 
 # ---------- experience ----------
@@ -401,7 +411,8 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
         short = text[:300]
         years = [n for n in (words_to_number(m.group(1)) for m in _YEARS_RE.finditer(text)) if n]
         if not years:
-            out.append(RuleOutcome("EXPERIENCE", "UNKNOWN", "required years not stated in a machine-readable form", short, "-", req.id, req.source_page))
+            out.append(RuleOutcome("EXPERIENCE", "UNKNOWN", "required years not stated in a machine-readable form", short, "-", req.id, req.source_page,
+                                   data={"reason": "YEARS_UNREADABLE"}))
             continue
         required = min(years)  # alternatives joined by "Or": the smallest is the most lenient
         until = crucial or date.today()
@@ -414,7 +425,7 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
             if not dated:
                 what = "post-graduate degree" if level == 3 else "qualifying degree"
                 out.append(RuleOutcome("EXPERIENCE", "UNKNOWN", f"only experience after the {what} counts, but its completion date is not in the profile",
-                                       short, "-", req.id, req.source_page))
+                                       short, "-", req.id, req.source_page, data={"reason": "QUALIFICATION_DATE_MISSING", "level": level}))
                 continue
             counted_from = min(dated)
         spans = []
@@ -423,6 +434,9 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
                 start = max(e.start_date, counted_from) if counted_from else e.start_date
                 spans.append((e, _years_between(start, min(e.end_date or until, until))))
         total = sum(y for _, y in spans)
+        domains = [d.strip().lower() for d in _DOMAIN_RE.findall(text)]
+        keywords = {w for d in domains for w in re.findall(r"[a-z]{4,}", d)} - _STOPWORDS
+        counting = {"required": required, "counted_from": counted_from, "until": until, "keywords": sorted(keywords), "fields": domains}
         undated = [e for e in profile.experience if not e.start_date]
         evidence = (f"{total:.1f} years dated experience"
                     + (f" counted from {counted_from.isoformat()} (after qualification)" if counted_from else "")
@@ -431,14 +445,14 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
         if total < required and not undated:
             out.append(RuleOutcome("EXPERIENCE", "NOT_MET", f"{total:.1f} years < {required} years required (all domains counted)",
                                    short, evidence, req.id, req.source_page,
-                                   data={"years": round(total, 2), "required": required, "relevance_confirmed": False}))
+                                   data={**counting, "years": round(total, 2), "relevance_confirmed": False, "reason": "TOO_FEW_YEARS"}))
             continue
         if total < required:
-            out.append(RuleOutcome("EXPERIENCE", "UNKNOWN", "dated experience is short; undated entries may cover the gap", short, evidence, req.id, req.source_page))
+            out.append(RuleOutcome("EXPERIENCE", "UNKNOWN", "dated experience is short; undated entries may cover the gap", short, evidence, req.id, req.source_page,
+                                   # no "required" key: relevance treats that as "could not be measured"
+                                   data={"required_years": required, "until": until, "years": round(total, 2), "reason": "UNDATED_ENTRIES"}))
             continue
 
-        domains = [d.strip().lower() for d in _DOMAIN_RE.findall(text)]
-        keywords = {w for d in domains for w in re.findall(r"[a-z]{4,}", d)} - _STOPWORDS
         relevant = [(e, y) for e, y in spans
                     if keywords and any(k in f"{e.designation} {e.domain or ''} {e.responsibilities or ''}".lower() for k in keywords)]
         relevant_years = sum(y for _, y in relevant)
@@ -448,12 +462,13 @@ def check_experience(profile: ProfileSnapshot, reqs: Sequence[Requirement], cruc
             outcome = "CONDITIONAL" if notes else "MET"
             out.append(RuleOutcome("EXPERIENCE", outcome, f"{relevant_years:.1f} years matching {sorted(keywords)} >= {required}",
                                    short, f"{names}; {evidence}", req.id, req.source_page, note="; ".join(notes) or None,
-                                   data={"years": round(relevant_years, 2), "required": required, "relevance_confirmed": True}))
+                                   data={**counting, "years": round(relevant_years, 2), "relevance_confirmed": True}))
         else:
             out.append(RuleOutcome("EXPERIENCE", "UNKNOWN",
                                    f"{total:.1f} years total >= {required}, but relevance to the required field could not be confirmed",
                                    short, evidence, req.id, req.source_page, note="; ".join(notes) or None,
-                                   data={"years": round(relevant_years, 2), "total_years": round(total, 2), "required": required, "relevance_confirmed": False}))
+                                   data={**counting, "years": round(relevant_years, 2), "total_years": round(total, 2), "relevance_confirmed": False,
+                                         "reason": "RELEVANCE_UNCONFIRMED"}))
     return out
 
 # ---------- combination ----------

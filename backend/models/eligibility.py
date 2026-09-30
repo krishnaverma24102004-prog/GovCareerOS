@@ -1,7 +1,7 @@
 import uuid
 from typing import List, Optional
-from datetime import datetime
-from sqlalchemy import String, Text, ForeignKey, Float, Integer
+from datetime import date, datetime
+from sqlalchemy import Boolean, Date, String, Text, ForeignKey, Float, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
 
@@ -57,6 +57,20 @@ class SkillGap(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('users.id'), index=True)
     vacancy_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('vacancies.id'), index=True)
-    gap_type: Mapped[str] = mapped_column(String(100))
+    gap_type: Mapped[str] = mapped_column(String(100))  # AGE, EDUCATION, EXPERIENCE, ..., PROFILE_MISSING_INFO, RELEVANCE_*
     requirement: Mapped[str] = mapped_column(Text)
     suggested_resource: Mapped[Optional[str]] = mapped_column(Text)
+    # Gaps are derived from one stored eligibility decision for one immutable profile version
+    profile_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey('profile_versions.id', name='fk_skill_gaps_profile_version_id'), index=True)
+    eligibility_result_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey('eligibility_results.id', name='fk_skill_gaps_eligibility_result_id'), index=True)
+    requirement_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey('vacancy_requirements.id', name='fk_skill_gaps_requirement_id'))
+    engine_version: Mapped[Optional[str]] = mapped_column(String(100))
+    reason_code: Mapped[Optional[str]] = mapped_column(String(60))
+    blocking: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
+    # The notification's own words and page; empty only for gaps that come from the profile side alone
+    requirement_quote: Mapped[Optional[str]] = mapped_column(Text)
+    requirement_page: Mapped[Optional[int]] = mapped_column(Integer)
+    profile_has: Mapped[Optional[str]] = mapped_column(Text)
+    profile_field: Mapped[Optional[str]] = mapped_column(String(100))
+    next_step: Mapped[Optional[str]] = mapped_column(Text)
+    due_date: Mapped[Optional[date]] = mapped_column(Date)
