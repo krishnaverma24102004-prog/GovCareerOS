@@ -4,8 +4,10 @@ Runs hard eligibility for (profile_version_id, vacancy_id) and stores the decisi
 Reads only rows that belong to the given ProfileVersion, which are never modified after
 creation, so re-running for an old version reproduces the old decision.
 """
+import hashlib
 import json
 import uuid
+from datetime import timezone
 from typing import List, Optional
 
 from sqlalchemy import select
@@ -67,6 +69,12 @@ async def load_requirements(session: AsyncSession, vacancy_id: uuid.UUID) -> Lis
         out.append(rules.Requirement(r.id, r.req_type, value, r.source_page))
     return out
 
+def input_fingerprint(vacancy: Vacancy, reqs: List[rules.Requirement]) -> str:
+    """Identifies the vacancy-side inputs of a decision; requirement rows are never edited in place, only superseded."""
+    crucial_dt = vacancy.eligibility_crucial_date or vacancy.application_deadline
+    parts = [rules.ENGINE_VERSION, crucial_dt.astimezone(timezone.utc).isoformat() if crucial_dt else "-", *sorted(str(r.id) for r in reqs)]
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()
+
 async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id: uuid.UUID, vacancy_id: uuid.UUID) -> EligibilityResult:
     version = await session.get(ProfileVersion, profile_version_id)
     if version is None or version.user_id != user_id:
@@ -91,6 +99,7 @@ async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id
     result = EligibilityResult(
         id=uuid.uuid4(), user_id=user_id, vacancy_id=vacancy_id, profile_version_id=profile_version_id,
         engine_version=rules.ENGINE_VERSION, crucial_date=crucial_dt, status=status, confidence=confidence,
+        input_fingerprint=input_fingerprint(vacancy, reqs),
     )
     session.add(result)
     for o in outcomes:

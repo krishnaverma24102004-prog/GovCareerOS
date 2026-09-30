@@ -87,3 +87,23 @@ def login(api):
         assert r.status_code == 200, r.text
         return {"Authorization": f"Bearer {r.json()['access_token']}"}
     return _login
+
+@pytest.fixture
+def apply_extension(db_session):
+    """HAND-BUILT closing-date extension for a UPSC vacancy. No real UPSC notice in the fixtures extends a closing
+    date (they are a clarification and a process change), so the notice's findings are stated here by hand. The
+    document it is recorded against is a real captured notice PDF, and everything after the parse (VacancyVersion,
+    effective deadline) runs through notice_ingestion.apply_notice."""
+    from govcareeros.backend.parsing import upsc_notice
+    from govcareeros.backend.services.document_ingestion import store_raw_document
+    from govcareeros.backend.services.notice_ingestion import apply_notice
+
+    async def _apply(source, carrier, vacancy_ref, notice_day, new_closing):
+        url = f"https://www.upsc.gov.in/sites/default/files/{carrier}"
+        body = (FIXTURES / "upsc" / "notices" / carrier).read_bytes()
+        raw, _ = await store_raw_document(db_session, source, url, body, 200, "application/pdf")
+        parsed = upsc_notice.ParsedNotice(upsc_notice.PARSER_VERSION, ["DATE_EXTENSION"], ["11/2026"], [vacancy_ref],
+                                          notice_day, new_closing, False, None,
+                                          title=f"Extension of closing date, notice of {notice_day.isoformat()}")
+        return await apply_notice(db_session, source, raw.id, parsed, url)
+    return _apply

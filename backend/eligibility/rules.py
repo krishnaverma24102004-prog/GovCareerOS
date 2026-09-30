@@ -97,6 +97,12 @@ def age_on(dob: date, on: date) -> int:
     """Completed years on a date."""
     return on.year - dob.year - ((on.month, on.day) < (dob.month, dob.day))
 
+def age_limit_for(reqs: Sequence[Requirement], category: Optional[str]) -> Optional[Requirement]:
+    """A category-specific AGE_MAX wins; "ALL" is a single limit the notice states for everyone."""
+    limits = [r for r in reqs if r.req_type == "AGE_MAX" and isinstance(r.value, dict)]
+    return next((r for r in limits if r.value.get("category") == category), None) or \
+        next((r for r in limits if r.value.get("category") == "ALL"), None)
+
 def check_age(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Optional[date]) -> List[RuleOutcome]:
     limits = [r for r in reqs if r.req_type == "AGE_MAX"]
     if not limits:
@@ -115,9 +121,7 @@ def check_age(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Op
 
     age = age_on(profile.date_of_birth, crucial)
     evidence = f"DOB {profile.date_of_birth.isoformat()}, category {category}, age {age} on crucial date {crucial.isoformat()}"
-    # A category-specific limit wins; "ALL" is a single limit the notice states for everyone
-    limit = next((r for r in limits if r.value["category"] == category), None) or \
-        next((r for r in limits if r.value["category"] == "ALL"), None)
+    limit = age_limit_for(limits, category)
     if limit is None:
         # e.g. a post whose block states limits for OBC only; the general relaxation rules are not parsed
         return [RuleOutcome("AGE", "UNKNOWN", f"no age limit stated for category {category} in this vacancy",

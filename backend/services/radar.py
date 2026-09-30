@@ -48,11 +48,12 @@ async def _add_alert(session: AsyncSession, run: RadarRun, **values) -> None:
     if res.rowcount:
         run.alerts_created[values["kind"]] = run.alerts_created.get(values["kind"], 0) + 1
 
-async def _latest_result(session: AsyncSession, version_id, vacancy_id) -> Optional[EligibilityResult]:
+async def _current_result(session: AsyncSession, version_id, vacancy_id, fingerprint: str) -> Optional[EligibilityResult]:
+    """The decision made on exactly the vacancy's current inputs; after a notice, reparse or moved date there is none."""
     res = await session.execute(
         select(EligibilityResult).where(
             EligibilityResult.profile_version_id == version_id, EligibilityResult.vacancy_id == vacancy_id,
-            EligibilityResult.engine_version == rules.ENGINE_VERSION,
+            EligibilityResult.input_fingerprint == fingerprint,
         ).order_by(EligibilityResult.created_at.desc()).limit(1)
     )
     return res.scalar_one_or_none()
@@ -78,7 +79,8 @@ async def run_for_user(session: AsyncSession, user: User, now: datetime, run: Ra
     ))).scalars().all()
 
     for vacancy in open_vacancies:
-        result = await _latest_result(session, version.id, vacancy.id)
+        reqs = await eligibility_engine.load_requirements(session, vacancy.id)
+        result = await _current_result(session, version.id, vacancy.id, eligibility_engine.input_fingerprint(vacancy, reqs))
         if result is None:
             result = await eligibility_engine.evaluate(session, user.id, version.id, vacancy.id)
             await relevance_service.evaluate(session, user.id, version.id, vacancy.id)
@@ -96,17 +98,17 @@ async def run_for_user(session: AsyncSession, user: User, now: datetime, run: Ra
         if vacancy.application_deadline and result.status in _ALERTABLE | {"MANUAL_REVIEW"} \
                 and vacancy.application_deadline - now <= DEADLINE_WINDOW:
             days = max(0, (vacancy.application_deadline - now).days)
-            await _add_alert(session, run, kind="DEADLINE_SOON", dedupe_key=f"deadline:{vacancy.id}",
+            await _add_alert(session, run, kind="DEADLINE_SOON", dedupe_key=f"deadline:{vacancy.id}:{vacancy.application_deadline.astimezone(timezone.utc).isoformat()}",
                              title=f"{days} day(s) left: {vacancy.post_name}",
                              body=f"Applications for {where} close {_fmt(vacancy.application_deadline)}. "
                                   + ("Your eligibility needs a manual check first." if result.status == "MANUAL_REVIEW" else ""),
                              due_at=vacancy.application_deadline, **base)
 
-        # Age headroom from the vacancy's own stated limit for the candidate's category
+        # Age headroom from the vacancy's own stated limit for the candidate's category (or its single ALL limit).
+        # A pending manual check does not change the age limit, so it is warned about as for deadlines.
         category = rules.normalize_category(snapshot.category)
-        if snapshot.date_of_birth and category and result.status in _ALERTABLE:
-            reqs = await eligibility_engine.load_requirements(session, vacancy.id)
-            limit = next((r for r in reqs if r.req_type == "AGE_MAX" and r.value.get("category") == category), None)
+        if snapshot.date_of_birth and category and result.status in _ALERTABLE | {"MANUAL_REVIEW"}:
+            limit = rules.age_limit_for(reqs, category)
             crucial_dt = vacancy.eligibility_crucial_date or vacancy.application_deadline
             if limit and crucial_dt:
                 age = rules.age_on(snapshot.date_of_birth, crucial_dt.astimezone(IST).date())
@@ -115,7 +117,7 @@ async def run_for_user(session: AsyncSession, user: User, now: datetime, run: Ra
                     out = age_out_date(snapshot.date_of_birth, limit.value["max_age"])
                     await _add_alert(session, run, kind="AGE_HEADROOM", dedupe_key=f"age:{vacancy.id}:{version.id}",
                                      title=f"Age limit close: {vacancy.post_name}",
-                                     body=f"You are {age} on the crucial date; the {category} limit for this post is "
+                                     body=f"You are {age} on the crucial date; the {limit.value['category']} limit for this post is "
                                           f"{limit.value['max_age']} (p.{limit.source_page}). Posts with this limit stop accepting you "
                                           f"from {out.strftime('%d %b %Y')} unless a relaxation applies.",
                                      due_at=datetime(out.year, out.month, out.day, tzinfo=IST), **base)
