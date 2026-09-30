@@ -37,6 +37,9 @@ class Vacancy(Base, TimestampMixin):
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     # ACTIVE, CANCELLED (set only from an official notice, recorded in vacancy_versions)
     status: Mapped[str] = mapped_column(String(30), default="ACTIVE", server_default="ACTIVE", index=True)
+    # DIRECT, DEPUTATION, CONTRACT, WALK_IN, UNKNOWN (parsing/recruitment_mode.py); the deciding sentence is in
+    # vacancy_field_provenance under field_name "recruitment_mode"
+    recruitment_mode: Mapped[str] = mapped_column(String(20), default="UNKNOWN", server_default="UNKNOWN", index=True)
 
     requirements: Mapped[List['VacancyRequirement']] = relationship(back_populates='vacancy')
     provenance: Mapped[List['VacancyFieldProvenance']] = relationship(back_populates='vacancy')

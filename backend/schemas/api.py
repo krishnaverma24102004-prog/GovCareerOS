@@ -64,6 +64,7 @@ class VacancySummary(BaseModel):
     application_deadline: Optional[datetime]
     notification_url: Optional[str]
     confidence: float
+    recruitment_mode: str = "UNKNOWN"
 
 class VacancyDetail(VacancySummary):
     pay_scale: Optional[str]

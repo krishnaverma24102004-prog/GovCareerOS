@@ -133,6 +133,45 @@ def recruitment_nav_links(html: str, base_url: str, limit: int = 4, policy: Opti
         ranked[url] = min(rank, ranked.get(url, 99))
     return sorted(ranked, key=ranked.get)[:limit]
 
+# Language switch on bilingual portals whose homepage opens in Hindi ("/en", hreflang="en", "English")
+_A_TAG_RE = re.compile(r"<a\b([^>]*?)href\s*=\s*[\"']([^\"'#][^\"']*)[\"']([^>]*)>(.*?)</a>", re.I | re.S)
+_ENGLISH_ATTR_RE = re.compile(r"hreflang\s*=\s*[\"']en[\"']|(?:title|aria-label)\s*=\s*[\"']English[\"']", re.I)
+
+def english_home_links(html: str, base_url: str, policy: Optional[UrlPolicy] = None) -> List[str]:
+    policy = policy or UrlPolicy.from_url(base_url)
+    out = []
+    for before, href, after, inner in _A_TAG_RE.findall(html):
+        url = urldefrag(urljoin(base_url, unescape(href.strip())))[0]
+        is_english = _ENGLISH_ATTR_RE.search(before + after) or _text(inner).lower() == "english" or \
+            re.fullmatch(r"/en/?", urlparse(url).path)
+        if is_english and policy.allows(url) and url.rstrip("/") != base_url.rstrip("/") and url not in out:
+            out.append(url)
+    return out[:2]
+
+_LOC_RE = re.compile(r"<loc>\s*(?:<!\[CDATA\[)?\s*(.*?)\s*(?:\]\]>)?\s*</loc>", re.I | re.S)
+_SITEMAP_INDEX_RE = re.compile(r"<sitemapindex\b", re.I)
+# Listing pages, not individual notices ("/vacancies", "/en/recruitment", "/careers-notices1.aspx")
+_SITEMAP_PAGE_RE = re.compile(r"vacanc|recruit|career|\bjobs?\b|deputation", re.I)
+
+def sitemap_locs(xml: str) -> Tuple[List[str], bool]:
+    """(<loc> URLs, whether the document is a sitemap index of further sitemaps)."""
+    return [unescape(u) for u in _LOC_RE.findall(xml)], bool(_SITEMAP_INDEX_RE.search(xml))
+
+def sitemap_recruitment_urls(xml: str, policy: UrlPolicy, limit: int = 12) -> List[str]:
+    """Recruitment listing pages named in a sitemap, on the source's own domain; shortest paths first."""
+    ranked: Dict[str, Tuple[int, int, int]] = {}
+    for url in sitemap_locs(xml)[0]:
+        url = urldefrag(url)[0]
+        path = urlparse(url).path
+        if not policy.allows(url) or _doc_type(url) != "HTML" or _EXCLUDE_RE.search(url):
+            continue
+        m = _SITEMAP_PAGE_RE.search(path)
+        if not m:
+            continue
+        rank = next((i for i, k in enumerate(_NAV_PRIORITY) if k in m.group(0).lower()), len(_NAV_PRIORITY))
+        ranked[url] = min((rank, path.count("/"), len(path)), ranked.get(url, (99, 0, 0)))
+    return sorted(ranked, key=ranked.get)[:limit]
+
 def analyze(fetch: FetchResult, fetch_mode: str, policy: Optional[UrlPolicy] = None) -> ProbeResult:
     if fetch.error:
         fetch.error.fetch_mode = fetch_mode
@@ -257,8 +296,33 @@ class PageFetcher:
             result = analyze(await self.fetch_browser(url, policy), "BROWSER", policy)
         return result
 
+    async def sitemap_candidates(self, home: str, policy: UrlPolicy, max_sitemaps: int = 6, limit: int = 12) -> List[str]:
+        """Recruitment pages listed in the site's sitemaps (robots.txt `Sitemap:` lines, else /sitemap.xml)."""
+        try:
+            queue = await self._robots.sitemaps(home, policy) or [urljoin(home, "/sitemap.xml")]
+        except UrlRefused:
+            return []
+        seen, found = set(), []
+        while queue and len(seen) < max_sitemaps and len(found) < limit:
+            sm = queue.pop(0)
+            if sm in seen or sm.lower().endswith(".gz"):
+                continue
+            seen.add(sm)
+            fetched = await self.fetch_http(sm, policy)  # policy + robots checked like any page
+            if fetched.error or fetched.status != 200 or "<loc>" not in fetched.html.lower():
+                continue
+            locs, is_index = sitemap_locs(fetched.html)
+            if is_index:
+                # Page sitemaps before post/media ones: listing pages live there
+                queue += sorted((u for u in locs if policy.allows(u)), key=lambda u: ("page" not in u.lower(), len(u)))
+                continue
+            found += [u for u in sitemap_recruitment_urls(fetched.html, policy) if u not in found]
+        return found[:limit]
+
     async def discover(self, url: str, policy: Optional[UrlPolicy] = None) -> ProbeResult:
-        """Probe the configured page; if it's wrong/missing, look for the site's own Vacancies/Recruitment link."""
+        """Probe the configured page; if it's wrong/missing, look for the site's own Vacancies/Recruitment page:
+        homepage menu, the English homepage's menu (bilingual portals open in Hindi), the sitemap, then the
+        JavaScript-rendered homepage menu."""
         policy = policy or UrlPolicy.from_url(url)
         result = await self.probe(url, policy)
         if result.status not in ("HTTP_ERROR", "NO_NOTICES"):
@@ -266,18 +330,40 @@ class PageFetcher:
 
         parts = urlparse(result.final_url or url)
         home = f"{parts.scheme}://{parts.netloc}/"
+        tried = {url.rstrip("/")}
+
+        async def first_ok(candidates: List[str], how: str) -> Optional[ProbeResult]:
+            for candidate in candidates:
+                if candidate.rstrip("/") in tried:
+                    continue
+                tried.add(candidate.rstrip("/"))
+                located = await self.probe(candidate, policy)
+                if located.status == "OK":
+                    located.detail = f"located via {how} (configured URL: {result.status} {result.http_status or ''})".strip()
+                    return located
+            return None
+
         home_fetch = await self.fetch_http(home, policy)
-        candidates = recruitment_nav_links(home_fetch.html, home_fetch.final_url or home, policy=policy) if not home_fetch.error else []
-        if not candidates and self.allow_browser and not home_fetch.error:
+        if not home_fetch.error:
+            home_url = home_fetch.final_url or home
+            located = await first_ok(recruitment_nav_links(home_fetch.html, home_url, policy=policy), "homepage link")
+            if located:
+                return located
+            for english in english_home_links(home_fetch.html, home_url, policy):
+                en_fetch = await self.fetch_http(english, policy)
+                if not en_fetch.error:
+                    located = await first_ok(recruitment_nav_links(en_fetch.html, en_fetch.final_url or english, policy=policy),
+                                             "English homepage link")
+                    if located:
+                        return located
+        located = await first_ok(await self.sitemap_candidates(home, policy), "sitemap")
+        if located:
+            return located
+        if self.allow_browser and not home_fetch.error:
             rendered = await self.fetch_browser(home, policy)
             if not rendered.error:
-                candidates = recruitment_nav_links(rendered.html, rendered.final_url or home, policy=policy)
-
-        for candidate in candidates:
-            if candidate.rstrip("/") == url.rstrip("/"):
-                continue
-            located = await self.probe(candidate, policy)
-            if located.status == "OK":
-                located.detail = f"located via homepage link (configured URL: {result.status} {result.http_status or ''})".strip()
-                return located
+                located = await first_ok(recruitment_nav_links(rendered.html, rendered.final_url or home, policy=policy),
+                                         "rendered homepage link")
+                if located:
+                    return located
         return result

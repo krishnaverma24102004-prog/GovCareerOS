@@ -1,6 +1,6 @@
 """
 Candidate official recruitment sources (Government of India ministries, recruitment
-bodies, defence/CAPF, PSU banks, autonomous bodies).
+bodies, defence/CAPF, PSU banks, autonomous bodies) and state public service commissions.
 
 These are CANDIDATES. A source is only enabled after `scripts/verify_sources.py`
 has fetched its page and found recruitment content there; unverified entries stay
@@ -33,6 +33,7 @@ DEFENCE = "DEFENCE_CAPF"
 BANK = "PSU_BANK_REGULATOR"
 BODY = "AUTONOMOUS_BODY_PSU"
 AGGREGATOR = "OFFICIAL_AGGREGATOR"
+STATE_PSC = "STATE_PSC"
 
 SOURCES: List[SourceSpec] = [
     # Central recruitment commissions / boards
@@ -66,12 +67,12 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("POWER", "Ministry of Power", MINISTRY, "https://powermin.gov.in/en/vacancies"),
     SourceSpec("MOEFCC", "Ministry of Environment, Forest & Climate Change", MINISTRY, "https://moef.gov.in/vacancies"),
     SourceSpec("MOSPI", "Ministry of Statistics & Programme Implementation", MINISTRY, "https://www.mospi.gov.in/vacancies"),
-    SourceSpec("MIB", "Ministry of Information & Broadcasting", MINISTRY, "https://mib.gov.in/vacancies"),
+    SourceSpec("MIB", "Ministry of Information & Broadcasting", MINISTRY, "https://mib.gov.in/en/offerings/vacancies"),
     SourceSpec("MOCA", "Ministry of Civil Aviation", MINISTRY, "https://www.civilaviation.gov.in/vacancies"),
     SourceSpec("MOPSW", "Ministry of Ports, Shipping & Waterways", MINISTRY, "https://shipmin.gov.in/vacancies"),
     SourceSpec("TEXTILES", "Ministry of Textiles", MINISTRY, "https://texmin.nic.in/vacancies"),
     SourceSpec("MNRE", "Ministry of New & Renewable Energy", MINISTRY, "https://mnre.gov.in/en/vacancies/"),
-    SourceSpec("DST", "Department of Science & Technology", MINISTRY, "https://dst.gov.in/vacancies"),
+    SourceSpec("DST", "Department of Science & Technology", MINISTRY, "https://dst.gov.in/administrationfinance/recruitment-cell"),
     SourceSpec("DBT", "Department of Biotechnology", MINISTRY, "https://dbtindia.gov.in/vacancies"),
     SourceSpec("CULTURE", "Ministry of Culture", MINISTRY, "https://www.indiaculture.gov.in/vacancies"),
     SourceSpec("TOURISM", "Ministry of Tourism", MINISTRY, "https://tourism.gov.in/vacancies"),
@@ -92,7 +93,8 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("POSTS", "Department of Posts", MINISTRY, "https://www.indiapost.gov.in/VAS/Pages/Recruitment.aspx"),
     SourceSpec("CONSUMER-AFFAIRS", "Department of Consumer Affairs", MINISTRY, "https://consumeraffairs.nic.in/vacancies"),
     SourceSpec("FOOD-PD", "Department of Food & Public Distribution", MINISTRY, "https://dfpd.gov.in/vacancies.htm"),
-    SourceSpec("YAS", "Ministry of Youth Affairs & Sports", MINISTRY, "https://yas.gov.in/vacancies"),
+    # No vacancies page; the English homepage lists the ministry's recruitment notices
+    SourceSpec("YAS", "Ministry of Youth Affairs & Sports", MINISTRY, "https://yas.gov.in/en"),
     SourceSpec("PANCHAYATI-RAJ", "Ministry of Panchayati Raj", MINISTRY, "https://panchayat.gov.in/vacancies"),
     SourceSpec("MINORITY", "Ministry of Minority Affairs", MINISTRY, "https://minorityaffairs.gov.in/vacancies"),
     SourceSpec("PARLIAMENTARY", "Ministry of Parliamentary Affairs", MINISTRY, "https://mpa.gov.in/vacancies"),
@@ -110,11 +112,13 @@ SOURCES: List[SourceSpec] = [
     # Banking regulators / PSU banks / insurance
     SourceSpec("RBI", "Reserve Bank of India", BANK, "https://opportunities.rbi.org.in/Scripts/Vacancies.aspx"),
     SourceSpec("SBI", "State Bank of India", BANK, "https://sbi.co.in/web/careers/current-openings"),
-    SourceSpec("NABARD", "National Bank for Agriculture & Rural Development", BANK, "https://www.nabard.org/careers-notices1.aspx"),
+    # Found through the site's sitemap.xml
+    SourceSpec("NABARD", "National Bank for Agriculture & Rural Development", BANK, "https://www.nabard.org/careers-notices1.aspx?cid=693&id=26"),
     SourceSpec("LIC", "Life Insurance Corporation of India", BANK, "https://licindia.in/careers"),
 
     # Autonomous bodies / scientific organisations / PSUs
-    SourceSpec("DRDO", "Defence Research & Development Organisation", BODY, "https://www.drdo.gov.in/drdo/careers"),
+    # The careers page is gone; the English homepage lists advertisements (the Hindi one lives on an IDN domain)
+    SourceSpec("DRDO", "Defence Research & Development Organisation", BODY, "https://drdo.gov.in/drdo/en/"),
     SourceSpec("ISRO", "Indian Space Research Organisation", BODY, "https://www.isro.gov.in/Careers.html"),
     SourceSpec("BARC", "Bhabha Atomic Research Centre", BODY, "https://www.barc.gov.in/careers/"),
     SourceSpec("AIIMS", "All India Institute of Medical Sciences, New Delhi", BODY, "https://www.aiimsexams.ac.in/"),
@@ -126,4 +130,23 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("CSIR", "Council of Scientific & Industrial Research", BODY, "https://www.csir.res.in/en/career-opportunities"),
     SourceSpec("ICAR", "Indian Council of Agricultural Research", BODY, "https://icar.org.in/vacancies"),
     SourceSpec("NHAI", "National Highways Authority of India", BODY, "https://nhai.gov.in/#/vacancies/current"),
+
+    # State public service commissions: each URL returned recruitment links on its own domain (live probe
+    # 2026-09-30). Left out: KPSC Karnataka (malformed HTTP header), WBPSC/HPPSC/PSSSB (servers need
+    # insecure legacy TLS renegotiation), MPPSC (robots.txt disallows), TGPSC (redirects to http),
+    # Kerala PSC/OPSC/OSSC (no recruitment links in the served HTML).
+    SourceSpec("UPPSC", "Uttar Pradesh Public Service Commission", STATE_PSC, "https://uppsc.up.nic.in/"),
+    SourceSpec("BPSC", "Bihar Public Service Commission", STATE_PSC, "https://bpsc.bihar.gov.in/"),
+    SourceSpec("MPSC", "Maharashtra Public Service Commission", STATE_PSC, "https://mpsc.gov.in/adv_notification/8"),
+    SourceSpec("RPSC", "Rajasthan Public Service Commission", STATE_PSC, "https://rpsc.rajasthan.gov.in/advertisements"),
+    SourceSpec("TNPSC", "Tamil Nadu Public Service Commission", STATE_PSC, "https://www.tnpsc.gov.in/English/notification.aspx"),
+    SourceSpec("GPSC", "Gujarat Public Service Commission", STATE_PSC, "https://gpsc.gujarat.gov.in/"),
+    SourceSpec("HPSC", "Haryana Public Service Commission", STATE_PSC, "https://hpsc.gov.in/en-us/"),
+    SourceSpec("PPSC", "Punjab Public Service Commission", STATE_PSC, "https://ppsc.gov.in/"),
+    SourceSpec("APPSC", "Andhra Pradesh Public Service Commission", STATE_PSC, "https://portal-psc.ap.gov.in/HomePages/RecruitmentNotifications"),
+    SourceSpec("UKPSC", "Uttarakhand Public Service Commission", STATE_PSC, "https://psc.uk.gov.in/candidate-corner/recruitment"),
+    SourceSpec("APSC", "Assam Public Service Commission", STATE_PSC, "https://apsc.nic.in/"),
+    SourceSpec("JKPSC", "Jammu & Kashmir Public Service Commission", STATE_PSC, "https://jkpsc.nic.in/"),
+    SourceSpec("JPSC", "Jharkhand Public Service Commission", STATE_PSC, "https://www.jpsc.gov.in/"),
+    SourceSpec("CGPSC", "Chhattisgarh Public Service Commission", STATE_PSC, "https://psc.cg.gov.in/Advertisement.php"),
 ]

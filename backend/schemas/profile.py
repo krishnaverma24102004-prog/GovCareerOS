@@ -25,6 +25,7 @@ class PersonalInfoIn(_In):
     armed_forces_service_months: Optional[int] = Field(None, ge=0)
     is_central_govt_employee: Optional[bool] = None
     central_govt_service_start: Optional[date] = None
+    is_state_govt_employee: Optional[bool] = None
     career_interests: Optional[str] = None
     nationality: Optional[str] = None
     contact: Optional[str] = None
