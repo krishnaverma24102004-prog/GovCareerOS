@@ -25,6 +25,7 @@ from govcareeros.backend.models.user import ProfileVersion, User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
 from govcareeros.backend.relevance import service as relevance_service
+from govcareeros.backend.services.application_tracker import application_update_alerts
 
 DEADLINE_WINDOW = timedelta(days=7)
 AGE_HEADROOM_YEARS = 1
@@ -144,5 +145,8 @@ async def run_radar(session: AsyncSession, now: Optional[datetime] = None, user_
         stmt = stmt.where(User.id.in_(user_ids))
     for user in (await session.execute(stmt)).scalars().all():
         await run_for_user(session, user, now, run)
+        # Result/corrigendum notices for advertisements the user tracks an application for
+        for values in await application_update_alerts(session, user.id):
+            await _add_alert(session, run, **values)
     await session.flush()
     return run
