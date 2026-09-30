@@ -1,9 +1,12 @@
 import uuid
 from datetime import date, datetime
 from typing import Dict, Any, Optional
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from govcareeros.backend.repositories.profile_repository import ProfileRepository, SECTION_MODELS
 from govcareeros.backend.repositories.fact_repository import FactRepository
+
+_VERSION_RETRIES = 10
 
 class ProfileService:
     def __init__(self, session: AsyncSession):
@@ -40,10 +43,19 @@ class ProfileService:
         carry_over=True (PATCH): sections not provided are copied from the latest version.
         carry_over=False (PUT): the payload is the whole profile.
         """
-        latest = await self.profile_repo.latest_version(user_id)
-        number = await self.profile_repo.next_version_number(user_id)
-        version = await self.profile_repo.create_profile_version(
-            user_id, number, change_summary or ("Initial Profile" if latest is None else "Updated Profile"))
+        await self.profile_repo.lock_user(user_id)
+        for attempt in range(_VERSION_RETRIES):
+            latest = await self.profile_repo.latest_version(user_id)
+            number = await self.profile_repo.next_version_number(user_id)
+            try:
+                # Savepoint: a concurrent save that took this number fails only this insert, then we renumber
+                async with self.session.begin_nested():
+                    version = await self.profile_repo.create_profile_version(
+                        user_id, number, change_summary or ("Initial Profile" if latest is None else "Updated Profile"))
+                break
+            except IntegrityError:
+                if attempt == _VERSION_RETRIES - 1:
+                    raise
         for key, model in SECTION_MODELS.items():
             payload = sections.get(key)
             if payload is None:

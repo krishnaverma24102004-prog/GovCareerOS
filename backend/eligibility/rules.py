@@ -115,6 +115,9 @@ def check_age(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Op
 
     age = age_on(profile.date_of_birth, crucial)
     evidence = f"DOB {profile.date_of_birth.isoformat()}, category {category}, age {age} on crucial date {crucial.isoformat()}"
+    if age < 0:
+        # Only a stored row that predates DOB validation can get here; never score impossible data
+        return [RuleOutcome("AGE", "UNKNOWN", "date of birth is after the crucial date", f"max age: {stated}", evidence, source_page=page)]
     # A category-specific limit wins; "ALL" is a single limit the notice states for everyone
     limit = next((r for r in limits if r.value["category"] == category), None) or \
         next((r for r in limits if r.value["category"] == "ALL"), None)
@@ -125,6 +128,11 @@ def check_age(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Op
 
     max_age = limit.value["max_age"]
     req_text = f"max age {max_age} for {limit.value['category']}"
+    min_age = limit.value.get("min_age")
+    if min_age is not None and age < min_age:
+        # Relaxations only raise the upper limit
+        return [RuleOutcome("AGE", "NOT_MET", f"age {age} < minimum {min_age}", f"age {min_age}-{max_age} for {limit.value['category']}",
+                            evidence, limit.id, limit.source_page)]
     if age <= max_age:
         return [RuleOutcome("AGE", "MET", f"age {age} <= {max_age}", req_text, evidence, limit.id, limit.source_page)]
 

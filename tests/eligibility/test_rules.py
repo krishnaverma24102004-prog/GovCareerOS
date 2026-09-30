@@ -7,6 +7,7 @@ from govcareeros.backend.eligibility.rules import (
     check_citizenship, EducationEntry, ExperienceEntry, ProfileSnapshot, Requirement, age_on, check_age, check_education,
     check_experience, overall_status, RuleOutcome,
 )
+from govcareeros.backend.extraction.validator import age_limits_in
 
 CRUCIAL = date(2026, 10, 16)
 
@@ -74,6 +75,18 @@ def test_age_unknown_without_dob_category_or_stated_limit():
 def test_general_category_maps_to_ur_limit():
     o = outcome(check_age(profile(category="General", date_of_birth=date(1996, 5, 1)), AGE, CRUCIAL))  # 30
     assert o.outcome == "MET" and o.requirement == "max age 30 for UR"
+
+def test_below_minimum_age_is_not_met():
+    # ITBP Head Constable, verbatim: "Between 18 and 25 years" -> {"category": "ALL", "min_age": 18, "max_age": 25}
+    itbp = [Requirement("a", "AGE_MAX", limit, 3) for limit in age_limits_in("Between 18 and 25 years")]
+    o = outcome(check_age(profile(date_of_birth=date(2010, 1, 1)), itbp, CRUCIAL))  # 16
+    assert o.outcome == "NOT_MET" and o.rule == "age 16 < minimum 18" and o.source_page == 3
+    assert outcome(check_age(profile(date_of_birth=date(2008, 10, 16)), itbp, CRUCIAL)).outcome == "MET"  # 18 on the day
+
+def test_dob_after_crucial_date_is_never_scored():
+    # Hand-built to reproduce the reported bug (DOB 2030 stored before input validation existed); no real document shows it
+    o = outcome(check_age(profile(date_of_birth=date(2030, 1, 1)), AGE, CRUCIAL))
+    assert o.outcome == "UNKNOWN" and "after the crucial date" in o.rule
 
 # ---------- education ----------
 

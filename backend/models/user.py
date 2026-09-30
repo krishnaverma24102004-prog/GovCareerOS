@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Text, Boolean, ForeignKey, DateTime, Integer
+from sqlalchemy import String, Text, Boolean, ForeignKey, DateTime, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from govcareeros.backend.models.base import Base, TimestampMixin
 
@@ -18,6 +18,7 @@ class User(Base, TimestampMixin):
 
 class ProfileVersion(Base, TimestampMixin):
     __tablename__ = "profile_versions"
+    __table_args__ = (UniqueConstraint("user_id", "version_number", name="uq_profile_versions_user_version"),)
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     version_number: Mapped[int] = mapped_column(Integer, index=True)

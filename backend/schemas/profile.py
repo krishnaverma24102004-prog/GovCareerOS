@@ -4,6 +4,8 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+_MAX_AGE_YEARS = 100
+
 class _In(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -28,6 +30,15 @@ class PersonalInfoIn(_In):
     contact: Optional[str] = None
     address: Optional[str] = None
     preferred_locations: Optional[str] = None
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _plausible_dob(cls, v):
+        # A mistyped year would otherwise give a negative or absurd age to the eligibility engine
+        today = date.today()
+        if v is not None and not date(today.year - _MAX_AGE_YEARS, 1, 1) <= v <= today:
+            raise ValueError(f"date of birth must lie between {today.year - _MAX_AGE_YEARS}-01-01 and today")
+        return v
 
 class EducationIn(_In):
     degree: str
@@ -108,6 +119,11 @@ class PersonalInfoOut(PersonalInfoIn, _Out):
     @classmethod
     def _dt_to_date(cls, v):
         return v.date() if isinstance(v, datetime) else v
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _plausible_dob(cls, v):
+        return v  # stored rows are shown as they are; the bound applies to input only
 
 def _out(model):
     class Out(model):
