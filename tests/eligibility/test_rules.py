@@ -37,8 +37,24 @@ def test_age_within_category_limit():
     assert o.outcome == "MET" and "33" in o.rule and o.source_page == 8
 
 def test_age_over_limit_is_not_met():
-    o = outcome(check_age(profile(date_of_birth=date(1990, 1, 1)), AGE, CRUCIAL))  # 36
+    answered = dict(is_pwbd=False, is_ex_serviceman=False, is_central_govt_employee=False)
+    o = outcome(check_age(profile(date_of_birth=date(1990, 1, 1), **answered), AGE, CRUCIAL))  # 36
     assert o.outcome == "NOT_MET"
+
+def test_over_age_stays_open_when_relaxation_rules_and_answers_are_missing():
+    # No General Instructions extracted and ex-serviceman / govt-servant status not answered
+    o = outcome(check_age(profile(date_of_birth=date(1990, 1, 1)), AGE, CRUCIAL))
+    assert o.outcome == "UNKNOWN" and "relaxation rules were not extracted" in o.rule
+
+def test_single_limit_for_all_categories():
+    all_limit = [Requirement("a", "AGE_MAX", {"category": "ALL", "max_age": 56}, 1)]
+    answered = dict(is_pwbd=False, is_ex_serviceman=False, is_central_govt_employee=False)
+    assert outcome(check_age(profile(date_of_birth=date(1972, 1, 1), **answered), all_limit, CRUCIAL)).outcome == "MET"  # 54
+    ur_over = outcome(check_age(profile(date_of_birth=date(1968, 1, 1), category="UR", **answered), all_limit, CRUCIAL))  # 58
+    assert ur_over.outcome == "NOT_MET" and ur_over.requirement == "max age 56 for ALL"
+    # An SC candidate over a single "ALL" limit may still have a concession the notice text states elsewhere
+    sc_over = outcome(check_age(profile(date_of_birth=date(1968, 1, 1), category="SC", **answered), all_limit, CRUCIAL))
+    assert sc_over.outcome == "UNKNOWN"
 
 def test_pwbd_relaxation_requires_stated_status():
     over = date(1985, 1, 1)  # 41: over 33, within 43
@@ -46,7 +62,8 @@ def test_pwbd_relaxation_requires_stated_status():
     # The General Instructions require at least 40% disability; without a percentage it can't be settled
     assert outcome(check_age(profile(date_of_birth=over, is_pwbd=True), AGE, CRUCIAL)).outcome == "UNKNOWN"
     assert outcome(check_age(profile(date_of_birth=over, is_pwbd=None), AGE, CRUCIAL)).outcome == "UNKNOWN"
-    assert outcome(check_age(profile(date_of_birth=over, is_pwbd=False), AGE, CRUCIAL)).outcome == "NOT_MET"
+    assert outcome(check_age(profile(date_of_birth=over, is_pwbd=False, is_ex_serviceman=False, is_central_govt_employee=False),
+                             AGE, CRUCIAL)).outcome == "NOT_MET"
 
 def test_age_unknown_without_dob_category_or_stated_limit():
     assert outcome(check_age(profile(date_of_birth=None), AGE, CRUCIAL)).outcome == "UNKNOWN"

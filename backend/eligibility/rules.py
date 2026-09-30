@@ -115,14 +115,16 @@ def check_age(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Op
 
     age = age_on(profile.date_of_birth, crucial)
     evidence = f"DOB {profile.date_of_birth.isoformat()}, category {category}, age {age} on crucial date {crucial.isoformat()}"
-    limit = next((r for r in limits if r.value["category"] == category), None)
+    # A category-specific limit wins; "ALL" is a single limit the notice states for everyone
+    limit = next((r for r in limits if r.value["category"] == category), None) or \
+        next((r for r in limits if r.value["category"] == "ALL"), None)
     if limit is None:
         # e.g. a post whose block states limits for OBC only; the general relaxation rules are not parsed
         return [RuleOutcome("AGE", "UNKNOWN", f"no age limit stated for category {category} in this vacancy",
                             f"max age: {stated}", evidence, source_page=page)]
 
     max_age = limit.value["max_age"]
-    req_text = f"max age {max_age} for {category}"
+    req_text = f"max age {max_age} for {limit.value['category']}"
     if age <= max_age:
         return [RuleOutcome("AGE", "MET", f"age {age} <= {max_age}", req_text, evidence, limit.id, limit.source_page)]
 
@@ -143,6 +145,14 @@ def check_age(profile: ProfileSnapshot, reqs: Sequence[Requirement], crucial: Op
         return [RuleOutcome("AGE", "UNKNOWN", f"age {age} fits only if relaxations {[o.basis for o in open_options]} are combined",
                             req_text, evidence, limit.id, limit.source_page,
                             note="the notification does not state whether these relaxations are cumulative")]
+    rules_known = any(r.req_type == "AGE_RELAXATION_RULE" for r in reqs)
+    # A category-specific limit already includes that category's concession; only a single "ALL" limit leaves it open
+    may_have_relaxation = (limit.value["category"] == "ALL" and category != "UR") or any(
+        flag is not False for flag in (profile.is_pwbd, profile.is_ex_serviceman, profile.is_central_govt_employee))
+    if not rules_known and may_have_relaxation:
+        # e.g. a notice that states one limit for everyone; its relaxation rules were not extracted
+        return [RuleOutcome("AGE", "UNKNOWN", f"age {age} > {max_age}; the notice's age relaxation rules were not extracted",
+                            req_text, evidence, limit.id, limit.source_page)]
     ruled_out = "; ".join(f"{o.basis}: {o.evidence}" for o in options) or "no relaxation rules found"
     return [RuleOutcome("AGE", "NOT_MET", f"age {age} > {max_age} and no applicable relaxation", req_text,
                         f"{evidence}; {ruled_out}", limit.id, limit.source_page)]

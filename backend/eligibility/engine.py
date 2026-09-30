@@ -82,6 +82,10 @@ async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id
     crucial = crucial_dt.astimezone(IST).date() if crucial_dt else None
 
     outcomes = rules.evaluate(snapshot, reqs, crucial)
+    if vacancy.eligibility_crucial_date is None and vacancy.application_deadline is not None:
+        outcomes.append(rules.RuleOutcome("CRUCIAL_DATE", "NOT_EVALUATED",
+                                          "the notice text used does not state a crucial date; the closing date was used for age and experience",
+                                          "-", f"closing date {crucial.isoformat()}"))
     status, confidence = rules.overall_status(outcomes)
 
     result = EligibilityResult(

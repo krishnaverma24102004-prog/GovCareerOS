@@ -13,8 +13,14 @@ class Settings(BaseSettings):
     DB_ECHO: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    LLM_PROVIDER: str = "gemini"
-    LLM_MODEL: str = "gemini-1.5-pro"
+    # Local-first default: a model served by the local Ollama install
+    LLM_PROVIDER: str = "ollama"
+    LLM_MODEL: str = "huihui_ai/qwen3-abliterated:8b-v2-q4_K_M"
+    OLLAMA_URL: str = "http://127.0.0.1:11434"
+    LLM_TIMEOUT_SECONDS: float = 1200
+    LLM_NUM_CTX: int = 8192
+    NVIDIA_API_KEY: str = ""
+    NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
     GOOGLE_API_KEY: str = ""
 
     EMAIL_HOST: str = "smtp.gmail.com"

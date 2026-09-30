@@ -12,6 +12,8 @@ class User(Base, TimestampMixin):
     hashed_password: Mapped[str] = mapped_column(String(255))
     full_name: Mapped[Optional[str]] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # May approve LLM extraction drafts into vacancies
+    is_reviewer: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     profile_versions: Mapped[List["ProfileVersion"]] = relationship(back_populates="user")
 
 class ProfileVersion(Base, TimestampMixin):

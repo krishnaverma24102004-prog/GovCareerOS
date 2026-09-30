@@ -11,3 +11,4 @@ from govcareeros.backend.models.auth import BrowserSessionState
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.auth_token import AuthToken
 from govcareeros.backend.models.alert import UserAlert
+from govcareeros.backend.models.extraction import ExtractionDraft

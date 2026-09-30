@@ -1,0 +1,124 @@
+{
+ "model": "nvidia/nemotron-3-super-120b-a12b",
+ "prompt_version": "vacancy_locate/1",
+ "document": "BSF_e0ee6e833f.pdf",
+ "chunks": [
+  {
+   "pages": [
+    1,
+    2,
+    3
+   ],
+   "seconds": 438.0,
+   "error": null,
+   "raw": {
+    "vacancies": [
+     {
+      "post_name": {
+       "value": "Specialist Doctors",
+       "quote": "(a) Specialist Doctors - Rs. 85,000/-Per Month",
+       "page": 1
+      },
+      "vacancy_count": {
+       "value": null,
+       "quote": "",
+       "page": 0
+      },
+      "last_date": {
+       "value": "03 Sept’ 2025",
+       "quote": "01 Sept’ 2025 to 03 Sept’ 2025",
+       "page": 1
+      },
+      "age_limit": {
+       "value": "67 years",
+       "quote": "Not more than 67 years",
+       "page": 1
+      },
+      "organization": {
+       "value": "Directorate General Border Security Force",
+       "quote": "Directorate General Border Security Force",
+       "page": 1
+      },
+      "pay_level": {
+       "value": "Rs. 85,000/-Per Month",
+       "quote": "(a) Specialist Doctors - Rs. 85,000/-Per Month",
+       "page": 1
+      },
+      "essential_qualification": {
+       "value": "(i) A recognized medical qualification included in the first or Second Schedule or Part II of the Third Schedule (other than that licentiate qualifications) to the Indian Medical Council Act, 1956.",
+       "quote": "(i) A recognized medical qualification included in the first or Second Schedule or Part II of the Third Schedule (other than that licentiate qualifications) to the Indian Medical Council Act, 1956.",
+       "page": 1
+      },
+      "experience": {
+       "value": "(iii) 1% years experience for Post Graduate Degree holder & 2% Years for Diploma holder in the concerned specialty after obtaining the Post Graduate Degree/Diploma or equivalent.",
+       "quote": "(iii) 1% years experience for Post Graduate Degree holder & 2% Years for Diploma holder in the concerned specialty after obtaining the Post Graduate Degree/Diploma or equivalent.",
+       "page": 1
+      },
+      "mode_of_selection": {
+       "value": "Suitable and willing male and female candidates may WALK IN FOR INTERVIEW",
+       "quote": "Suitable and willing male and female candidates may WALK IN FOR INTERVIEW",
+       "page": 1
+      },
+      "how_to_apply": {
+       "value": "Suitable and willing candidates may walk in for Interview to any of the place of Interview of their choice on 01 Sept 2025 to 03 Sept 2025 along with original & photocopies of all relevant documents",
+       "quote": "Suitable and willing candidates may walk in for Interview to any of the place of Interview of their choice on 01 Sept 2025 to 03 Sept 2025 along with original & photocopies of all relevant documents",
+       "page": 3
+      }
+     },
+     {
+      "post_name": {
+       "value": "General Duty Medical Officer",
+       "quote": "(b) General Duty Medical Officer - Rs. 75,000/-Per Month",
+       "page": 1
+      },
+      "vacancy_count": {
+       "value": null,
+       "quote": "",
+       "page": 0
+      },
+      "last_date": {
+       "value": "03 Sept’ 2025",
+       "quote": "01 Sept’ 2025 to 03 Sept’ 2025",
+       "page": 1
+      },
+      "age_limit": {
+       "value": "67 years",
+       "quote": "Not more than 67 years",
+       "page": 1
+      },
+      "organization": {
+       "value": "Directorate General Border Security Force",
+       "quote": "Directorate General Border Security Force",
+       "page": 1
+      },
+      "pay_level": {
+       "value": "Rs. 75,000/-Per Month",
+       "quote": "(b) General Duty Medical Officer - Rs. 75,000/-Per Month",
+       "page": 1
+      },
+      "essential_qualification": {
+       "value": "(i) A recognized medical qualification included in the first or Second Schedule or Part II of the Third Schedule (other than that licentiate qualifications) to the Indian Medical Council Act, 1956.",
+       "quote": "(i) A recognized medical qualification included in the first or Second Schedule or Part II of the Third Schedule (other than that licentiate qualifications) to the Indian Medical Council Act, 1956.",
+       "page": 1
+      },
+      "experience": {
+       "value": null,
+       "quote": "",
+       "page": 0
+      },
+      "mode_of_selection": {
+       "value": "Suitable and willing male and female candidates may WALK IN FOR INTERVIEW",
+       "quote": "Suitable and willing male and female candidates may WALK IN FOR INTERVIEW",
+       "page": 1
+      },
+      "how_to_apply": {
+       "value": "Suitable and willing candidates may walk in for Interview to any of the place of Interview of their choice on 01 Sept 2025 to 03 Sept 2025 along with original & photocopies of all relevant documents",
+       "quote": "Suitable and willing candidates may walk in for Interview to any of the place of Interview of their choice on 01 Sept 2025 to 03 Sept 2025 along with original & photocopies of all relevant documents",
+       "page": 3
+      }
+     }
+    ]
+   }
+  }
+ ]
+}
