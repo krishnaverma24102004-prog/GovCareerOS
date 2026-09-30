@@ -15,7 +15,7 @@ from govcareeros.backend.models.extraction import ExtractionDraft
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.user import User
-from govcareeros.backend.services import extraction_drafts
+from govcareeros.backend.services import exam_drafts, extraction_drafts
 
 router = APIRouter(prefix="/review", tags=["review"])
 
@@ -86,7 +86,10 @@ async def get_draft(draft_id: uuid.UUID, user: User = Depends(current_user), ses
 async def approve(draft_id: uuid.UUID, body: ApproveIn, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
     draft, source, title, url = await _load(session, draft_id)
     try:
-        await extraction_drafts.approve(session, draft, user, body.vacancy_indexes, body.note)
+        if exam_drafts.is_exam_draft(draft):
+            await exam_drafts.approve_exam_draft(session, draft, user, body.note)
+        else:
+            await extraction_drafts.approve(session, draft, user, body.vacancy_indexes, body.note)
     except PermissionError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     except extraction_drafts.DraftError as e:

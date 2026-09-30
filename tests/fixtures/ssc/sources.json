@@ -1,0 +1,22 @@
+{
+  "_note": "Unmodified responses from ssc.gov.in's public (no-login) endpoints, fetched with User-Agent 'GovCareerOS/0.1 (personal government-job tracker)'. robots.txt returned 404 at capture time. The endpoints were found by watching the XHR traffic of https://ssc.gov.in/ and https://ssc.gov.in/home/notice-board in headless Chromium.",
+  "notice_boards_page1.json": {
+    "url": "https://ssc.gov.in/api/general-website/portal/notice-boards?page=1&limit=10&contentType=notice-boards&key=createdAt&order=DESC&isAttachment=true&language=english&attributes=id,headline,examId,contentType,redirectUrl,startDate,endDate,language,createdAt",
+    "captured_at": "2026-09-30T08:33:03Z"
+  },
+  "notice_boards_page3.json": {
+    "url": "https://ssc.gov.in/api/general-website/portal/notice-boards?page=3&limit=10&contentType=notice-boards&key=createdAt&order=DESC&isAttachment=true&language=english&attributes=id,headline,examId,contentType,redirectUrl,startDate,endDate,language,createdAt",
+    "captured_at": "2026-09-30T08:33:03Z"
+  },
+  "live_exams.json": {
+    "url": "https://ssc.gov.in/api/admin/5.1/liveExams?examId=",
+    "captured_at": "2026-09-30T08:33:03Z"
+  },
+  "Notice_of_adv_chsle_2026.pdf": {
+    "url": "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Notice_of_adv_chsle_2026.pdf",
+    "title": "Notice of Combined Higher Secondary (10+2) Level Examination, 2026",
+    "published_on_notice_board": "2026-09-07T15:59:02.300Z",
+    "last_modified": "Tue, 08 Sep 2026 09:19:12 GMT",
+    "captured_at": "2026-09-30T08:29:12Z"
+  }
+}

@@ -38,7 +38,8 @@ SOURCES: List[SourceSpec] = [
     # Central recruitment commissions / boards
     SourceSpec("UPSC", "Union Public Service Commission", COMMISSION, "https://www.upsc.gov.in/recruitment/recruitment-advertisement", parser="upsc_advertisement"),
     SourceSpec("UPSC-EXAMS", "Union Public Service Commission", COMMISSION, "https://www.upsc.gov.in/examinations/active-exams"),
-    SourceSpec("SSC", "Staff Selection Commission", COMMISSION, "https://ssc.gov.in/"),
+    # JavaScript app; notices come from its public JSON API (backend/sources/ssc.py)
+    SourceSpec("SSC", "Staff Selection Commission", COMMISSION, "https://ssc.gov.in/home/notice-board", parser="ssc"),
     SourceSpec("IBPS", "Institute of Banking Personnel Selection", COMMISSION, "https://www.ibps.in/"),
     # rrbcdg.gov.in redirects here; the board's pages now live on the Indian Railways domain
     SourceSpec("RRB-CDG", "Railway Recruitment Board Chandigarh", COMMISSION, "https://rrb.indianrailways.gov.in/chandigarh"),

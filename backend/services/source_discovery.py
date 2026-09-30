@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.sources.generic_notices import PageFetcher, ProbeResult
+from govcareeros.backend.sources import ssc
 from govcareeros.backend.sources.notice_classifier import classify_notice
 from govcareeros.backend.sources.registry import SOURCES, SourceSpec
 from govcareeros.backend.sources.url_guard import UrlPolicy
@@ -70,12 +71,17 @@ def _probe_url(source: GovernmentSource) -> str:
     resolved = _config(source).get("resolved_url")
     return resolved if resolved and source_policy(source).allows(resolved) else source.recruitment_url
 
+def _classify(source: GovernmentSource, title: str, url: str) -> str:
+    return ssc.classify(title, url) if source.adapter_name == "ssc" else classify_notice(title, url)
+
 async def probe_sources(fetcher: PageFetcher, sources: List[GovernmentSource], concurrency: int = 6) -> List[ProbeResult]:
     sem = asyncio.Semaphore(concurrency)
 
     async def one(source: GovernmentSource) -> ProbeResult:
         async with sem:
             try:
+                if source.adapter_name == "ssc":
+                    return await ssc.probe(fetcher, allow_browser=getattr(fetcher, "allow_browser", False))
                 return await fetcher.discover(_probe_url(source), source_policy(source))
             except Exception as e:  # one broken site must not stop the sweep
                 return ProbeResult("UNREACHABLE", detail=f"{type(e).__name__}: {str(e)[:200]}")
@@ -112,9 +118,9 @@ async def record_probe(session: AsyncSession, source: GovernmentSource, result: 
             if h in known:
                 known[h].last_seen_at = now
                 # Classification is deterministic; re-apply so classifier fixes reach stored notices
-                known[h].notice_kind = classify_notice(link.title, link.url)
+                known[h].notice_kind = _classify(source, link.title, link.url)
                 continue
-            kind = classify_notice(link.title, link.url)
+            kind = _classify(source, link.title, link.url)
             session.add(RecruitmentNotice(
                 source_id=source.id, url=link.url, url_hash=h, title=link.title,
                 document_type=link.document_type, notice_kind=kind, found_on_url=result.final_url,

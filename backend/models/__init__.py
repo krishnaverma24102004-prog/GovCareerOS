@@ -13,3 +13,4 @@ from govcareeros.backend.models.auth_token import AuthToken
 from govcareeros.backend.models.alert import UserAlert
 from govcareeros.backend.models.extraction import ExtractionDraft
 from govcareeros.backend.models.digest import DigestRun
+from govcareeros.backend.models.exam import Exam, ExamPost, ExamRequirement, ExamFieldProvenance, ExamEligibilityResult, ExamEligibilityEvidence
