@@ -67,6 +67,16 @@ def _accepted(fields: Dict[str, Dict[str, Any]], name: str) -> Optional[Dict[str
     f = fields.get(name)
     return f if f and f.get("accepted") else None
 
+def _undecided(payload: Dict[str, Any]) -> List[int]:
+    return [i for i, v in enumerate(payload["vacancies"]) if not v.get("decision")]
+
+async def _close(session: AsyncSession, draft: ExtractionDraft, payload: Dict[str, Any]) -> None:
+    """Every vacancy is decided: the draft leaves the queue and the notice is settled."""
+    approved = any(v["decision"]["status"] == "APPROVED" for v in payload["vacancies"])
+    draft.status, draft.reviewed_at = ("APPROVED" if approved else "REJECTED"), datetime.now(timezone.utc)
+    if draft.notice_id:
+        (await session.get(RecruitmentNotice, draft.notice_id)).review_status = "PARSED" if approved else "REJECTED"
+
 async def approve(session: AsyncSession, draft: ExtractionDraft, reviewer: User,
                   vacancy_indexes: Optional[List[int]] = None, note: Optional[str] = None) -> List[Vacancy]:
     if not reviewer.is_reviewer:
@@ -77,15 +87,23 @@ async def approve(session: AsyncSession, draft: ExtractionDraft, reviewer: User,
     source = await session.get(GovernmentSource, draft.source_id)
     raw_url = (await session.execute(select(RecruitmentNotice.url).where(RecruitmentNotice.id == draft.notice_id))).scalar_one_or_none() \
         if draft.notice_id else None
-    indexes = vacancy_indexes if vacancy_indexes is not None else list(range(len(payload["vacancies"])))
-    created: List[Vacancy] = []
+    indexes = vacancy_indexes if vacancy_indexes is not None else _undecided(payload)
+    # Check every index before creating anything, so a bad request changes nothing
+    if not indexes:
+        raise DraftError("no vacancy selected; reject the draft if none of its vacancies is right")
+    if len(set(indexes)) != len(indexes):
+        raise DraftError(f"duplicate vacancy index in {indexes}")
     for i in indexes:
         if not 0 <= i < len(payload["vacancies"]):
             raise DraftError(f"vacancy index {i} out of range")
+        if payload["vacancies"][i].get("decision"):
+            raise DraftError(f"vacancy {i} is already {payload['vacancies'][i]['decision']['status']}")
+        if _accepted(payload["vacancies"][i]["fields"], "post_name") is None:
+            raise DraftError(f"vacancy {i} has no verified post name and cannot be approved")
+    created: List[Vacancy] = []
+    for i in indexes:
         fields = payload["vacancies"][i]["fields"]
         post = _accepted(fields, "post_name")
-        if post is None:
-            raise DraftError(f"vacancy {i} has no verified post name and cannot be approved")
         count = _accepted(fields, "vacancy_count")
         last = _accepted(fields, "last_date")
         pay = _accepted(fields, "pay_level")
@@ -125,11 +143,13 @@ async def approve(session: AsyncSession, draft: ExtractionDraft, reviewer: User,
                 source_excerpt=f["quote"][:400],
             ))
         created.append(vacancy)
-    draft.status, draft.reviewer_id, draft.reviewed_at, draft.review_note = "APPROVED", reviewer.id, datetime.now(timezone.utc), note
-    draft.created_vacancy_ids = json.dumps([str(v.id) for v in created])
-    if draft.notice_id:
-        notice = await session.get(RecruitmentNotice, draft.notice_id)
-        notice.review_status = "PARSED"
+        payload["vacancies"][i]["decision"] = {"status": "APPROVED", "vacancy_id": str(vacancy.id), "reviewer_id": str(reviewer.id)}
+    # The draft stays in the queue until every vacancy in it is approved or rejected
+    draft.payload = json.dumps(payload, ensure_ascii=False)
+    draft.reviewer_id, draft.review_note = reviewer.id, note or draft.review_note
+    draft.created_vacancy_ids = json.dumps(json.loads(draft.created_vacancy_ids or "[]") + [str(v.id) for v in created])
+    if not _undecided(payload):
+        await _close(session, draft, payload)
     await session.flush()
     return created
 
@@ -138,9 +158,13 @@ async def reject(session: AsyncSession, draft: ExtractionDraft, reviewer: User, 
         raise PermissionError("only reviewers can reject drafts")
     if draft.status != "PENDING_REVIEW":
         raise DraftError(f"draft is {draft.status}, not PENDING_REVIEW")
-    draft.status, draft.reviewer_id, draft.reviewed_at, draft.review_note = "REJECTED", reviewer.id, datetime.now(timezone.utc), note
-    if draft.notice_id:
-        (await session.get(RecruitmentNotice, draft.notice_id)).review_status = "REJECTED"
+    # Rejects the vacancies not yet decided; ones already approved stay, and then the draft counts as approved
+    payload = json.loads(draft.payload)
+    for i in _undecided(payload):
+        payload["vacancies"][i]["decision"] = {"status": "REJECTED", "reviewer_id": str(reviewer.id)}
+    draft.payload = json.dumps(payload, ensure_ascii=False)
+    draft.reviewer_id, draft.review_note = reviewer.id, note
+    await _close(session, draft, payload)
     await session.flush()
     return draft
 

@@ -2,8 +2,9 @@
 LLM draft -> validator -> review queue -> Vacancy, on a real BSF walk-in notice (scanned, OCR) and the
 real output nvidia/nemotron-3-super-120b-a12b produced for it on 30-09-2026 (replayed, not generated).
 """
+import copy
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -13,9 +14,9 @@ from govcareeros.backend.documents.pdf_text import extract_pages, tessdata_dir
 from govcareeros.backend.extraction.llm_extractor import extract
 from govcareeros.backend.extraction.validator import IST
 from govcareeros.backend.llm.provider import LLMResponse
-from govcareeros.backend.models import User, Vacancy, VacancyFieldProvenance, VacancyRequirement
+from govcareeros.backend.models import RecruitmentNotice, User, Vacancy, VacancyFieldProvenance, VacancyRequirement
 from govcareeros.backend.services.extraction_drafts import create_draft
-from govcareeros.backend.services.source_discovery import sync_registry
+from govcareeros.backend.services.source_discovery import sync_registry, url_hash
 from govcareeros.backend.sources.registry import SOURCES
 
 LLM = Path(__file__).parents[1] / "fixtures" / "llm"
@@ -32,6 +33,7 @@ class ReplayProvider:
 
     def __init__(self, recording):
         self.model = recording["model"]
+        self.prompt_version = recording["prompt_version"]  # the prompt the recorded answer was produced with
         self._answers = [c["raw"] for c in recording["chunks"]]
 
     async def complete_json(self, system, user, schema):
@@ -47,18 +49,51 @@ async def test_recorded_output_passes_validation_without_fabrication():
     fabricated = [f for v in result.vacancies for f in v.fields.values() if f.reason == "quote not found in document"]
     assert fabricated == []
     doctors = result.vacancies[0].fields
+    assert all(doctors[f].accepted for f in ("post_name", "last_date", "age_limit", "organization", "pay_level",
+                                             "essential_qualification", "experience", "mode_of_selection", "how_to_apply"))
     assert doctors["age_limit"].value == [{"category": "ALL", "max_age": 67}]
     # "01 Sept' 2025 to 03 Sept' 2025": the later date closes; no time stated -> 23:59 IST
     assert doctors["last_date"].value == datetime(2025, 9, 3, 23, 59, tzinfo=IST)
     assert "time not stated" in doctors["last_date"].reason
     assert doctors["essential_qualification"].quote.startswith("(i) A recognized medical qualification")
 
+@pytest.mark.asyncio
+async def test_tampered_recording_is_rejected():
+    """The real answer with invented text put in: the validator must refuse exactly the tampered fields."""
+    recording = copy.deepcopy(RECORDING)
+    doctors, gdmo = recording["chunks"][0]["raw"]["vacancies"]
+    # Not in the PDF at all
+    doctors["essential_qualification"]["quote"] = "MBBS degree from a university recognised by the National Medical Commission"
+    # One digit changed: an OCR near match still finds "Not more than 67 years", but 62 is not what the notice says
+    doctors["age_limit"].update(value="62 years", quote="Not more than 62 years")
+    # A post the notice does not name, quoted from a line that exists
+    gdmo["post_name"]["value"] = "Chief Medical Officer"
+    # The interview date as the value of a date quote that does not contain it
+    doctors["last_date"]["value"] = "12 Sept 2025"
+    result = await extract(extract_pages(PDF.read_bytes()), ReplayProvider(recording))
+    fields = result.vacancies[0].fields
+    assert fields["essential_qualification"].reason == "quote not found in document"
+    assert not fields["age_limit"].accepted and "disagrees" in fields["age_limit"].reason
+    assert not fields["last_date"].accepted and "not one of the dates" in fields["last_date"].reason
+    assert [v.fields["post_name"].value for v in result.vacancies if v.fields["post_name"].accepted] == ["Specialist Doctors"]
+    assert result.vacancies[1].fields["post_name"].reason == "post name is not whole words of its quote"
+    # Untouched fields are still accepted
+    assert fields["experience"].accepted and fields["organization"].accepted
+
 async def _draft(db_session):
     sources = await sync_registry(db_session, [s for s in SOURCES if s.name == "BSF"])
-    draft = await create_draft(db_session, sources["BSF"], URL, PDF.read_bytes(), ReplayProvider(RECORDING))
+    now = datetime.now(timezone.utc)
+    notice = RecruitmentNotice(source_id=sources["BSF"].id, url=URL, url_hash=url_hash(URL), title="Walk-in: Specialist Doctors and GDMOs",
+                               document_type="PDF", notice_kind="VACANCY", first_seen_at=now, last_seen_at=now, review_status="MANUAL_REVIEW")
+    db_session.add(notice)
+    await db_session.flush()
+    draft = await create_draft(db_session, sources["BSF"], URL, PDF.read_bytes(), ReplayProvider(RECORDING), notice)
     await db_session.commit()
     await db_session.refresh(draft)
     return draft
+
+async def _notice_status(db_session):
+    return (await db_session.execute(select(RecruitmentNotice.review_status).execution_options(populate_existing=True))).scalar_one()
 
 @pytest.mark.asyncio
 async def test_review_queue_needs_a_reviewer_and_creates_verified_vacancies(api, login, db_session):
@@ -78,10 +113,20 @@ async def test_review_queue_needs_a_reviewer_and_creates_verified_vacancies(api,
     user.is_reviewer = True
     await db_session.commit()
 
-    r = await api.post(f"/review/drafts/{draft_id}/approve", json={"vacancy_indexes": [0], "note": "checked against PDF"}, headers=h)
+    approve = lambda body: api.post(f"/review/drafts/{draft_id}/approve", json=body, headers=h)
+    # Nothing selected, or the same vacancy twice, changes nothing
+    assert (await approve({"vacancy_indexes": []})).status_code == 409
+    assert (await approve({"vacancy_indexes": [0, 0]})).status_code == 409
+    assert (await db_session.execute(select(Vacancy))).scalars().all() == []
+
+    r = await approve({"vacancy_indexes": [0], "note": "checked against PDF"})
     assert r.status_code == 200, r.text
-    assert r.json()["status"] == "APPROVED" and len(r.json()["created_vacancy_ids"]) == 1
-    assert (await api.post(f"/review/drafts/{draft_id}/approve", json={}, headers=h)).status_code == 409
+    # One of two approved: the draft stays open for the other one
+    assert r.json()["status"] == "PENDING_REVIEW" and len(r.json()["created_vacancy_ids"]) == 1
+    assert r.json()["payload"]["vacancies"][0]["decision"]["status"] == "APPROVED"
+    assert [d["id"] for d in (await api.get("/review/drafts", headers=h)).json()] == [str(draft_id)]
+    assert (await approve({"vacancy_indexes": [0]})).status_code == 409
+    assert await _notice_status(db_session) == "DRAFTED"
 
     v = (await db_session.execute(select(Vacancy))).scalar_one()
     assert v.post_name == "Specialist Doctors" and v.organization == "Border Security Force"
@@ -104,6 +149,16 @@ async def test_review_queue_needs_a_reviewer_and_creates_verified_vacancies(api,
     assert checks["EDUCATION"]["match_type"] == "EXACT_MATCH"
     assert checks["CRUCIAL_DATE"]["outcome"] == "NOT_EVALUATED"
 
+    # The remaining vacancy closes the draft
+    r = await approve({"vacancy_indexes": [1]})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "APPROVED" and len(r.json()["created_vacancy_ids"]) == 2
+    assert sorted(v.post_name for v in (await db_session.execute(select(Vacancy))).scalars()) == \
+        ["General Duty Medical Officer", "Specialist Doctors"]
+    assert (await approve({})).status_code == 409
+    assert (await api.get("/review/drafts", headers=h)).json() == []
+    assert await _notice_status(db_session) == "PARSED"
+
 @pytest.mark.asyncio
 async def test_reject_leaves_no_vacancy(api, login, db_session):
     draft = await _draft(db_session)
@@ -115,3 +170,18 @@ async def test_reject_leaves_no_vacancy(api, login, db_session):
     assert (await api.post(f"/review/drafts/{draft_id}/reject", json={"note": "walk-in already held"}, headers=h)).json()["status"] == "REJECTED"
     assert (await db_session.execute(select(Vacancy))).scalars().all() == []
     assert (await api.get("/review/drafts", headers=h)).json() == []
+    assert await _notice_status(db_session) == "REJECTED"
+
+@pytest.mark.asyncio
+async def test_reject_after_partial_approval_keeps_the_approved_vacancy(api, login, db_session):
+    draft = await _draft(db_session)
+    draft_id = draft.id
+    h = await login("reviewer@example.com")
+    user = (await db_session.execute(select(User))).scalar_one()
+    user.is_reviewer = True
+    await db_session.commit()
+    assert (await api.post(f"/review/drafts/{draft_id}/approve", json={"vacancy_indexes": [1]}, headers=h)).status_code == 200
+    r = (await api.post(f"/review/drafts/{draft_id}/reject", json={"note": "no specialist posts at my centre"}, headers=h)).json()
+    assert r["status"] == "APPROVED" and [x["decision"]["status"] for x in r["payload"]["vacancies"]] == ["REJECTED", "APPROVED"]
+    assert [v.post_name for v in (await db_session.execute(select(Vacancy))).scalars()] == ["General Duty Medical Officer"]
+    assert await _notice_status(db_session) == "PARSED"
