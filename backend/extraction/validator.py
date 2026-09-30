@@ -62,6 +62,14 @@ def find_quote(quote: str, pages: List[PageText], hint_page: Optional[int]) -> O
     q_tokens = _tokens(quote)
     if not q_tokens:
         return None
+    # Same words in the same order, differing only in punctuation/spacing ("D-Wing,Room" vs "D-Wing, Room")
+    if len(q_tokens) >= 3:
+        pattern = re.compile(r"[^a-z0-9]*".join(re.escape(t) for t in q_tokens), re.I)
+        for p in ordered:
+            flat = re.sub(r"\s+", " ", p.text).strip()
+            m = pattern.search(_norm(flat))
+            if m:
+                return p.page_number, flat[m.start():m.end()], "EXACT_WORDS"
     for p in ordered:
         if not p.ocr:
             continue
@@ -121,15 +129,22 @@ def _count_in(quote: str) -> List[int]:
                 break
     return nums
 
-_AGE_CAT_RE = re.compile(r"(\d{2})\s*years?\s*(?:for|in\s+case\s+of)\s*(UR|GEN(?:ERAL)?|OBC|SC|ST|EWS)\b", re.I)
-_AGE_GENERAL_RE = re.compile(r"(?:not\s+(?:exceed(?:ing)?|more\s+than|above)|upper\s+age\s+limit(?:\s+is)?|maximum\s+age(?:\s+limit)?(?:\s+is)?|below|upto|up\s+to)\D{0,20}?(\d{2})\s*years", re.I)
+_CAT = r"(?:UR|GEN(?:ERAL)?|OBC|SC|ST|EWS)"
+# "40 years for UR/EWS", "43 years for OBC"
+_AGE_CAT_RE = re.compile(r"(\d{2})\s*years?\s*(?:for|in\s+case\s+of)\s*(" + _CAT + r"(?:\s*/\s*" + _CAT + r")*)\b", re.I)
+_AGE_GENERAL_RE = re.compile(
+    r"(?:not\s+(?:be\s+)?(?:exceed(?:ing)?|more\s+than|above)|upper\s+age[\s-]+limit|maximum\s+age(?:[\s-]+limit)?|below|upto|up\s+to)"
+    # up to 80 non-digit characters, e.g. "... for appointment on deputation shall be" or "fifty-two ("
+    r"\D{0,80}?(\d{2})\)?\s*years", re.I)
 # "55 years or less than 55 years", "56 years and below"
 _AGE_OR_LESS_RE = re.compile(r"(\d{2})\s*years?\s*(?:of\s+age\s+)?(?:or\s+(?:less|below)|and\s+below)", re.I)
-_AGE_RANGE_RE = re.compile(r"\b(\d{2})\s*(?:-|to)\s*(\d{2})\s*years", re.I)
+# "18 - 25 years", "18 to 25 years", "Between 18 and 25 years"
+_AGE_RANGE_RE = re.compile(r"\b(?:between\s+)?(\d{2})\s*(?:-|to|and)\s*(\d{2})\s*years", re.I)
 
 def age_limits_in(quote: str) -> List[Dict[str, Any]]:
     """Upper age limits stated in the quote; category-specific when the quote names categories."""
-    per_cat = [{"category": "UR" if c.upper().startswith("GEN") else c.upper(), "max_age": int(a)} for a, c in _AGE_CAT_RE.findall(quote)]
+    per_cat = [{"category": "UR" if c.upper().startswith("GEN") else c.upper(), "max_age": int(a)}
+               for a, cats in _AGE_CAT_RE.findall(quote) for c in re.split(r"\s*/\s*", cats)]
     if per_cat:
         return per_cat
     m = _AGE_RANGE_RE.search(quote)
