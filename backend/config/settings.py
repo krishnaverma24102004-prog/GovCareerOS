@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     EMAIL_USERNAME: str = ""
     EMAIL_PASSWORD: str = ""
 
+    # The only browser origin allowed to call the API (the local Next.js dashboard)
+    FRONTEND_ORIGIN: str = "http://localhost:3000"
+
     STORAGE_PATH: str = str(PROJECT_ROOT / "storage")
     PLAYWRIGHT_HEADLESS: bool = True
     # Folder containing eng.traineddata; defaults to the standard Windows Tesseract install

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from govcareeros.backend.api.deps import current_user, get_session
+from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.vacancy import Vacancy
 from govcareeros.backend.schemas.api import VacancyDetail, VacancySummary
 
@@ -36,4 +37,9 @@ async def get_vacancy(vacancy_id: uuid.UUID, session: AsyncSession = Depends(get
     # Filter on the response, never on the ORM relationship (that would detach rows on commit)
     detail = VacancyDetail.model_validate(vacancy)
     active = {r.id for r in vacancy.requirements if r.superseded_at is None}
-    return detail.model_copy(update={"requirements": [r for r in detail.requirements if r.id in active]})
+    doc_ids = {p.raw_document_id for p in detail.provenance}
+    urls = dict((await session.execute(select(RawDocument.id, RawDocument.url).where(RawDocument.id.in_(doc_ids)))).all()) if doc_ids else {}
+    return detail.model_copy(update={
+        "requirements": [r for r in detail.requirements if r.id in active],
+        "provenance": [p.model_copy(update={"document_url": urls.get(p.raw_document_id)}) for p in detail.provenance],
+    })

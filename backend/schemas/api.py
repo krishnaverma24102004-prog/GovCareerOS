@@ -27,6 +27,7 @@ class UserOut(BaseModel):
     id: uuid.UUID
     email: str
     full_name: Optional[str]
+    is_reviewer: bool = False
 
 class TokenOut(BaseModel):
     access_token: str
@@ -50,6 +51,7 @@ class ProvenanceOut(BaseModel):
     page: Optional[int]
     section: Optional[str]
     excerpt: Optional[str]
+    document_url: Optional[str] = None  # official URL the RawDocument was fetched from
 
 class VacancySummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
