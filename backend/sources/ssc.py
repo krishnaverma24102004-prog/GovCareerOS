@@ -39,6 +39,7 @@ SSC_SOURCE = {
     "official_domain": "ssc.gov.in",
     "recruitment_url": NOTICE_BOARD_PAGE,
     "source_type": "API",
+    "jurisdiction": "IN",
     "adapter_name": "ssc",
 }
 SSC_POLICY = UrlPolicy.for_source("ssc.gov.in", NOTICE_BOARD_PAGE)

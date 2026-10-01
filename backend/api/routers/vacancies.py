@@ -10,6 +10,7 @@ from govcareeros.backend.api.deps import current_user, get_session
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.vacancy import Vacancy
 from govcareeros.backend.schemas.api import VacancyDetail, VacancySummary
+from govcareeros.backend.services import attribution
 
 router = APIRouter(prefix="/vacancies", tags=["vacancies"], dependencies=[Depends(current_user)])
 
@@ -26,7 +27,9 @@ async def list_vacancies(
     if q:
         like = f"%{q}%"
         stmt = stmt.where(Vacancy.post_name.ilike(like) | Vacancy.ministry.ilike(like) | Vacancy.department.ilike(like))
-    return (await session.execute(stmt.limit(limit).offset(offset))).scalars().all()
+    vacancies = (await session.execute(stmt.limit(limit).offset(offset))).scalars().all()
+    return [VacancySummary.model_validate(v).model_copy(update={"attribution": a})
+            for v, a in zip(vacancies, await attribution.for_vacancies(session, vacancies))]
 
 @router.get("/{vacancy_id}", response_model=VacancyDetail)
 async def get_vacancy(vacancy_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
@@ -45,4 +48,5 @@ async def get_vacancy(vacancy_id: uuid.UUID, session: AsyncSession = Depends(get
     return detail.model_copy(update={
         "requirements": [r for r in detail.requirements if r.id in active],
         "provenance": [p.model_copy(update={"document_url": urls.get(p.raw_document_id)}) for p in detail.provenance],
+        "attribution": (await attribution.for_vacancies(session, [vacancy]))[0],
     })

@@ -16,6 +16,8 @@ from govcareeros.backend.eligibility.engine import EligibilityInputError
 from govcareeros.backend.models.exam import Exam, ExamEligibilityResult
 from govcareeros.backend.models.user import User
 from govcareeros.backend.schemas.api import EligibilityEvidenceOut, ProvenanceOut, RequirementOut
+from govcareeros.backend.schemas.attribution import DISCLAIMER, AttributionOut
+from govcareeros.backend.services import attribution
 
 router = APIRouter(prefix="/exams", tags=["exams"])
 
@@ -48,6 +50,8 @@ class ExamSummary(BaseModel):
     notification_url: Optional[str]
     tentative_vacancies: Optional[int]
     confidence: float
+    attribution: Optional[AttributionOut] = None
+    disclaimer: str = DISCLAIMER
 
 class ExamDetail(ExamSummary):
     external_ref: str
@@ -96,7 +100,9 @@ async def list_exams(q: Optional[str] = Query(None, description="substring of th
         stmt = stmt.where(Exam.name.ilike(f"%{q}%") | Exam.exam_code.ilike(f"%{q}%"))
     if open_only:
         stmt = stmt.where(Exam.status == "NOTIFIED", Exam.application_end > datetime.now().astimezone())
-    return (await session.execute(stmt.limit(limit).offset(offset))).scalars().all()
+    exams = (await session.execute(stmt.limit(limit).offset(offset))).scalars().all()
+    return [ExamSummary.model_validate(e).model_copy(update={"attribution": a})
+            for e, a in zip(exams, await attribution.for_exams(session, exams))]
 
 @router.get("/{exam_id}", response_model=ExamDetail, dependencies=[Depends(current_user)])
 async def get_exam(exam_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
@@ -107,7 +113,8 @@ async def get_exam(exam_id: uuid.UUID, session: AsyncSession = Depends(get_sessi
     # Filter on the response, never on the ORM relationship (that would detach rows on commit)
     detail = ExamDetail.model_validate(exam)
     active = {r.id for r in exam.requirements if r.superseded_at is None}
-    return detail.model_copy(update={"requirements": [r for r in detail.requirements if r.id in active]})
+    return detail.model_copy(update={"requirements": [r for r in detail.requirements if r.id in active],
+                                     "attribution": (await attribution.for_exams(session, [exam]))[0]})
 
 @router.post("/{exam_id}/eligibility", response_model=ExamEligibilityOut, status_code=status.HTTP_201_CREATED)
 async def evaluate(exam_id: uuid.UUID, body: ExamEligibilityIn, user: User = Depends(current_user),

@@ -26,6 +26,7 @@ UPSC_SOURCE = {
     "official_domain": "upsc.gov.in",
     "recruitment_url": LISTING_URL,
     "source_type": "DOCUMENT",
+    "jurisdiction": "IN",
     "adapter_name": "upsc_advertisement",
 }
 UPSC_POLICY = UrlPolicy.for_source(UPSC_SOURCE["official_domain"], LISTING_URL)

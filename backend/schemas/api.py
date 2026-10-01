@@ -5,6 +5,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from govcareeros.backend.schemas.attribution import DISCLAIMER, AttributionOut
+
 class RegisterIn(BaseModel):
     email: str
     password: str = Field(min_length=10)
@@ -67,6 +69,8 @@ class VacancySummary(BaseModel):
     notification_url: Optional[str]
     confidence: float
     recruitment_mode: str = "UNKNOWN"
+    attribution: Optional[AttributionOut] = None
+    disclaimer: str = DISCLAIMER
 
 class VacancyDetail(VacancySummary):
     pay_scale: Optional[str]

@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from govcareeros.backend.api.deps import current_user, get_session
 from govcareeros.backend.models.exam import Exam
 from govcareeros.backend.models.exam_version import ExamVersion
+from govcareeros.backend.schemas.attribution import DISCLAIMER, AttributionOut
+from govcareeros.backend.services import attribution
 
 router = APIRouter(prefix="/exams", tags=["exams"])
 
@@ -27,6 +29,8 @@ class ExamVersionOut(BaseModel):
     change_log: Optional[str]
     details: Optional[Any]
     created_at: datetime
+    attribution: Optional[AttributionOut] = None
+    disclaimer: str = DISCLAIMER
 
     @field_validator("details", mode="before")
     @classmethod
@@ -35,8 +39,11 @@ class ExamVersionOut(BaseModel):
 
 @router.get("/{exam_id}/versions", response_model=List[ExamVersionOut], dependencies=[Depends(current_user)])
 async def list_versions(exam_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
-    if await session.get(Exam, exam_id) is None:
+    exam = await session.get(Exam, exam_id)
+    if exam is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "exam not found")
     stmt = (select(ExamVersion).where(ExamVersion.exam_id == exam_id)
             .order_by(ExamVersion.notice_date.desc().nulls_last(), ExamVersion.created_at.desc()))
-    return (await session.execute(stmt)).scalars().all()
+    versions = (await session.execute(stmt)).scalars().all()
+    return [ExamVersionOut.model_validate(v).model_copy(update={"attribution": a})
+            for v, a in zip(versions, await attribution.for_exam_versions(session, exam, versions))]
