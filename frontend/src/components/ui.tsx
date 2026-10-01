@@ -30,6 +30,11 @@ export function useSession(): User | null {
 
 const LINKS = [
   ["/matches", "Matches"],
+  ["/exams", "Exams"],
+  ["/gaps", "Gaps"],
+  ["/applications", "Applications"],
+  ["/prep", "Study plan"],
+  ["/resume", "Resume"],
   ["/profile", "Profile"],
   ["/alerts", "Alerts"],
   ["/review", "Review"],
