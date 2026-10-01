@@ -40,8 +40,17 @@ const LINKS = [
   ["/review", "Review"],
 ] as const;
 
-export function Shell({ user, children }: { user: User | null; children: ReactNode }) {
+// Reviewer console pages; the backend refuses them to everyone else anyway
+const REVIEWER_LINKS = [
+  ["/review/facts", "Facts"],
+  ["/admin/users", "Users"],
+] as const;
+
+export function Shell({ user, children, wide = false }: { user: User | null; children: ReactNode; wide?: boolean }) {
   const path = usePathname();
+  const links = user?.is_reviewer ? [...LINKS, ...REVIEWER_LINKS] : LINKS;
+  // The most specific link wins, so /review/facts does not also light up /review
+  const active = links.map(([href]) => href).filter((href) => path === href || path?.startsWith(href + "/")).sort((a, b) => b.length - a.length)[0];
   const router = useRouter();
   async function logout() {
     await api("/auth/logout", { method: "POST" }).catch(() => undefined);
@@ -51,13 +60,13 @@ export function Shell({ user, children }: { user: User | null; children: ReactNo
   return (
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
-        <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-4 px-4 py-3">
+        <nav className={`mx-auto flex ${wide ? "max-w-screen-2xl" : "max-w-5xl"} flex-wrap items-center gap-4 px-4 py-3`}>
           <span className="font-semibold">GovCareerOS</span>
-          {LINKS.map(([href, label]) => (
+          {links.map(([href, label]) => (
             <Link
               key={href}
               href={href}
-              className={path?.startsWith(href) ? "font-medium text-blue-700" : "text-slate-600 hover:text-slate-900"}
+              className={href === active ? "font-medium text-blue-700" : "text-slate-600 hover:text-slate-900"}
             >
               {label}
             </Link>
@@ -68,7 +77,7 @@ export function Shell({ user, children }: { user: User | null; children: ReactNo
           </button>
         </nav>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{user ? children : <p className="text-slate-500">Loading…</p>}</main>
+      <main className={`mx-auto ${wide ? "max-w-screen-2xl" : "max-w-5xl"} px-4 py-6`}>{user ? children : <p className="text-slate-500">Loading…</p>}</main>
     </div>
   );
 }
@@ -87,6 +96,13 @@ const STATUS_STYLE: Record<string, string> = {
   NOT_MET: "bg-red-100 text-red-800",
   REJECTED: "bg-red-100 text-red-800",
   FAILED: "bg-red-100 text-red-800",
+  DRAFT_FAILED: "bg-red-100 text-red-800",
+  VERIFIED: "bg-green-100 text-green-800",
+  UNVERIFIED: "bg-amber-100 text-amber-800",
+  SKIPPED: "bg-slate-200 text-slate-700",
+  NOT_REQUIRED: "bg-slate-200 text-slate-700",
+  NOT_STATED: "bg-slate-100 text-slate-500",
+  REVIEWER: "bg-green-100 text-green-800",
 };
 
 export function Badge({ value }: { value: string }) {

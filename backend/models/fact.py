@@ -1,8 +1,9 @@
 import uuid
+from datetime import datetime
 from typing import Optional, List
 from sqlalchemy import String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from govcareeros.backend.models.base import Base, TimestampMixin
+from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
 
 class Fact(Base, TimestampMixin):
     __tablename__ = "profile_facts"
@@ -14,6 +15,10 @@ class Fact(Base, TimestampMixin):
     value: Mapped[str] = mapped_column(Text)
     # UNVERIFIED, VERIFIED, REJECTED
     status: Mapped[str] = mapped_column(String(100), default="UNVERIFIED")
+    # Who set VERIFIED/REJECTED (never the fact's own user); history is in review_audit_log
+    reviewer_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", name="fk_profile_facts_reviewer_id_users"))
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
+    review_note: Mapped[Optional[str]] = mapped_column(Text)
 
     profile_version: Mapped["ProfileVersion"] = relationship(back_populates="facts")
     evidence: Mapped[List["Evidence"]] = relationship(back_populates="fact")

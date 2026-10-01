@@ -228,3 +228,116 @@ export interface DraftDetail extends DraftSummary {
   created_vacancy_ids: string[];
   payload: { vacancies: DraftVacancy[]; chunks?: unknown[] };
 }
+
+/** Reviewer console (backend/api/routers/review_console.py, admin_console.py). */
+export interface QueueItem {
+  type: "DRAFT" | "NOTICE";
+  id: string;
+  draft_id: string | null;
+  notice_id: string | null;
+  source: string;
+  title: string | null;
+  url: string | null;
+  notice_kind: string;
+  document_type: string | null;
+  status: string;
+  priority: unknown;
+  first_seen_at: string | null;
+  created_at: string | null;
+  vacancies: number | null;
+  fields_offered: number | null;
+  fields_accepted: number | null;
+  model: string | null;
+  review_note: string | null;
+  reviewed_at: string | null;
+}
+
+export interface Paged<T> {
+  total: number;
+  offset: number;
+  limit: number;
+  items: T[];
+}
+
+export interface QueueFacets {
+  sources: string[];
+  kinds: string[];
+  statuses: string[];
+}
+
+/** Where a field's quote sits in the page text (offsets into DraftPage.text). */
+export interface QuoteSpan {
+  vacancy_index: number;
+  field: string;
+  accepted: boolean;
+  reason: string | null;
+  match: string | null;
+  page: number | null;
+  start: number | null;
+  end: number | null;
+  quote: string;
+  located: boolean;
+}
+
+export interface DraftPage {
+  page_number: number;
+  text: string;
+  ocr: boolean;
+}
+
+export interface DraftPages {
+  draft_id: string;
+  raw_document_id: string;
+  document_url: string | null;
+  content_hash: string;
+  pages: DraftPage[];
+  spans: QuoteSpan[];
+}
+
+export interface EvidenceView {
+  id: string;
+  evidence_type: string;
+  source: string | null;
+  artifact_id: string | null;
+  artifact_url: string | null;
+  artifact_content_hash: string | null;
+  artifact_content_type: string | null;
+  created_at: string;
+}
+
+export interface FactView {
+  id: string;
+  profile_version_id: string;
+  version_number: number;
+  owner_id: string;
+  own: boolean;
+  subject: string;
+  predicate: string;
+  value: string;
+  status: string;
+  reviewer_id: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  created_at: string;
+  evidence: EvidenceView[];
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string | null;
+  is_active: boolean;
+  is_reviewer: boolean;
+}
+
+export interface AuditRow {
+  id: string;
+  actor_id: string;
+  actor_email: string;
+  action: string;
+  object_type: string;
+  object_id: string;
+  note: string | null;
+  detail: Record<string, unknown> | null;
+  at: string;
+}
