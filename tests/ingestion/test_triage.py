@@ -306,3 +306,29 @@ async def test_reclassify_brings_stored_notices_up_to_the_current_classifier(db_
     # Idempotent: a second pass finds nothing to change
     from govcareeros.backend.services.source_discovery import reclassify_notices
     assert await reclassify_notices(db_session) == {}
+
+# Title prefixes as listed on the official pages (real DB, 1 Oct 2026): process notices about existing recruitments
+@pytest.mark.parametrize("title, url, kind", [
+    ("Announcement dated 09.09.2026 regarding Provisionally Rejection for the Posts of Accounts Officer in",
+     "https://hpsc.gov.in/Portals/0/Ann_Prov_Rej_AO_09_09_2026.pdf", "RESULT"),
+    ("Rejection of candidature for the post of Lady Medical Officer (RTHC) in HME Deptt", "https://jkpsc.nic.in/", "RESULT"),
+    ("PUBLIC NOTICE REGARDING DISCREPANCY FOUND IN DOCUMENTS DURING SCRUTINY OF DOCUMENT FOR THE POST OF D",
+     "https://ppsc.gov.in/", "RESULT"),
+    ("LIST OF 4 QUALIFIED CANDIDATES", "https://crpf.gov.in/", "RESULT"),
+    ("TIME SLOT FOR COMPETITIVE EXAMINATION RECRUITMENT TO 05 POST",
+     "https://ppsc.gov.in/index.aspx?page=2800&tabid=10&tablinkid=6839", "EXAM_SCHEDULE"),
+    ("Notification regarding rescheduling of Forest Ranger Examination (Advt. No. 22/2025)", "https://apsc.nic.in/", "EXAM_SCHEDULE"),
+    ("Public Notice Regarding Date Of Examination For Recruitment To 34 Posts Of Functional Manager In The Departmen",
+     "https://ppsc.gov.in/", "EXAM_SCHEDULE"),
+    ("Extension in last date of submission of application form for the post of Chief Financial Officer-( o",
+     "https://www.nabard.org/", "CORRIGENDUM"),
+    ("Clarification for the post of Assistant Public Prosecutor in Delhi, vide Advt. No. 11 - 2026",
+     "https://upsc.gov.in/", "CORRIGENDUM"),
+    # and real advertisements stay vacancies
+    ("Advt. No. LPSC/03/2026 dated 26.09.2026 - Recruitment to the", "https://www.isro.gov.in/LPSCRecruitment14.html", "VACANCY"),
+    ("MICRO_BIOLOGIST_ADVERTISEMENT (08-09-2026)",
+     "https://psc.cg.gov.in/PDFs/advertisement/MICRO_BIOLOGIST_ADVERTISEMENT (08-09-2026).pdf", "VACANCY"),
+])
+def test_process_notices_on_real_listings(title, url, kind):
+    from govcareeros.backend.sources.notice_classifier import classify_notice
+    assert classify_notice(title, url) == kind

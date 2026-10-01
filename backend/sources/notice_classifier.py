@@ -10,13 +10,19 @@ _RULES = [
     ("RESULT", re.compile(
         r"\bresults?\b|selected\s+candidates|provisionally\s+selected|short[\s-]?listed|shortlist|merit\s+list|"
         r"nominal\s+roll|marks|answer\s+key|admit\s+card|e-?admit|call\s+letter|interview\s+schedule|"
-        r"list\s+of\s+(?:\d+\s+)?(?:selected|eligible|candidates)|final\s+selection", re.I)),
+        r"list\s+of\s+(?:\d+\s+)?(?:selected|eligible|candidates)|final\s+selection|"
+        # Candidature decisions on an existing recruitment (JKPSC / HPSC / PPSC public notices)
+        r"rejection\s+(?:of\s+(?:the\s+)?candidature|notice|list)|provisionally\s+reject|ineligibility\s+of\s+candidates|"
+        r"deficienc(?:y|ies)|discrepanc(?:y|ies)|qualified\s+candidates|(?:sports|pwd)\s+(?:category\s+)?candidates|"
+        r"person\s+with\s+disability\s+candidates", re.I)),
     ("RULES", re.compile(r"recruitment\s+rules|\bRRs?\b|comments\s+on\s+recruitment|service\s+rules", re.I)),
-    ("CORRIGENDUM", re.compile(r"corrigendum|addendum|extension\s+of\s+(?:last\s+)?date|date\s+extended|cancell?ation|cancell?ed|postpone", re.I)),
+    ("CORRIGENDUM", re.compile(r"corrigendum|addendum|clarification|extension\s+(?:of|in)\s+(?:the\s+)?(?:last\s+)?dates?|date\s+extended|cancell?ation|cancell?ed|postpone", re.I)),
     # Process notices about an existing recruitment (interview/PMT schedules, exam scheme and syllabus), not new vacancies
     ("EXAM_SCHEDULE", re.compile(
         r"schedule\s+of\s+(?:the\s+)?(?:interviews?|written|physical|pmt|pet|pst|exam(?:ination)?s?|tests?|document|dv|skill)|"
-        r"scheme\s+(?:and|&)\s+(?:pattern|syllabus)|\bsyllabus\b", re.I)),
+        r"scheme\s+(?:and|&)\s+(?:pattern|syllabus)|\bsyllabus\b|time[\s-]?slots?\b|re-?schedul|tentative\s+schedule|"
+        r"date\s+of\s+(?:the\s+)?(?:competitive\s+)?exam(?:ination)?|exam(?:ination)?\s+date|scrutiny\s+of\s+documents|"
+        r"date\s*sheet", re.I)),
     ("VACANCY", re.compile(
         r"vacanc|advertis|\badvt\b|recruitment\s+(?:of|for|to|through)|filling\s*up|deputation|engagement\s+of|"
         r"walk[\s-]?in|applications?\s+(?:are\s+)?invited|inviting\s+(?:online\s+)?applications|"
