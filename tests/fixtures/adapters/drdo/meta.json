@@ -1,0 +1,43 @@
+{
+  "source": "DRDO",
+  "captured_on": "2026-10-01",
+  "fetch_mode": "HTTP",
+  "fetched_with": "govcareeros.backend.sources.generic_notices.PageFetcher.fetch_http (robots.txt + url_guard, honest User-Agent)",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "notes": "HTML stored exactly as returned by FetchResult.html (Drupal, server-rendered; no browser needed). All three returned HTTP 200 with final_url equal to the requested url.",
+  "files": [
+    {
+      "file": "home.html",
+      "url": "https://drdo.gov.in/drdo/en/",
+      "final_url": "https://drdo.gov.in/drdo/en/",
+      "http_status": 200,
+      "captured_on": "2026-10-01",
+      "fetch_mode": "HTTP",
+      "sha256": "5be84915a45b83a8d8bca8bd54a448365db3996fb5842738d6195000467f4de5",
+      "bytes": 408386,
+      "notes": "Registry page for DRDO (English homepage). Its 'Vacancies' quick tab (view-vacancies block_1, server-rendered) lists the current vacancy titles and links only, no dates or advertisement numbers."
+    },
+    {
+      "file": "vacancies.html",
+      "url": "https://drdo.gov.in/drdo/en/offerings/vacancies",
+      "final_url": "https://drdo.gov.in/drdo/en/offerings/vacancies",
+      "http_status": 200,
+      "captured_on": "2026-10-01",
+      "fetch_mode": "HTTP",
+      "sha256": "3742a65992bb9d98acd945116658a77ec17ce4d2326c086fe4b45b9fce7485b7",
+      "bytes": 465633,
+      "notes": "Offerings > Vacancies, page 1 of 2 (12 cards): title, Advertisement No, Published Date, Start Date, End Date, View More link (linked as http://drdo.gov.in/...)."
+    },
+    {
+      "file": "vacancies_page2.html",
+      "url": "https://drdo.gov.in/drdo/en/offerings/vacancies?page=1",
+      "final_url": "https://drdo.gov.in/drdo/en/offerings/vacancies?page=1",
+      "http_status": 200,
+      "captured_on": "2026-10-01",
+      "fetch_mode": "HTTP",
+      "sha256": "9682a9f9e0ed769c99262d69a1e73197aa0d8a7c9d4dd89df60601341f14cdcb",
+      "bytes": 317661,
+      "notes": "Offerings > Vacancies, page 2 of 2 (2 cards). ?page=2 returned an empty listing on the same day."
+    }
+  ]
+}
