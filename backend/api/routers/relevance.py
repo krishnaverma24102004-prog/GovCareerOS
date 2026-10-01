@@ -14,6 +14,8 @@ from govcareeros.backend.models.user import User
 from govcareeros.backend.models.vacancy import Vacancy
 from govcareeros.backend.relevance import service
 from govcareeros.backend.relevance.scoring import DEFAULT_WEIGHTS
+from govcareeros.backend.schemas.attribution import DISCLAIMER, AttributionOut
+from govcareeros.backend.services import attribution
 
 router = APIRouter(tags=["relevance"])
 
@@ -49,6 +51,8 @@ class MatchOut(BaseModel):
     eligibility_result_id: uuid.UUID
     relevance_score: float
     relevance_id: uuid.UUID
+    attribution: Optional[AttributionOut] = None
+    disclaimer: str = DISCLAIMER
 
 def _check_weights(weights: Optional[Dict[str, float]]):
     if weights is None:
@@ -88,7 +92,9 @@ async def matches(
     if not include_closed:
         stmt = stmt.where((Vacancy.application_deadline.is_(None)) | (Vacancy.application_deadline > now))
     out = []
-    for vacancy in (await session.execute(stmt)).scalars().all():
+    vacancies = (await session.execute(stmt)).scalars().all()
+    attributions = await attribution.for_vacancies(session, vacancies)
+    for vacancy, attributed in zip(vacancies, attributions):
         try:
             elig = await eligibility_engine.evaluate(session, user.id, profile_version_id, vacancy.id)
             rel = await service.evaluate(session, user.id, profile_version_id, vacancy.id)
@@ -99,5 +105,6 @@ async def matches(
             application_deadline=vacancy.application_deadline,
             open_for_applications=vacancy.application_deadline is None or vacancy.application_deadline > now,
             eligibility_status=elig.status, eligibility_result_id=elig.id, relevance_score=rel.score, relevance_id=rel.id,
+            attribution=attributed,
         ))
     return sorted(out, key=lambda m: (_STATUS_ORDER.get(m.eligibility_status, 9), -m.relevance_score))

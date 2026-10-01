@@ -5,6 +5,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
 from datetime import datetime
 
+REUSE_LEVELS = ("LIBERAL", "MODERATE", "CONSERVATIVE", "UNKNOWN")
+
 class GovernmentSource(Base, TimestampMixin):
     __tablename__ = "government_sources"
     
@@ -25,6 +27,12 @@ class GovernmentSource(Base, TimestampMixin):
     last_failure: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
     last_verified: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
     configuration: Mapped[Optional[str]] = mapped_column(Text)
+    # "IN" for Union bodies, ISO 3166-2:IN code ("IN-HR") for state bodies; set from the registry by sync_registry
+    jurisdiction: Mapped[Optional[str]] = mapped_column(String(10), index=True)
+    # Reuse terms of the source's content, set by a reviewer from the site's copyright policy page (never guessed)
+    copyright_policy_url: Mapped[Optional[str]] = mapped_column(String(1000))
+    reuse_level: Mapped[str] = mapped_column(String(20), default="UNKNOWN", server_default="UNKNOWN")  # see REUSE_LEVELS
+    reuse_checked_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
     
     endpoints: Mapped[List["SourceEndpoint"]] = relationship(back_populates="source")
     adapters: Mapped[List["SourceAdapterVersion"]] = relationship(back_populates="source")

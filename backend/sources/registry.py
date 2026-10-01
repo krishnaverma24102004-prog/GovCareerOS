@@ -9,6 +9,10 @@ so re-run the verification periodically.
 
 `parser` names a vacancy-level parser; sources without one still get notice-level
 discovery (title + link + first seen), and their notices go to MANUAL_REVIEW.
+
+`jurisdiction` is "IN" for Union government bodies and the ISO 3166-2:IN code of the state
+for a state body (HPSC -> "IN-HR"). It is derived from the category and the organisation
+name, never guessed: a state body whose state is not in STATE_CODES gets None.
 """
 from dataclasses import dataclass
 from typing import List, Optional
@@ -30,6 +34,10 @@ class SourceSpec:
         host = urlparse(self.recruitment_url).hostname or ""
         return host[4:] if host.startswith("www.") else host
 
+    @property
+    def jurisdiction(self) -> Optional[str]:
+        return jurisdiction_for(self.category, self.organization)
+
 COMMISSION = "RECRUITMENT_COMMISSION"
 MINISTRY = "MINISTRY"
 DEFENCE = "DEFENCE_CAPF"
@@ -37,6 +45,38 @@ BANK = "PSU_BANK_REGULATOR"
 BODY = "AUTONOMOUS_BODY_PSU"
 AGGREGATOR = "OFFICIAL_AGGREGATOR"
 STATE_PSC = "STATE_PSC"
+
+# Categories whose bodies belong to a state government; every other category is a Union body
+STATE_CATEGORIES = {STATE_PSC}
+CENTRAL = "IN"
+# ISO 3166-2:IN subdivision codes (as revised in 2020: Chhattisgarh IN-CG, Uttarakhand IN-UK), only for
+# the states that have a body in SOURCES; add a state here when its body is added
+STATE_CODES = {
+    "Andhra Pradesh": "IN-AP",
+    "Assam": "IN-AS",
+    "Bihar": "IN-BR",
+    "Chhattisgarh": "IN-CG",
+    "Gujarat": "IN-GJ",
+    "Haryana": "IN-HR",
+    "Jammu & Kashmir": "IN-JK",
+    "Jharkhand": "IN-JH",
+    "Maharashtra": "IN-MH",
+    "Punjab": "IN-PB",
+    "Rajasthan": "IN-RJ",
+    "Tamil Nadu": "IN-TN",
+    "Uttar Pradesh": "IN-UP",
+    "Uttarakhand": "IN-UK",
+}
+_STATE_BODY_SUFFIXES = (" Public Service Commission",)
+
+def jurisdiction_for(category: str, organization: str) -> Optional[str]:
+    """A Union body gets "IN"; a state body the code of the state its name starts with, else None."""
+    if category not in STATE_CATEGORIES:
+        return CENTRAL
+    for suffix in _STATE_BODY_SUFFIXES:
+        if organization.endswith(suffix):
+            return STATE_CODES.get(organization[: -len(suffix)])
+    return None
 
 SOURCES: List[SourceSpec] = [
     # Central recruitment commissions / boards

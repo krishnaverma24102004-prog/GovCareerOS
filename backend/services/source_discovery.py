@@ -42,7 +42,7 @@ def _config(source: GovernmentSource) -> Dict:
         return {}
 
 async def sync_registry(session: AsyncSession, specs: Iterable[SourceSpec] = SOURCES) -> Dict[str, GovernmentSource]:
-    """Insert missing sources; existing rows keep their health and discovery history."""
+    """Insert missing sources; existing rows keep their health, discovery history and reviewer-set reuse policy."""
     by_name: Dict[str, GovernmentSource] = {}
     existing = {s.name: s for s in (await session.execute(select(GovernmentSource))).scalars()}
     for spec in specs:
@@ -51,7 +51,7 @@ async def sync_registry(session: AsyncSession, specs: Iterable[SourceSpec] = SOU
             source = GovernmentSource(
                 name=spec.name, organization=spec.organization, category=spec.category,
                 official_domain=spec.official_domain, recruitment_url=spec.recruitment_url,
-                source_type="DOCUMENT", adapter_name=spec.parser, enabled=True,
+                source_type="DOCUMENT", adapter_name=spec.parser, enabled=True, jurisdiction=spec.jurisdiction,
             )
             session.add(source)
         else:
@@ -64,6 +64,7 @@ async def sync_registry(session: AsyncSession, specs: Iterable[SourceSpec] = SOU
             # The fetch policy is derived from the domain, so it must follow the registry
             source.official_domain = spec.official_domain
             source.adapter_name = spec.parser or source.adapter_name
+            source.jurisdiction = spec.jurisdiction
         # Fetch mode follows the registry too (the probe reads it from the stored configuration)
         config = _config(source)
         if bool(config.get("force_browser")) != spec.force_browser:
