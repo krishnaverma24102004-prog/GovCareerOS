@@ -13,7 +13,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.documents.pdf_text import PageText, extract_pages
@@ -23,11 +23,13 @@ from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.extraction import ExtractionDraft
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
+from govcareeros.backend.models.triage import NoticeTriage
 from govcareeros.backend.models.user import User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance, VacancyRequirement
 from govcareeros.backend.parsing.recruitment_mode import ModeDetection, detect_in_pages, detect_recruitment_mode, govt_service_requirement
 from govcareeros.backend.services.document_ingestion import store_raw_document
 from govcareeros.backend.services.source_discovery import source_policy
+from govcareeros.backend.services.triage import SKIP_FOR_DRAFTS
 from govcareeros.backend.sources.url_guard import UrlRefused
 
 class DraftError(ValueError):
@@ -215,11 +217,17 @@ async def reject(session: AsyncSession, draft: ExtractionDraft, reviewer: User, 
 
 async def draft_pending_notices(session: AsyncSession, fetcher, provider, limit: int = 5,
                                 source_names: Optional[List[str]] = None, commit_each: bool = False) -> List[ExtractionDraft]:
-    """Create drafts for VACANCY PDF notices of sources without a deterministic parser."""
+    """Create drafts for VACANCY PDF notices of sources without a deterministic parser.
+
+    Triaged notices go highest priority first and STALE / NOT_REQUIRED ones are skipped (services/triage.py);
+    notices not triaged yet follow, newest first."""
     stmt = (select(RecruitmentNotice, GovernmentSource).join(GovernmentSource, GovernmentSource.id == RecruitmentNotice.source_id)
+            .outerjoin(NoticeTriage, NoticeTriage.notice_id == RecruitmentNotice.id)
             .where(RecruitmentNotice.notice_kind == "VACANCY", RecruitmentNotice.document_type == "PDF",
-                   RecruitmentNotice.review_status == "MANUAL_REVIEW", GovernmentSource.adapter_name.is_(None))
-            .order_by(RecruitmentNotice.first_seen_at.desc()).limit(limit))
+                   RecruitmentNotice.review_status == "MANUAL_REVIEW", GovernmentSource.adapter_name.is_(None),
+                   or_(NoticeTriage.id.is_(None), NoticeTriage.triage_status.not_in(SKIP_FOR_DRAFTS)))
+            .order_by(NoticeTriage.priority.desc().nulls_last(), RecruitmentNotice.first_seen_at.desc(),
+                      RecruitmentNotice.url_hash).limit(limit))
     if source_names:
         stmt = stmt.where(GovernmentSource.name.in_(source_names))
     drafts = []
