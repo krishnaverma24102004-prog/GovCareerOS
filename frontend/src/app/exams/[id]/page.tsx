@@ -81,12 +81,19 @@ function ExamView({ id }: { id: string }) {
     };
   }, [id]);
 
-  /** Official document for a raw document id: the URL stored with its provenance, else the notification URL. */
+  /**
+   * Official document for a raw document id: the URL stored with its provenance, else the notification URL,
+   * but only for the exam's own notice (a corrigendum must never be cited as a page of the original notice).
+   */
   const docUrl = useMemo(() => {
     const byDoc = new Map<string, string>();
     for (const p of exam?.provenance ?? []) if (p.document_url) byDoc.set(p.raw_document_id, p.document_url);
-    return (rawDocumentId: string | null | undefined): string | null =>
-      (rawDocumentId ? byDoc.get(rawDocumentId) : undefined) ?? exam?.notification_url ?? null;
+    return (rawDocumentId: string | null | undefined): string | null => {
+      const stored = rawDocumentId ? byDoc.get(rawDocumentId) : undefined;
+      if (stored) return stored;
+      const ownNotice = !rawDocumentId || rawDocumentId === exam?.raw_document_id;
+      return ownNotice ? exam?.notification_url ?? null : null;
+    };
   }, [exam]);
 
   if (error)
