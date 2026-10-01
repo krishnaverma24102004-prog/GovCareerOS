@@ -274,3 +274,35 @@ def test_real_dates_still_read_from_file_names():
 def test_exam_process_announcements_are_not_vacancies(title, url):
     from govcareeros.backend.sources.notice_classifier import classify_notice
     assert classify_notice(title, url) == "EXAM_SCHEDULE"
+
+@pytest.mark.asyncio
+async def test_reclassify_brings_stored_notices_up_to_the_current_classifier(db_session):
+    await load_snapshot(db_session)
+    hpsc = GovernmentSource(name="HPSC", organization="Haryana Public Service Commission", category="STATE_PSC",
+                            official_domain="hpsc.gov.in", recruitment_url="https://hpsc.gov.in/", source_type="DOCUMENT")
+    db_session.add(hpsc)
+    await db_session.flush()
+    # Stored as VACANCY by the classifier before EXAM_SCHEDULE existed (real HPSC listing entry, 1 Oct 2026)
+    url = "https://hpsc.gov.in/Portals/0/Ann_Sch_PMT_DSP_25.09.2026.pdf"
+    db_session.add(RecruitmentNotice(
+        source_id=hpsc.id, url=url, url_hash=url_hash(url), document_type="PDF", notice_kind="VACANCY",
+        title="Announcement dated 25.09.2026 regarding Schedule of Physical Measurement Test for DSP",
+        first_seen_at=NOW, last_seen_at=NOW, review_status="MANUAL_REVIEW"))
+    await db_session.commit()
+
+    factory = async_sessionmaker(db_session.bind, expire_on_commit=False, class_=AsyncSession)
+    lines = []
+    assert await triage_script.main(["--reclassify"], session_factory=factory, now=NOW, out=lines.append) == 0
+    assert "VACANCY->EXAM_SCHEDULE" in lines[0] and lines[1].startswith("DRY RUN")
+    db_session.expire_all()
+    kind = select(RecruitmentNotice.notice_kind).where(RecruitmentNotice.url == url)
+    assert (await db_session.execute(kind)).scalar_one() == "VACANCY"  # dry run wrote nothing
+
+    assert await triage_script.main(["--reclassify", "--apply"], session_factory=factory, now=NOW, out=lines.append) == 0
+    db_session.expire_all()
+    assert (await db_session.execute(kind)).scalar_one() == "EXAM_SCHEDULE"
+    status = select(NoticeTriage.triage_status).join(RecruitmentNotice).where(RecruitmentNotice.url == url)
+    assert (await db_session.execute(status)).scalar_one() == NOT_REQUIRED
+    # Idempotent: a second pass finds nothing to change
+    from govcareeros.backend.services.source_discovery import reclassify_notices
+    assert await reclassify_notices(db_session) == {}

@@ -8,7 +8,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,6 +73,20 @@ def _probe_url(source: GovernmentSource) -> str:
 
 def _classify(source: GovernmentSource, title: str, url: str) -> str:
     return ssc.classify(title, url) if source.adapter_name == "ssc" else classify_notice(title, url)
+
+async def reclassify_notices(session: AsyncSession) -> Dict[Tuple[str, str], int]:
+    """Re-apply the (deterministic) classifier to every stored notice, so classifier fixes also reach notices
+    that are no longer on any listing page. Returns {(old_kind, new_kind): count} for the rows it changed."""
+    changed: Dict[Tuple[str, str], int] = {}
+    rows = (await session.execute(select(RecruitmentNotice, GovernmentSource)
+                                  .join(GovernmentSource, GovernmentSource.id == RecruitmentNotice.source_id))).all()
+    for notice, source in rows:
+        kind = _classify(source, notice.title, notice.url)
+        if kind != notice.notice_kind:
+            changed[(notice.notice_kind, kind)] = changed.get((notice.notice_kind, kind), 0) + 1
+            notice.notice_kind = kind
+    await session.flush()
+    return changed
 
 async def probe_sources(fetcher: PageFetcher, sources: List[GovernmentSource], concurrency: int = 6) -> List[ProbeResult]:
     sem = asyncio.Semaphore(concurrency)

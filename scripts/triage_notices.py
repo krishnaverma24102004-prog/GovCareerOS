@@ -1,12 +1,14 @@
 """
 Backlog triage over every discovered notice (backend/services/triage.py). Dry run by default: prints what
 would be decided and writes nothing; --apply stores the decisions (notice_triage + triage_decisions log).
-Notices are never deleted or edited, and review_status is never touched.
+Notices are never deleted or edited, and review_status is never touched; the one exception is --reclassify,
+which first re-applies the deterministic notice classifier to stored notice_kind (same rule discovery uses).
 
     $env:PYTHONPATH="C:\\Users\\krishna"
     python govcareeros/scripts/triage_notices.py
     python govcareeros/scripts/triage_notices.py --stale-days 90 --top 30
     python govcareeros/scripts/triage_notices.py --apply
+    python govcareeros/scripts/triage_notices.py --reclassify --apply
 """
 import argparse
 import asyncio
@@ -18,6 +20,7 @@ from typing import Callable, List, Optional
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from govcareeros.backend.services.source_discovery import reclassify_notices
 from govcareeros.backend.services.triage import DEFAULT_STALE_DAYS, TriageRun, triage_notices
 
 def report(run: TriageRun, top: int, out: Callable[[str], None] = print) -> None:
@@ -39,6 +42,8 @@ async def main(argv: Optional[List[str]] = None, *, session_factory=None, now: O
     p = argparse.ArgumentParser(description="Deterministic backlog triage of discovered notices")
     p.add_argument("--apply", action="store_true", help="write the decisions (default: dry run)")
     p.add_argument("--stale-days", type=int, default=DEFAULT_STALE_DAYS, help=f"staleness window (default {DEFAULT_STALE_DAYS})")
+    p.add_argument("--reclassify", action="store_true",
+                   help="re-apply the notice classifier to stored notices first (written only with --apply)")
     p.add_argument("--top", type=int, default=20, help="how many top-priority notices to list (default 20)")
     args = p.parse_args(argv)
 
@@ -48,6 +53,9 @@ async def main(argv: Optional[List[str]] = None, *, session_factory=None, now: O
         session_factory = AsyncSessionLocal
     try:
         async with session_factory() as session:
+            if args.reclassify:
+                moved = await reclassify_notices(session)
+                out("reclassified: " + (", ".join(f"{a}->{b} {n}" for (a, b), n in sorted(moved.items())) or "nothing"))
             run = await triage_notices(session, now=now, stale_days=args.stale_days, apply=args.apply)
             if args.apply:
                 await session.commit()
