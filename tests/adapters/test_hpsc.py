@@ -258,6 +258,18 @@ def test_homepage_date_is_the_notices_own_not_one_it_refers_to(parsed):
     assert r.published_on == date(2026, 9, 28)
     assert r.kind_hint == "RESULT"
 
+def test_one_advertisement_per_post_followed_by_the_department(parsed):
+    # The department after the last "(Advt. No. ...)" is not a post and does not drop the posts before it
+    r = _by_url(parsed["home.html"])[DOC + "Ann_postpond_SM_IA_M_IA_03_09_2026.pdf"]
+    assert r.title == ("Announcement dated 03.09.2026 regarding postponement of Subject Knowledge Test for the posts of "
+                       "Senior Manager (IA) (Advt. No. 08/2026) & Manager (IA) (Advt. No. 09/2026) in HSIIDC, scheduled "
+                       "to be held on 27.09.2026")
+    assert r.advertisement_number == "08/2026"
+    assert r.post_names == ["Senior Manager (IA)", "Manager (IA)"]
+
+    r = _by_url(parsed["home.html"])[DOC + "Ann_Scheme_Pattern_Syllabus_SASP_JSA_P_24_08_2026.pdf"]
+    assert r.post_names == ["System Analyst/Senior Programmer", "Jr. System Analyst/Programmer"]
+
 def test_sidebar_is_not_read_on_pages_with_their_own_table(parsed):
     # "What's New" is a sidebar on every page; on listing pages only the page's table is read
     sidebar_only = DOC + "Rollwise_Marks_SKT_AP_Commerce_29_09_2026.pdf"

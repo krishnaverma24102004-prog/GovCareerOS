@@ -282,7 +282,9 @@ def _post_names(title: str) -> Optional[Tuple[List[str], str]]:
         region = rest[:end.start()] if end else rest
         items = [re.sub(r"^(?:\s*(?:,|&|\band\b))+\s*", "", seg, flags=re.I) for seg in _ADVT_GROUP_RE.split(region)]
         items = [seg for seg in items if seg.strip(" ,.-&")]
-        posts = [_post_name(seg) for seg in items]
+        # The text after the last group is the department ("... (Advt. No. 09/2026) in HSIIDC, scheduled ..."),
+        # which leaves no post name of its own
+        posts = [p for p in (_post_name(seg) for seg in items) if p]
         if any(" " not in p or re.search(r"\bCadres?$", p, re.I) for p in posts):
             # "... in the subjects of Biology (Advt. ...), Chemistry (Advt. ...)", "... Haryana Cadre (Advt. ...) &
             # Mewat Cadre (Advt. ...)": the advertisements split subjects or cadres there, not posts
