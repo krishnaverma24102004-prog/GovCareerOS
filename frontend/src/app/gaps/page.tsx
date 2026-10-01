@@ -164,7 +164,9 @@ function GapsView() {
         {vacancies === null && !vacanciesError && <p className="text-sm text-slate-500">Loading vacancies…</p>}
         {shown?.length === 0 && (
           <p className="text-sm text-slate-500">
-            {filter ? "None of the listed vacancies is in the current list." : "No active vacancies in the database yet."}
+            {filter ? "None of the listed vacancies is in the current list." : includeClosed
+              ? "No active vacancies in the database yet."
+              : "No vacancy is open for applications; tick \"Include closed vacancies\" to see the rest."}
           </p>
         )}
         {shown && shown.length > 0 && (
