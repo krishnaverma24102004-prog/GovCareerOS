@@ -1,0 +1,26 @@
+{
+  "_note": "Unmodified HTML (as decoded by httpx, written as UTF-8) of ISRO's official careers listing pages (www.isro.gov.in), fetched over https with PageFetcher.fetch_http under the url_guard policy for www.isro.gov.in. robots.txt returned HTTP 404 at capture time (no restrictions). No browser was needed: the notice board and the opportunities table are in the served HTML (list.min.js only paginates them client-side).",
+  "source": "ISRO",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "captured_on": "2026-10-01",
+  "files": {
+    "careers.html": {
+      "url": "https://www.isro.gov.in/Careers.html",
+      "final_url": "https://www.isro.gov.in/Careers.html",
+      "http_status": 200,
+      "captured_at": "2026-10-01T06:46:01Z",
+      "fetch_mode": "HTTP"
+    },
+    "view_all_opportunities.html": {
+      "url": "https://www.isro.gov.in/ViewAllOpportunities.html",
+      "final_url": "https://www.isro.gov.in/ViewAllOpportunities.html",
+      "http_status": 200,
+      "captured_at": "2026-10-01T06:46:01Z",
+      "fetch_mode": "HTTP"
+    }
+  },
+  "robots_txt": {
+    "url": "https://www.isro.gov.in/robots.txt",
+    "http_status": 404
+  }
+}
