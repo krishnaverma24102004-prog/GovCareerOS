@@ -1,0 +1,182 @@
+{
+ "meta": {
+  "collected_at": "2026-10-01",
+  "description": "Recruitment websites and notices debunked as fake by PIB Fact Check, ministries or police, as reported by news and fact-check pages (no government recruitment site was fetched). 'value' is the fake domain exactly as the debunk names it, or wording the debunk quotes from the fake notice (at most 25 words). 'official_per_debunk' is the genuine site the debunk points to, where it names one.",
+  "kinds": {
+   "DOMAIN": "a fake website's address",
+   "TEXT": "wording of a fake notice, as quoted by the debunk"
+  }
+ },
+ "items": [
+  {
+   "id": "rashtriyaunnatikendra",
+   "kind": "DOMAIN",
+   "value": "http://rashtriyaunnatikendra.org",
+   "impersonates": "Ministry of Skill Development (Skill India)",
+   "official_per_debunk": null,
+   "debunked_by": "PIB Fact Check",
+   "debunk_url": "https://news.careers360.com/fake-website-asks-rs-1645-application-fee-recruitment-in-govt-job-projects-pib",
+   "debunk_date": "2021-12-19"
+  },
+  {
+   "id": "rashtriyaunnatikendra-fee-all-categories",
+   "kind": "TEXT",
+   "value": "applicants of all categories should remit an application fee of Rs 1645 for recruitment",
+   "impersonates": "Ministry of Skill Development (Skill India)",
+   "official_per_debunk": null,
+   "debunked_by": "PIB Fact Check",
+   "debunk_url": "https://news.careers360.com/fake-website-asks-rs-1645-application-fee-recruitment-in-govt-job-projects-pib",
+   "debunk_date": "2021-12-19",
+   "note": "Reported speech: careers360 writes that the website 'further said the examination fee is mandatory for the sitting arrangement and that applicants of all categories should remit ...'"
+  },
+  {
+   "id": "rashtriyaunnatikendra-sitting-arrangement",
+   "kind": "TEXT",
+   "value": "the examination fee is mandatory for the 'sitting arrangement'",
+   "impersonates": "Ministry of Skill Development (Skill India)",
+   "official_per_debunk": null,
+   "debunked_by": "PIB Fact Check",
+   "debunk_url": "https://news.careers360.com/fake-website-asks-rs-1645-application-fee-recruitment-in-govt-job-projects-pib",
+   "debunk_date": "2021-12-19",
+   "note": "Reported speech, same sentence as above"
+  },
+  {
+   "id": "bsnltowerindia",
+   "kind": "DOMAIN",
+   "value": "bsnltowerindia(dot)com",
+   "impersonates": "Bharat Sanchar Nigam Limited (BSNL)",
+   "official_per_debunk": "bsnl.co.in",
+   "debunked_by": "PIB Fact Check",
+   "debunk_url": "https://www.newsonair.gov.in/pibs-fact-check-unit-warned-against-fraudulent-website-of-bsnl",
+   "debunk_date": "2024-09-07"
+  },
+  {
+   "id": "viksitbharatrozgaryojana-org",
+   "kind": "DOMAIN",
+   "value": "https://viksitbharatrozgaryojana.org/",
+   "impersonates": "Ministry of Labour & Employment (PM Viksit Bharat Rozgar Yojana)",
+   "official_per_debunk": "pmvbry.epfindia.gov.in",
+   "debunked_by": "Ministry of Labour & Employment; PIB Fact Check",
+   "debunk_url": "https://www.newkerala.com/news/o/govt-warns-against-fake-websites-posting-jobs-receiving-applications-677",
+   "debunk_date": "2025-09-03"
+  },
+  {
+   "id": "pmviksitbharatrozgaryojana-com",
+   "kind": "DOMAIN",
+   "value": "https://pmviksitbharatrozgaryojana.com/",
+   "impersonates": "Ministry of Labour & Employment (PM Viksit Bharat Rozgar Yojana)",
+   "official_per_debunk": "pmvbry.epfindia.gov.in",
+   "debunked_by": "Ministry of Labour & Employment; PIB Fact Check",
+   "debunk_url": "https://www.newkerala.com/news/o/govt-warns-against-fake-websites-posting-jobs-receiving-applications-677",
+   "debunk_date": "2025-09-03"
+  },
+  {
+   "id": "rsby-ind-in",
+   "kind": "DOMAIN",
+   "value": "https://rsby.ind.in/vacancies",
+   "impersonates": "Rashtriya Swasthya Bima Yojana (Ministry of Health & Family Welfare)",
+   "official_per_debunk": null,
+   "debunked_by": "PIB Fact Check",
+   "debunk_url": "https://news.careers360.com/government-fact-check-pib-warns-candidates-of-fake-rsby-website-demanding-fee",
+   "debunk_date": "2023-02-21"
+  },
+  {
+   "id": "rsby-posts",
+   "kind": "TEXT",
+   "value": "as many as 189 assistant- level and 196 multitasking staff posts are vacant",
+   "impersonates": "Rashtriya Swasthya Bima Yojana (Ministry of Health & Family Welfare)",
+   "official_per_debunk": null,
+   "debunked_by": "PIB Fact Check",
+   "debunk_url": "https://news.careers360.com/government-fact-check-pib-warns-candidates-of-fake-rsby-website-demanding-fee",
+   "debunk_date": "2023-02-21",
+   "note": "Reported speech: 'According to the fake website, as many as 189 assistant- level and 196 multitasking staff posts are vacant ...'"
+  },
+  {
+   "id": "sarvashikshaabhiyan-com",
+   "kind": "DOMAIN",
+   "value": "http://sarvashikshaabhiyan.com",
+   "impersonates": "Samagra Shiksha Abhiyan (Ministry of Education)",
+   "official_per_debunk": "samagra.shikshaabhiyan.gov.in",
+   "debunked_by": "PIB Fact Check",
+   "debunk_url": "https://www.latestly.com/social-viral/fact-check/sarvashikshaabhiyan-com-website-offering-job-opportunities-claims-to-be-official-website-of-sarva-shiksha-abhiyan-pib-fact-check-reveals-truth-6966016.html",
+   "debunk_date": "2025-07-01"
+  },
+  {
+   "id": "sarvashiksha-online",
+   "kind": "DOMAIN",
+   "value": "www.sarvashiksha.online",
+   "impersonates": "Sarva Shiksha Abhiyan (Ministry of Education)",
+   "official_per_debunk": null,
+   "debunked_by": "Ministry of Education",
+   "debunk_url": "https://www.oneindia.com/fact-check/fact-check-is-samagra-education-associated-with-sarva-shiksha-abhiyan-fake-website-3407283.html",
+   "debunk_date": "2022-05-12"
+  },
+  {
+   "id": "samagra-shikshaabhiyan-co-in",
+   "kind": "DOMAIN",
+   "value": "https://samagra.shikshaabhiyan.co.in",
+   "impersonates": "Samagra Shiksha (Ministry of Education)",
+   "official_per_debunk": null,
+   "debunked_by": "Ministry of Education",
+   "debunk_url": "https://www.oneindia.com/fact-check/fact-check-is-samagra-education-associated-with-sarva-shiksha-abhiyan-fake-website-3407283.html",
+   "debunk_date": "2022-05-12"
+  },
+  {
+   "id": "shikshaabhiyan-org-in",
+   "kind": "DOMAIN",
+   "value": "https://shikshaabhiyan.org.in",
+   "impersonates": "Samagra Shiksha (Ministry of Education)",
+   "official_per_debunk": null,
+   "debunked_by": "Ministry of Education",
+   "debunk_url": "https://www.oneindia.com/fact-check/fact-check-is-samagra-education-associated-with-sarva-shiksha-abhiyan-fake-website-3407283.html",
+   "debunk_date": "2022-05-12"
+  },
+  {
+   "id": "ssabhiyan-org",
+   "kind": "DOMAIN",
+   "value": "https://ssabhiyan.org",
+   "impersonates": "'Swasthya Shiksha Abhiyan', claimed to be under the Ministry of Rural Development",
+   "official_per_debunk": null,
+   "debunked_by": "PIB Fact Check",
+   "debunk_url": "https://www.latestly.com/social-viral/fact-check/is-swasthya-shiksha-abhiyan-recruiting-for-government-jobs-under-the-ministry-of-rural-development-pib-fact-check-reveals-the-truth-about-fake-claims-by-ssabhiyan-org-website-7082568.html",
+   "debunk_date": "2025-08-28"
+  },
+  {
+   "id": "indiapostgds-online",
+   "kind": "DOMAIN",
+   "value": "indiapostgds.online",
+   "impersonates": "India Post (Gramin Dak Sevak recruitment)",
+   "official_per_debunk": "indiapost.gov.in",
+   "debunked_by": "Net Protector (NPAV) security advisory",
+   "debunk_url": "https://blogs.npav.net/blogs/post/india-post-gds-phishing-scam-fake-website-warning-for-job-seekers",
+   "debunk_date": "2026-02-04"
+  },
+  {
+   "id": "field-assistant-1736",
+   "kind": "TEXT",
+   "value": "recruitment of 1736 Field Assistant (GD) posts",
+   "impersonates": "Government of India (no organisation named in the debunk)",
+   "official_per_debunk": null,
+   "debunked_by": "PIB Fact Check",
+   "debunk_url": "https://www.latestly.com/fact-check/fake-news-alert-pib-fact-check-debunks-fake-recruitment-drive-for-1736-field-assistant-posts-6877370.html",
+   "debunk_date": "2025-05-23"
+  }
+ ],
+ "genuine_counterparts": [
+  {
+   "value": "https://pmvbry.epfindia.gov.in",
+   "note": "The registration portal the Ministry of Labour & Employment names in the same advisory",
+   "cited_by": "https://www.newkerala.com/news/o/govt-warns-against-fake-websites-posting-jobs-receiving-applications-677"
+  },
+  {
+   "value": "https://www.jointerritorialarmy.gov.in/",
+   "note": "Official Territorial Army site named in the Indian Army's warning about a fake Territorial Army recruitment website",
+   "cited_by": "https://www.ssbcrack.com/2021/06/fake-territorial-army-website-scamming-aspirants-indian-army-warns.html"
+  },
+  {
+   "value": "indiapost.gov.in",
+   "note": "Official India Post site named in the indiapostgds.online advisory",
+   "cited_by": "https://blogs.npav.net/blogs/post/india-post-gds-phishing-scam-fake-website-warning-for-job-seekers"
+  }
+ ]
+}
