@@ -23,7 +23,9 @@ import {
 } from "@/lib/types-prep";
 
 /** Codes the UPSC previous-question-paper source assigns (backend/sources/upsc_pyq.py); any code can be typed. */
-const KNOWN_CODES = ["CSE", "IFS", "CDS", "NDA", "ESE", "CMS", "CAPF", "IES_ISS", "GEOSCIENTIST"];
+const KNOWN_CODES = [
+  "CSE", "IFS", "CDS", "NDA", "ESE", "CMS", "CAPF", "IES_ISS", "GEOSCIENTIST", "CISF_AC_LDCE", "CBI_DSP_LDCE", "SO_LDCE",
+];
 
 export default function PrepPage() {
   const user = useSession();
