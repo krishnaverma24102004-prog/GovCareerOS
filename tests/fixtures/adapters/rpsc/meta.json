@@ -1,0 +1,13 @@
+{
+  "url": "https://rpsc.rajasthan.gov.in/advertisements",
+  "final_url": "https://rpsc.rajasthan.gov.in/advertisements",
+  "captured_on": "2026-10-01",
+  "fetch_mode": "HTTP",
+  "http_status": 200,
+  "fetched_with": "govcareeros.backend.sources.generic_notices.PageFetcher.fetch_http (robots.txt + url_guard, honest User-Agent)",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "file": "advertisements.html",
+  "sha256": "47071495f7c7dc46ab6d4d6a1f4ccbaf4dccc527618ed753365b969deef53936",
+  "bytes": 794860,
+  "notes": "HTML stored exactly as returned by FetchResult.html (httpx text, page declares charset=UTF-8). A few RPSC descriptions contain U+FFFD where the served text was not valid UTF-8 (e.g. 'Corr. No. 22/2024\ufffd25'); kept verbatim."
+}
