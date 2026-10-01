@@ -1,0 +1,812 @@
+{
+  "description": "Real court decisions and official rules on validity of reservation certificates (OBC-NCL, EWS, SC/ST, PwBD, ex-servicemen, domicile) in Indian government recruitment. Research data only; not consumed by any engine yet. See certificate_cases.README.md.",
+  "compiled_on": "2026-10-01",
+  "cases": [
+    {
+      "id": "sc-2023-divya-uoi",
+      "court": "Supreme Court of India",
+      "case_name": "Divya v. Union of India & Ors.",
+      "case_number": "W.P.(C) No. 724 of 2023 (2023 INSC 900; (2024) 1 SCC 448)",
+      "date": "2023-10-09",
+      "citation_url": "https://api.sci.gov.in/supremecourt/2023/27875/27875_2023_13_1501_47490_Judgement_09-Oct-2023.pdf",
+      "source_kind": "judgment",
+      "certificate_type": "ews",
+      "recruitment": "UPSC Civil Services Examination 2022",
+      "facts": {
+        "certificate_issue_dates": [
+          "2020-10-09"
+        ],
+        "certificate_financial_year": "2019-20",
+        "required_financial_year": "2020-21",
+        "cut_off_date": "2022-02-22",
+        "advertisement_date": "2022-02-02",
+        "notes": "Held only an I&AC for FY 2019-20 on the cut-off date; FY 2020-21 certificate obtained on 2023-06-01."
+      },
+      "rule_applied": "CSE-2022 Rules 13, 27(3), 28 read with DoPT OMs 19.01.2019 and 31.01.2019: I&AC for FY 2020-21 must be possessed by the closing date.",
+      "outcome": "rejected",
+      "outcome_note": "Candidature converted from EWS to General; writ petition dismissed.",
+      "quote": "the I&AC must be as per the prescribed norms and must be in possession of the candidate on or before the cut-off date.",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2023-divya-ashwani-dubey",
+      "court": "Supreme Court of India",
+      "case_name": "Vimlok Tiwari & Ors. v. UPSC (petitioner 2: Ashwani Dubey), decided with Divya v. Union of India",
+      "case_number": "W.P.(C) No. 705 of 2023 (2023 INSC 900)",
+      "date": "2023-10-09",
+      "citation_url": "https://api.sci.gov.in/supremecourt/2023/27875/27875_2023_13_1501_47490_Judgement_09-Oct-2023.pdf",
+      "source_kind": "judgment",
+      "certificate_type": "ews",
+      "recruitment": "UPSC Civil Services Examination 2022",
+      "facts": {
+        "certificate_issue_dates": [
+          "2022-01-25"
+        ],
+        "certificate_financial_year": "2021-22",
+        "required_financial_year": "2020-21",
+        "cut_off_date": "2022-02-22",
+        "advertisement_date": "2022-02-02",
+        "notes": "Tehsildar later (2023-01-16) certified the FY 2021-22 entry was a mistake for 2020-21; clarification produced after DAF-I deadline."
+      },
+      "rule_applied": "I&AC must state the correct FY (2020-21) and be possessed by the closing date; post-deadline corrections not accepted.",
+      "outcome": "rejected",
+      "outcome_note": "Converted to General category; writ petition dismissed.",
+      "quote": "The UPSC was justified in rejecting the claim of the petitioners, for consideration under the EWS Category in CSE-2022.",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2022-gaurav-singh-wp2-wp4",
+      "court": "Supreme Court of India",
+      "case_name": "Union Public Service Commission v. Gaurav Singh & Ors. (respondent-writ petitioners 2 and 4)",
+      "case_number": "C.A. No. 4152 of 2022 arising out of SLP (C) No. 426 of 2021; (2024) 2 SCC 605",
+      "date": "2022-05-18",
+      "citation_url": "https://indiankanoon.org/doc/148737380/",
+      "source_kind": "judgment",
+      "certificate_type": "ews",
+      "recruitment": "UPSC Central Armed Police Forces (AC) Examination 2019",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": "2019-20",
+        "required_financial_year": "2018-19",
+        "cut_off_date": "2019-05-20",
+        "advertisement_date": "2019-04-24",
+        "notes": "Certificates dated after the last date and for the later FY; High Court noted a one-time relaxation requiring certificates dated earlier than 01.08.2019."
+      },
+      "rule_applied": "DoPT OM 31.01.2019 paras 4.1 and 5.3: income for FY prior to year of application; crucial date is the closing date.",
+      "outcome": "rejected",
+      "outcome_note": "High Court order set aside as regards writ petitioners 2 and 4.",
+      "quote": "they have filed certificates issued subsequent to the last date and for the later financial year.",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2022-gaurav-singh-wp1",
+      "court": "Supreme Court of India",
+      "case_name": "Union Public Service Commission v. Gaurav Singh & Ors. (respondent-writ petitioner 1)",
+      "case_number": "C.A. No. 4152 of 2022 arising out of SLP (C) No. 426 of 2021; (2024) 2 SCC 605",
+      "date": "2022-05-18",
+      "citation_url": "https://indiankanoon.org/doc/148737380/",
+      "source_kind": "judgment",
+      "certificate_type": "ews",
+      "recruitment": "UPSC Central Armed Police Forces (AC) Examination 2019",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": "2018-19",
+        "cut_off_date": "2019-05-20",
+        "advertisement_date": "2019-04-24",
+        "notes": "Correct date and FY; only defect was a seal stamped without the officer's name."
+      },
+      "rule_applied": "A seal/format irregularity not attributable to the candidate does not defeat a certificate of the correct date and FY.",
+      "outcome": "accepted",
+      "outcome_note": "Directed to be treated as an EWS candidate (writ petitioner 3, issuing-authority objection, also accepted).",
+      "quote": "The certificate of writ-petitioner No.1 was also accepted as there was no discrepancy in either the date of issuance or the year.",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2026-poonam-dwivedi",
+      "court": "Supreme Court of India",
+      "case_name": "Poonam Dwivedi & Ors. v. State of U.P. & Ors. (appellant Poonam Dwivedi)",
+      "case_number": "C.A. arising out of SLP (C) Nos. 4001-4002 of 2023 (2026 INSC 351)",
+      "date": "2026-04-10",
+      "citation_url": "https://www.sci.gov.in/sci-get-pdf/?diary_no=50892023&type=j&order_date=2026-04-10&from=latest_judgements_order",
+      "source_kind": "judgment",
+      "certificate_type": "ews",
+      "recruitment": "UPSSSC Health Worker (Female), advertisement dated 15.12.2021",
+      "facts": {
+        "certificate_issue_dates": [
+          "2021-01-12"
+        ],
+        "certificate_financial_year": "2020-21",
+        "required_financial_year": "2020-21",
+        "cut_off_date": "2022-01-05",
+        "advertisement_date": "2021-12-15",
+        "notes": "Certificate for FY 2020-21 was issued before that FY closed; valid window per Court was 01.04.2021 to 05.01.2022."
+      },
+      "rule_applied": "UP OM 18.02.2019 / Clause 8.3 of advertisement: income for FY prior to year of application, certificate issued by last date of application.",
+      "outcome": "rejected",
+      "outcome_note": "Appeals dismissed; exclusion from EWS select list upheld.",
+      "quote": "were issued prior to even closure of the relevant financial year, there was an error apparent on the face of those certificates",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2026-poonam-dwivedi-sunita-kumari",
+      "court": "Supreme Court of India",
+      "case_name": "Poonam Dwivedi & Ors. v. State of U.P. & Ors. (appellant Sunita Kumari)",
+      "case_number": "C.A. arising out of SLP (C) Nos. 4001-4002 of 2023 (2026 INSC 351)",
+      "date": "2026-04-10",
+      "citation_url": "https://www.sci.gov.in/sci-get-pdf/?diary_no=50892023&type=j&order_date=2026-04-10&from=latest_judgements_order",
+      "source_kind": "judgment",
+      "certificate_type": "ews",
+      "recruitment": "UPSSSC Health Worker (Female), advertisement dated 15.12.2021",
+      "facts": {
+        "certificate_issue_dates": [
+          "2022-01-10"
+        ],
+        "certificate_financial_year": "2021-22",
+        "required_financial_year": "2020-21",
+        "cut_off_date": "2022-01-05",
+        "advertisement_date": "2021-12-15",
+        "notes": "Certificate related to FY 2021-22 instead of 2020-21 (also dated after the last date of application)."
+      },
+      "rule_applied": "Certificate of a different FY goes to the root of eligibility (following UPSC v. Gaurav Singh).",
+      "outcome": "rejected",
+      "outcome_note": "Appeal dismissed.",
+      "quote": "even the certificate of Sunita Kumari was invalid for claiming the benefit of reservation.",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2026-poonam-dwivedi-archana-saxena",
+      "court": "Supreme Court of India",
+      "case_name": "Poonam Dwivedi & Ors. v. State of U.P. & Ors. (appellant Archana Saxena)",
+      "case_number": "C.A. arising out of SLP (C) No. 20256 of 2023 (2026 INSC 351)",
+      "date": "2026-04-10",
+      "citation_url": "https://www.sci.gov.in/sci-get-pdf/?diary_no=50892023&type=j&order_date=2026-04-10&from=latest_judgements_order",
+      "source_kind": "judgment",
+      "certificate_type": "ews",
+      "recruitment": "UPSSSC Health Worker (Female), advertisement dated 15.12.2021",
+      "facts": {
+        "certificate_issue_dates": [
+          "2021-02-05"
+        ],
+        "certificate_financial_year": "2019-20",
+        "required_financial_year": "2020-21",
+        "cut_off_date": "2022-01-05",
+        "advertisement_date": "2021-12-15",
+        "notes": "Certificate stated valid for FY 2020-21 but income was for FY 2019-20; quote is the High Court Division Bench finding reproduced and upheld by the Supreme Court."
+      },
+      "rule_applied": "Income must be for the FY prior to the year of application (2020-21).",
+      "outcome": "rejected",
+      "outcome_note": "Appeal dismissed.",
+      "quote": "though, it was required to be filed for the financial year 2020-21, thus, this certificate is not valid.",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2026-poonam-dwivedi-shanu-tiwari",
+      "court": "Supreme Court of India",
+      "case_name": "Poonam Dwivedi & Ors. v. State of U.P. & Ors. (appellant Shanu Tiwari)",
+      "case_number": "C.A. arising out of SLP (C) Nos. 4001-4002 of 2023 (2026 INSC 351)",
+      "date": "2026-04-10",
+      "citation_url": "https://www.sci.gov.in/sci-get-pdf/?diary_no=50892023&type=j&order_date=2026-04-10&from=latest_judgements_order",
+      "source_kind": "judgment",
+      "certificate_type": "ews",
+      "recruitment": "UPSSSC Health Worker (Female), advertisement dated 15.12.2021",
+      "facts": {
+        "certificate_issue_dates": [
+          "2021-01-21"
+        ],
+        "certificate_financial_year": "2019-20",
+        "required_financial_year": "2020-21",
+        "cut_off_date": "2022-01-05",
+        "advertisement_date": "2021-12-15",
+        "notes": "Income for FY 2019-20, certificate stated valid for 2020-2021; quote is the High Court Division Bench finding upheld by the Supreme Court."
+      },
+      "rule_applied": "Income must be for the FY prior to the year of application (2020-21).",
+      "outcome": "rejected",
+      "outcome_note": "Appeal dismissed.",
+      "quote": "This certificate too did not relate to the financial year",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2025-sakshi-arha",
+      "court": "Supreme Court of India (3-Judge Bench)",
+      "case_name": "Sakshi Arha v. The Rajasthan High Court & Ors.",
+      "case_number": "C.A. No. 3957 of 2023 with connected appeals (2025 INSC 463)",
+      "date": "2025-04-08",
+      "citation_url": "https://api.sci.gov.in/supremecourt/2022/29234/29234_2022_2_1501_60761_Judgement_08-Apr-2025.pdf",
+      "source_kind": "judgment",
+      "certificate_type": "obc_ncl",
+      "recruitment": "Rajasthan High Court Civil Judge Examination 2021 (advertisement 22.07.2021)",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": "2021-08-31",
+        "advertisement_date": "2021-07-22",
+        "notes": "OBC-NCL / MBC-NCL appellants; each held only older certificates (2012-2018) without affidavit and fresh ones issued in 2022. Subsequent notice of 04.08.2022 fixed the 31.08.2021 cut-off."
+      },
+      "rule_applied": "Where advertisement is silent, eligibility is judged on the last date of application; Rajasthan circulars 09.09.2015 / 08.08.2019: NCL certificate valid one year, extendable to three years with affidavit.",
+      "outcome": "rejected",
+      "outcome_note": "Appeals dismissed; split verdict of 18.05.2023 resolved against the candidates.",
+      "quote": "none of the appellants had a valid certificate and/or accompanied by the affidavit as per the proforma at the relevant time",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2025-sakshi-arha-jyoti-beniwal",
+      "court": "Supreme Court of India (3-Judge Bench), affirming Rajasthan High Court order dated 18.08.2022",
+      "case_name": "Jyoti Beniwal v. The Rajasthan High Court (decided with Sakshi Arha v. The Rajasthan High Court)",
+      "case_number": "C.A. No. 3909 of 2023 (arising from D.B. Civil Writ Petition No. 11784 of 2022) (2025 INSC 463)",
+      "date": "2025-04-08",
+      "citation_url": "https://api.sci.gov.in/supremecourt/2022/29234/29234_2022_2_1501_60761_Judgement_08-Apr-2025.pdf",
+      "source_kind": "judgment",
+      "certificate_type": "obc_ncl",
+      "recruitment": "Rajasthan High Court Civil Judge Examination 2021",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": "2021-08-31",
+        "advertisement_date": "2021-07-22",
+        "notes": "Presented an OBC-NCL certificate of the year 2016."
+      },
+      "rule_applied": "OBC-NCL status is determined annually; certificate must be valid as on the last date of application.",
+      "outcome": "rejected",
+      "outcome_note": "Writ petition dismissed by High Court; appeal dismissed by Supreme Court.",
+      "quote": "the certificate of the year 2016, as presented by the petitioner therein, was deemed to have failed to meet the requirements as per the law",
+      "uncertain": false
+    },
+    {
+      "id": "dhc-2022-aashima-goyal",
+      "court": "High Court of Delhi (Division Bench)",
+      "case_name": "Aashima Goyal v. Union of India & Anr.",
+      "case_number": "W.P.(C) No. 6932/2021",
+      "date": "2022-01-25",
+      "citation_url": "https://www.livelaw.in/pdf_upload/ras25012022cw69322021-172349-408301.pdf",
+      "source_kind": "judgment",
+      "certificate_type": "ews",
+      "recruitment": "UPSC Civil Services Examination 2019",
+      "facts": {
+        "certificate_issue_dates": [
+          "2019-06-24"
+        ],
+        "certificate_financial_year": "2018-19",
+        "required_financial_year": "2017-18",
+        "cut_off_date": null,
+        "advertisement_date": null,
+        "notes": "Submitted FY 2018-19 I&AC; FY 2017-18 I&AC submitted only on 24.09.2020 after the extended deadline of 31.08.2020; family income for FY 2017-18 also found above Rs 8 lakh via CBDT."
+      },
+      "rule_applied": "DoPT OMs 19.01.2019 and 31.01.2019: income for FY 2017-18 (AY 2018-19) below Rs 8 lakh, certificate by deadline.",
+      "outcome": "rejected",
+      "outcome_note": "Candidature cancellation (09.09.2020) upheld; writ petition dismissed.",
+      "quote": "was not able to meet the extended deadline fixed for submission of the correct I&A certificate for the F.Y. 2017-18",
+      "uncertain": false
+    },
+    {
+      "id": "calhc-2026-deepak-kumar-aai",
+      "court": "High Court at Calcutta (Single Judge)",
+      "case_name": "Deepak Kumar v. Airports Authority of India & Ors.",
+      "case_number": "WPA 8642 of 2026",
+      "date": null,
+      "citation_url": "https://www.livelaw.in/high-court/calcutta-high-court/job-aspirants-cannot-dictate-recruitment-conditions-calcutta-high-court-refuses-relaxation-in-ews-certificate-requirement-534344",
+      "source_kind": "news_report",
+      "certificate_type": "ews",
+      "recruitment": "Airports Authority of India recruitment (EWS category)",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": "2023-24",
+        "cut_off_date": "2026-02-13",
+        "advertisement_date": null,
+        "notes": "Did not produce the FY 2023-24 certificate at document verification; undertaking to submit by 06.02.2026, last extension 13.02.2026."
+      },
+      "rule_applied": "Recruitment notice prescribed FY 2023-24 income and asset certificate; no relaxation clause.",
+      "outcome": "rejected",
+      "outcome_note": "Writ petition dismissed; candidature cancellation upheld.",
+      "quote": "Relying upon a certificate of any other financial year will not validate the reservation claimed by the petitioner",
+      "uncertain": true,
+      "uncertain_reason": "Judgment date not stated in the fetched report (report published 15 May 2026); judgment PDF not read."
+    },
+    {
+      "id": "dhc-2026-kadam-kiran-sanjay",
+      "court": "High Court of Delhi (Division Bench)",
+      "case_name": "Kadam Kiran Sanjay v. Indian Coast Guard",
+      "case_number": "2026 SCC OnLine Del 7081",
+      "date": "2026-09-02",
+      "citation_url": "https://www.scconline.com/blog/post/2026/09/10/ews-certificate-preceding-financial-year-delhi-hc-coast-guard-navik/",
+      "source_kind": "news_report",
+      "certificate_type": "ews",
+      "recruitment": "Indian Coast Guard Navik (General Duty) 01/2025 batch",
+      "facts": {
+        "certificate_issue_dates": [
+          "2024-04-11"
+        ],
+        "certificate_financial_year": "2023-24",
+        "required_financial_year": "2024-25",
+        "cut_off_date": "2024-07-03",
+        "advertisement_date": null,
+        "notes": "Submitted FY 2023-24 certificate; also held FY 2024-25 certificate issued 11.04.2024. Notice required documents issued on/before 03.07.2024 and valid until 30.04.2025."
+      },
+      "rule_applied": "DoPT OM 31.01.2019 (FY preceding year of application); ambiguous advertisement notes construed for the candidate.",
+      "outcome": "accepted",
+      "outcome_note": "Disposed in terms of interim order of 16.04.2025; petitioner inducted and allowed to continue.",
+      "quote": "an EWS certificate pertaining to the financial year preceding the year of application cannot be rejected merely on a technical ground",
+      "uncertain": false
+    },
+    {
+      "id": "dhc-2025-raghvendra-singh",
+      "court": "High Court of Delhi (Division Bench)",
+      "case_name": "Raghvendra Singh & Anr. v. Union Public Service Commission & Anr.",
+      "case_number": "W.P.(C) 8304/2025 and connected matters (2025:DHC:11105-DB)",
+      "date": "2025-12-10",
+      "citation_url": "https://indiankanoon.org/doc/149906480/",
+      "source_kind": "judgment",
+      "certificate_type": "obc_ncl",
+      "recruitment": "UPSC CAPF (Assistant Commandants) Examinations 2023 and 2024",
+      "facts": {
+        "certificate_issue_dates": [
+          "2024-02-19",
+          "2024-10-08",
+          "2024-05-25"
+        ],
+        "certificate_financial_year": null,
+        "required_financial_year": "2023-24",
+        "cut_off_date": "2024-05-14",
+        "advertisement_date": null,
+        "notes": "Rule 21.2 required OBC-NCL certificates issued 01.04.2024-14.05.2024 (2024 exam) or 01.04.2023-16.05.2023 (2023 exam); lead petitioners' certificates fell outside the window."
+      },
+      "rule_applied": "Rule 21.2 of CAPF (AC) Examination Rules held arbitrary; DoPT OM 08.10.2015 (provisional appointment on prima facie proof).",
+      "outcome": "accepted",
+      "outcome_note": "Certificates outside the window to be accepted, subject to verification of OBC-NCL status.",
+      "quote": "to cancel the candidature of otherwise eligible candidates, on sole grounds of issuance date, deprives the petitioners of their fundamental rights",
+      "uncertain": true,
+      "uncertain_reason": "UPSC stated (in W.P.(C) 3404/2025) that it intended to appeal to the Supreme Court; appeal status not checked."
+    },
+    {
+      "id": "dhc-2026-bharath-singarappa",
+      "court": "High Court of Delhi (Division Bench)",
+      "case_name": "Bharath Singarappa v. Union Public Service Commission & Ors.",
+      "case_number": "W.P.(C) 3404/2025",
+      "date": "2026-02-03",
+      "citation_url": "https://delhihighcourt.nic.in/app/showFileJudgment/VKR03022026CW34042025_120501.pdf",
+      "source_kind": "judgment",
+      "certificate_type": "obc_ncl",
+      "recruitment": "UPSC CAPF (Assistant Commandants) Examination 2023",
+      "facts": {
+        "certificate_issue_dates": [
+          "2023-02-16"
+        ],
+        "certificate_financial_year": null,
+        "required_financial_year": "2022-23",
+        "cut_off_date": "2023-05-16",
+        "advertisement_date": "2023-04-26",
+        "notes": "Notice window 01.04.2023-16.05.2023; held NCL certificate dated 16.02.2023 and another issued February 2024."
+      },
+      "rule_applied": "Followed Raghvendra Singh v. UPSC (2025:DHC:11105-DB).",
+      "outcome": "accepted",
+      "outcome_note": "Candidature to be considered subject to verification; seniority but no financial benefits.",
+      "quote": "the cut off date shall not be a factor for disqualification",
+      "uncertain": false
+    },
+    {
+      "id": "dhc-2025-amjad-khan",
+      "court": "High Court of Delhi (Division Bench)",
+      "case_name": "Amjad Khan v. The Chairman, Delhi Subordinate Services Selection Board & Ors.",
+      "case_number": "W.P.(C) 2018/2019",
+      "date": "2025-09-24",
+      "citation_url": "https://delhihighcourt.nic.in/app/showFileJudgment/NAC24092025CW20182019_183345.pdf",
+      "source_kind": "judgment",
+      "certificate_type": "obc_ncl",
+      "recruitment": "DSSSB Advertisement No. 02/2012, TGT (Maths) Male, Post Code 110/12",
+      "facts": {
+        "certificate_issue_dates": [
+          "2012-06-28"
+        ],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": "2012-06-15",
+        "advertisement_date": null,
+        "notes": "Applied for OBC certificate on 14.06.2012 and enclosed the receipt; certificate issued 28.06.2012; same certificate accepted for his LDC selection."
+      },
+      "rule_applied": "Ram Kumar Gijroya (2016) 4 SCC 754; DoPT OM 08.10.2015; Sakshi Arha distinguished (application pending with competent authority).",
+      "outcome": "accepted",
+      "outcome_note": "CAT order set aside; consideration for appointment with notional seniority, no back salary.",
+      "quote": "Procedural requirements must yield to substantive justice where the eligibility of a candidate is otherwise established and undisputed.",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2022-karn-singh-yadav",
+      "court": "Supreme Court of India",
+      "case_name": "Karn Singh Yadav v. Govt. of NCT of Delhi & Ors.",
+      "case_number": "C.A. arising out of SLP (C) No. 14948 of 2016 (2022 INSC 1031)",
+      "date": "2022-09-28",
+      "citation_url": "https://indiankanoon.org/doc/79966520/",
+      "source_kind": "judgment",
+      "certificate_type": "obc_ncl",
+      "recruitment": "MCD 'A' Grade Staff Nurse, advertisement dated 30.08.2007",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": null,
+        "advertisement_date": "2007-08-30",
+        "notes": "OBC documents not filed before the cut-off date."
+      },
+      "rule_applied": "Ram Kumar Gijroya v. DSSSB (2016) 4 SCC 754.",
+      "outcome": "accepted",
+      "outcome_note": "Held covered by Ram Kumar Gijroya, but no substantial relief granted given lapse of time.",
+      "quote": "The instant matter is thus completely covered by said decision.",
+      "uncertain": false
+    },
+    {
+      "id": "trihc-2026-rajat-ghosh",
+      "court": "High Court of Tripura (Division Bench)",
+      "case_name": "Rajat Ghosh v. Tripura University",
+      "case_number": "2026 SCC OnLine Tri 197",
+      "date": "2026-05-14",
+      "citation_url": "https://www.scconline.com/blog/post/2026/06/01/caste-certificate-can-be-submitted-after-cut-off-date-tripura-high-court/",
+      "source_kind": "news_report",
+      "certificate_type": "obc_ncl",
+      "recruitment": "Tripura University, Associate Professor (Pharmacy), OBC-NCL reserved post",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": null,
+        "advertisement_date": null,
+        "notes": "Selected candidate (respondent 7) obtained the updated OBC-NCL certificate after the interview and selection; advertisement required eligibility by the last date."
+      },
+      "rule_applied": "DoPT OMs 08.10.2015 and 29.03.2023 (provisional consideration on prima facie proof); Sakshi Arha distinguished as arising under Rajasthan rules.",
+      "outcome": "accepted",
+      "outcome_note": "Appeal against the appointment dismissed.",
+      "quote": "permitted production of the caste certificate at a later date in spite of the advertisement saying that it should be produced before the cut-off date",
+      "uncertain": false
+    },
+    {
+      "id": "sc-2026-rohith-nathan",
+      "court": "Supreme Court of India",
+      "case_name": "Union of India & Ors. v. Rohith Nathan & Anr., etc.",
+      "case_number": "C.A. Nos. 2827-2829 of 2018 with connected appeals (2026 INSC 230)",
+      "date": "2026-03-11",
+      "citation_url": "https://api.sci.gov.in/supremecourt/2017/30325/30325_2017_13_1501_69248_Judgement_11-Mar-2026.pdf",
+      "source_kind": "judgment",
+      "certificate_type": "obc_ncl",
+      "recruitment": "UPSC Civil Services Examinations 2012-2017 (service allocation)",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": null,
+        "advertisement_date": null,
+        "notes": "Creamy-layer status computed by DoPT from salary of parents employed in PSU/private sector (para 9 of letter 14.10.2004), where equivalence with Government posts was not established."
+      },
+      "rule_applied": "OM 08.09.1993 Income/Wealth Test excludes salary income; letter 14.10.2004 para 9 discriminatory without equivalence.",
+      "outcome": "accepted",
+      "outcome_note": "Union's appeals dismissed; candidates satisfying NCL criteria to be accommodated (supernumerary posts) within six months.",
+      "quote": "Thus, we find no infirmity in the judgments impugned before us.",
+      "uncertain": false
+    },
+    {
+      "id": "phhc-2025-divya-kalia",
+      "court": "High Court of Punjab and Haryana (Division Bench)",
+      "case_name": "Divya Kalia v. State of Haryana",
+      "case_number": "2025 SCC OnLine P&H 1790",
+      "date": "2025-03-20",
+      "citation_url": "https://www.scconline.com/blog/post/2025/03/27/punjab-haryana-hc-grants-relief-judicial-aspirant-whose-candidature-rejected-defect-caste-certificate/",
+      "source_kind": "news_report",
+      "certificate_type": "sc_st",
+      "recruitment": "Haryana Civil Services (Judicial Branch) Examination 2023-2024",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": null,
+        "advertisement_date": null,
+        "notes": "SC certificate lacked registration number/date in the prescribed position; Tehsildar confirmed it genuine."
+      },
+      "rule_applied": "Possession of eligibility vs proof (Charles K. Skaria; Dolly Chhanda; Ram Kumar Gijroya): defects attributable to the issuing authority may be condoned.",
+      "outcome": "accepted",
+      "outcome_note": "Rejection quashed; costs on HPSC.",
+      "quote": "the fault (if any) was solely the competent authority concerned in issuing the SC certificate",
+      "uncertain": false
+    },
+    {
+      "id": "jhhc-2026-jpsc-jssc-caste-format",
+      "court": "High Court of Jharkhand (Division Bench)",
+      "case_name": "Letters Patent Appeals arising from W.P.(S) No. 3151 of 2018 batch (JPSC/JSSC recruitments)",
+      "case_number": null,
+      "date": null,
+      "citation_url": "https://thejharkhandstory.co.in/jharkhand-hc-upholds-jpsc-jssc-rule-on-caste-certificate-deadline/",
+      "source_kind": "news_report",
+      "certificate_type": "sc_st",
+      "recruitment": "JPSC and JSSC recruitments (Dentist (Basic Cadre), police radio operator and others)",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": null,
+        "advertisement_date": null,
+        "notes": "Candidates uploaded central-government format caste certificates or produced state-format certificates only at document verification after the cut-off date."
+      },
+      "rule_applied": "Advertisement required caste certificate details in the prescribed State format before the last date; Ram Kumar Gijroya held inapplicable.",
+      "outcome": "rejected",
+      "outcome_note": "Treated as general category; appeals dismissed.",
+      "quote": "can be treated under the general category if they fail to submit details of caste certificates in the prescribed format before the application deadline",
+      "uncertain": true,
+      "uncertain_reason": "Report gives only 'Ranchi, May 7' without year or case number; lead appellant name not stated."
+    },
+    {
+      "id": "cat-2026-samit-kumar",
+      "court": "Central Administrative Tribunal, Principal Bench, New Delhi",
+      "case_name": "Samit Kumar v. Union of India (DoPT) & Ors.",
+      "case_number": "O.A. No. 2555/2025",
+      "date": "2026-02-12",
+      "citation_url": "https://indiankanoon.org/doc/187675859/",
+      "source_kind": "judgment",
+      "certificate_type": "pwbd",
+      "recruitment": "SSC Multi-Tasking Staff (Non-Technical), advertisement dated 18.01.2023",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": null,
+        "advertisement_date": "2023-01-18",
+        "notes": "Disability certificate (Mental Illness - BPAD, benchmark >40%) was temporary, valid up to 03.11.2026; rejected 14.05.2025 relying on DEPwD clarification 20.01.2025."
+      },
+      "rule_applied": "RPwD Act 2016 s.2(r) and RPwD Rules 2017 r.18(3); DoPT OM 17.05.2022 held confined to promotion.",
+      "outcome": "accepted",
+      "outcome_note": "Rejection quashed; appointment subject to AIIMS Medical Board reassessment.",
+      "quote": "a valid benchmark disability certificate cannot be disregarded merely because it specifies a period of validity",
+      "uncertain": false
+    },
+    {
+      "id": "bomhc-2026-shritij-mohan-shrivastava",
+      "court": "High Court of Bombay (Division Bench)",
+      "case_name": "Shritij Mohan Shrivastava v. Reserve Bank of India & Anr.",
+      "case_number": "Writ Petition (L) No. 7619 of 2026 (2026:BHC-OS:18169-DB)",
+      "date": "2026-08-05",
+      "citation_url": "https://www.livelaw.in/pdf_upload/2026/08/18/shritij-mohan-shrivastava-v-the-reserve-bank-of-india-694752.pdf",
+      "source_kind": "judgment",
+      "certificate_type": "pwbd",
+      "recruitment": "RBI Officers in Grade 'B' (DR) - General, advertisement dated 10.09.2025",
+      "facts": {
+        "certificate_issue_dates": [
+          "2022-06-29"
+        ],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": null,
+        "advertisement_date": "2025-09-10",
+        "notes": "Permanent disability certificate and UDID (60%, Autism Spectrum Disorder with Learning Disability); advertisement required permanent certificate issued before closing date."
+      },
+      "rule_applied": "Government of India notification 04.01.2021 identifying ASD(M), MI and MD as suitable; RPwD Act Schedule.",
+      "outcome": "accepted",
+      "outcome_note": "RBI directed to issue appointment order.",
+      "quote": "the petitioner additionally having a learning disability, in our opinion, certainly cannot be considered to be any ineligibility",
+      "uncertain": false
+    },
+    {
+      "id": "dhc-2026-ghunna-ram",
+      "court": "High Court of Delhi (Division Bench)",
+      "case_name": "Ghunna Ram v. Union of India & Ors.",
+      "case_number": "W.P.(C) 3427/2023 (2026:DHC:1910-DB)",
+      "date": null,
+      "citation_url": "https://24law.in/story/one-year-discharge-period-for-ex-servicemen-under-capfs-recruitment-to-be-counted-from-date-of-exam",
+      "source_kind": "news_report",
+      "certificate_type": "ex_serviceman",
+      "recruitment": "UPSC CAPF (Assistant Commandants) Examination 2019, BSF",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": null,
+        "advertisement_date": null,
+        "notes": "Serving Havildar Major applied as ESM with serving-personnel certificate showing completion of service by 31.12.2020; UPSC said he was not discharged within one year of the last date of application."
+      },
+      "rule_applied": "Rule 5(c)(i), Ex-servicemen (Re-employment in Central Civil Services and Posts) Rules 1979 as amended 2012: assignment due to be completed within one year, counted from declaration of results.",
+      "outcome": "accepted",
+      "outcome_note": "Cancellation quashed; to be processed against an available ESM vacancy, no arrears.",
+      "quote": "the benefit of any ambiguity has to enure to the benefit of the candidate, and not the administration.",
+      "uncertain": true,
+      "uncertain_reason": "Judgment date not stated in the fetched report; LiveLaw weekly round-up places it around 16-22 March 2026."
+    },
+    {
+      "id": "mphc-2019-aakansha-meena",
+      "court": "High Court of Madhya Pradesh (Single Judge)",
+      "case_name": "Aakansha Meena v. State of M.P.",
+      "case_number": "2019 SCC OnLine MP 491",
+      "date": "2019-03-27",
+      "citation_url": "https://www.scconline.com/blog/post/2019/03/29/mp-hc-requirement-of-domicile-certificate-not-mentioned-in-application-form-cant-be-ground-for-denying-participation-in-selection-process/",
+      "source_kind": "news_report",
+      "certificate_type": "domicile",
+      "recruitment": "MP Police Subedar (M.P. Police Executive (Non-Gazetted) Service Recruitment Rules 1997)",
+      "facts": {
+        "certificate_issue_dates": [],
+        "certificate_financial_year": null,
+        "required_financial_year": null,
+        "cut_off_date": null,
+        "advertisement_date": null,
+        "notes": "Domicile certificate issued after the last date of application; advertisement required it only for age-relaxation claimants and the form had no domicile column."
+      },
+      "rule_applied": "Requirement not in advertisement/application form cannot be inserted by a later notice.",
+      "outcome": "accepted",
+      "outcome_note": "Writ petitions allowed; permitted to participate in second stage.",
+      "quote": "the respondents could not have denied the petitioner's participation in the second stage of the selection process",
+      "uncertain": false
+    }
+  ],
+  "rules": [
+    {
+      "id": "ews-income-fy-prior-to-application",
+      "certificate_type": "ews",
+      "issuer": "DoPT",
+      "reference": "O.M. No. 43011/11/2022-Estt.(Res-II) dated 19.09.2022 (FAQ 15), restating O.M. No. 36039/1/2019-Estt(Res) dated 31.01.2019 para 4.1",
+      "rule": "Family gross income (all sources) below Rs 8 lakh for the financial year prior to the year of application.",
+      "source_url": "https://documents.doptcirculars.nic.in/D2/D02est/ews%20faq_1_compressedicLhY.pdf",
+      "quote": "Income for the purpose shall include income from all sources i.e. salary, agriculture, business, profession, etc. for the financial year prior to the year",
+      "uncertain": false,
+      "source_kind": "official_document"
+    },
+    {
+      "id": "ews-crucial-date-closing-date",
+      "certificate_type": "ews",
+      "issuer": "DoPT",
+      "reference": "O.M. No. 43011/11/2022-Estt.(Res-II) dated 19.09.2022 (FAQ 21), restating O.M. dated 31.01.2019 para 5.3",
+      "rule": "Crucial date for the Income & Asset Certificate is the closing date for receipt of applications unless the advertisement fixes another date.",
+      "source_url": "https://documents.doptcirculars.nic.in/D2/D02est/ews%20faq_1_compressedicLhY.pdf",
+      "quote": "may be treated as the closing date for receipt of application for the post, except in cases where crucial date is fixed otherwise.",
+      "uncertain": false,
+      "source_kind": "official_document"
+    },
+    {
+      "id": "ews-later-certificate-major-discrepancy",
+      "certificate_type": "ews",
+      "issuer": "DoPT",
+      "reference": "O.M. No. 43011/11/2022-Estt.(Res-II) dated 19.09.2022 (FAQ 21)",
+      "rule": "A certificate issued after the crucial date and for a later financial year is a major discrepancy.",
+      "source_url": "https://documents.doptcirculars.nic.in/D2/D02est/ews%20faq_1_compressedicLhY.pdf",
+      "quote": "Income & Asset Certificates issued subsequent to the crucial date and for the later Financial Year shall be treated as major discrepancies.",
+      "uncertain": false,
+      "source_kind": "official_document"
+    },
+    {
+      "id": "ews-validity-year-example",
+      "certificate_type": "ews",
+      "issuer": "DoPT",
+      "reference": "O.M. No. 43011/11/2022-Estt.(Res-II) dated 19.09.2022 (FAQ 23)",
+      "rule": "Worked example: closing date 1 August 2022 -> income FY 2021-22, certificate valid for 2022-23. A blank validity year with the correct FY in the body may be referred back to the issuer.",
+      "source_url": "https://documents.doptcirculars.nic.in/D2/D02est/ews%20faq_1_compressedicLhY.pdf",
+      "quote": "the financial year for computing gross annual income of the family shall be 2021-2022 and the certificate shall be valid for 2022-2023.",
+      "uncertain": false,
+      "source_kind": "official_document"
+    },
+    {
+      "id": "ews-not-for-central-list-sc-st-obc",
+      "certificate_type": "ews",
+      "issuer": "DoPT",
+      "reference": "O.M. No. 43011/11/2022-Estt.(Res-II) dated 19.09.2022 (FAQ 11, 12)",
+      "rule": "SC/ST and Central-List OBC persons are not eligible for EWS in Central Government posts; a State-list-only OBC may obtain an EWS certificate.",
+      "source_url": "https://documents.doptcirculars.nic.in/D2/D02est/ews%20faq_1_compressedicLhY.pdf",
+      "quote": "Applicants belonging to SC, ST or OBC included in the Central List residing in any of the States/UTs are not eligible for EWS reservation",
+      "uncertain": false,
+      "source_kind": "official_document"
+    },
+    {
+      "id": "obc-ncl-income-limit-three-years",
+      "certificate_type": "obc_ncl",
+      "issuer": "DoPT",
+      "reference": "O.M. No. 36033/1/2013-Estt.(Res.) dated 13.09.2017, effective 01.09.2017",
+      "rule": "Creamy layer income limit Rs 8 lakh per annum (Category VI of Schedule to O.M. 08.09.1993); test applied over three consecutive years.",
+      "source_url": "https://ncbc.nic.in/Writereaddata/OM8Lakha.pdf",
+      "quote": "It has now been decided to raise the income limit from 6 lakh to 8 lakh per annum for determining the creamy layer",
+      "uncertain": false,
+      "source_kind": "official_document"
+    },
+    {
+      "id": "obc-ncl-three-consecutive-years",
+      "certificate_type": "obc_ncl",
+      "issuer": "DoPT",
+      "reference": "O.M. No. 36033/1/2013-Estt.(Res.) dated 13.09.2017 (recital of O.M. No. 36012/22/93-Estt.(SCT) dated 08.09.1993)",
+      "rule": "Creamy layer is judged on gross annual income for a period of three consecutive years.",
+      "source_url": "https://ncbc.nic.in/Writereaddata/OM8Lakha.pdf",
+      "quote": "for a period of three consecutive years would fall within the creamy layer",
+      "uncertain": false,
+      "source_kind": "official_document"
+    },
+    {
+      "id": "sc-st-obc-provisional-appointment",
+      "certificate_type": "sc_st",
+      "applies_to": [
+        "sc_st",
+        "obc_ncl"
+      ],
+      "issuer": "DoPT",
+      "reference": "O.M. No. 41034/1(ii)/2022-Estt.(Res-I) dated 29.03.2023 (restating O.M. 08.10.2015)",
+      "rule": "A SC/ST/OBC candidate unable to produce the prescribed certificate may be appointed provisionally on prima facie proof, subject to furnishing the certificate within a reasonable time.",
+      "source_url": "https://doptcirculars.nic.in/OM/ViewOM.aspx?id=392&headid=6",
+      "quote": "he/she may be appointed provisionally on the basis of whatever prima-facie proof he/she is able to produce in support of his/her claim",
+      "uncertain": false,
+      "source_kind": "official_document"
+    },
+    {
+      "id": "default-cut-off-last-date-of-application",
+      "certificate_type": "all",
+      "issuer": "Supreme Court of India",
+      "reference": "Sakshi Arha v. Rajasthan High Court, 2025 INSC 463, para 27 (following Bhupinderpal Singh (2000) 5 SCC 262)",
+      "rule": "Eligibility date: recruitment rules first, then advertisement; if both are silent, the last date for submission of applications.",
+      "source_url": "https://api.sci.gov.in/supremecourt/2022/29234/29234_2022_2_1501_60761_Judgement_08-Apr-2025.pdf",
+      "quote": "in case of absence of specifications in both context, the eligibility is to be adjudged in lieu of the last date of submission of applications",
+      "source_kind": "judgment",
+      "uncertain": false
+    },
+    {
+      "id": "rajasthan-ncl-one-year-plus-affidavit",
+      "certificate_type": "obc_ncl",
+      "jurisdiction": "Rajasthan",
+      "issuer": "Government of Rajasthan, Department of Social Justice and Empowerment (circulars 09.09.2015 and 08.08.2019), as applied by the Supreme Court",
+      "reference": "Sakshi Arha v. Rajasthan High Court, 2025 INSC 463, para 33",
+      "rule": "Rajasthan OBC/MBC-NCL certificate valid one year from issue, extendable up to three years with an affidavit.",
+      "source_url": "https://api.sci.gov.in/supremecourt/2022/29234/29234_2022_2_1501_60761_Judgement_08-Apr-2025.pdf",
+      "quote": "is valid for a period of one year from the date of issuance, and subsequently, extendable up to three years",
+      "source_kind": "judgment",
+      "uncertain": true,
+      "uncertain_reason": "Official circular text read only as reproduced in the judgment; original circular not fetched."
+    },
+    {
+      "id": "sc-st-state-of-origin",
+      "certificate_type": "sc_st",
+      "issuer": "Supreme Court of India (Constitution Bench)",
+      "reference": "Bir Singh v. Delhi Jal Board, decided 30.08.2018, para 30 (Ranjan Gogoi J.)",
+      "rule": "SC/ST status is tied to the State/UT of the Presidential Order; a migrant cannot claim SC/ST benefits of the State to which he migrates (State services).",
+      "source_url": "https://indiankanoon.org/doc/50417182/",
+      "quote": "cannot be deemed to be a Scheduled Caste person in relation to any other State to which he migrates",
+      "source_kind": "judgment",
+      "uncertain": false
+    },
+    {
+      "id": "sc-st-delhi-pan-india",
+      "certificate_type": "sc_st",
+      "jurisdiction": "NCT of Delhi",
+      "issuer": "Supreme Court of India (Constitution Bench)",
+      "reference": "Bir Singh v. Delhi Jal Board, decided 30.08.2018, para 61 (majority)",
+      "rule": "For NCT of Delhi services the pan-India reservation rule (SC/ST of any State) is valid.",
+      "source_url": "https://indiankanoon.org/doc/50417182/",
+      "quote": "so far as the National Capital Territory of Delhi is concerned the pan India Reservation Rule in force is in accord",
+      "source_kind": "judgment",
+      "uncertain": false
+    },
+    {
+      "id": "esm-assignment-within-one-year",
+      "certificate_type": "ex_serviceman",
+      "issuer": "DoPT (Gazette notification G.S.R. 757(E))",
+      "reference": "Ex-servicemen (Re-employment in Central Civil Services and Posts) Amendment Rules, 2012, dated 04.10.2012, rule 5(c)",
+      "rule": "For All India Competitive Examination posts (Group A/B), ESM with five years' service released on completion of assignment, including those whose assignment is due to be completed within one year, get up to five years' age relaxation.",
+      "source_url": "https://documents.doptcirculars.nic.in/D2/D02adm/36034_1_2006-Estt.Res-04102012A.pdf",
+      "quote": "on completion of assignment (including those whose assignment is due to be completed within one year)",
+      "uncertain": false,
+      "source_kind": "official_document"
+    },
+    {
+      "id": "pwbd-no-reservation-on-temporary-certificate",
+      "certificate_type": "pwbd",
+      "issuer": "DoPT",
+      "reference": "O.M. No. 36035/8/2023-Estt.(Res-II) dated 19.05.2023, as reproduced in the RBI Grade B advertisement quoted in Shritij Mohan Shrivastava v. RBI (Bom HC, 05.08.2026)",
+      "rule": "Reservation in permanent jobs should not be granted on a temporary disability certificate (contested: CAT in Samit Kumar held a valid time-bound certificate cannot be ignored).",
+      "source_url": "https://www.livelaw.in/pdf_upload/2026/08/18/shritij-mohan-shrivastava-v-the-reserve-bank-of-india-694752.pdf",
+      "quote": "not be appropriate to grant the benefit of reservation in jobs which are permanent in nature on the basis of temporary certificate of disability",
+      "source_kind": "judgment",
+      "uncertain": true,
+      "uncertain_reason": "Official O.M. not fetched; text read only as reproduced in an advertisement inside the judgment."
+    },
+    {
+      "id": "capf-ac-obc-ncl-issue-window",
+      "certificate_type": "obc_ncl",
+      "issuer": "Ministry of Home Affairs (CAPF (AC) Examination Rules 2023, Rule 21.2)",
+      "reference": "Reproduced in Raghvendra Singh v. UPSC, Delhi HC, 10.12.2025, para 7",
+      "rule": "CAPF (AC) 2023 required OBC-NCL certificate on FY 2022-23/2021-22/2020-21 income, issued on/after 01.04.2023 and not later than the closing date. Delhi HC declared this window arbitrary.",
+      "source_url": "https://indiankanoon.org/doc/149906480/",
+      "quote": "issued on/after 01.04.2023 (after completion of FY 2022-23) but not later than the closing date of the application",
+      "source_kind": "judgment",
+      "uncertain": true,
+      "uncertain_reason": "Rule struck down by Delhi HC; Supreme Court appeal status not checked."
+    }
+  ]
+}
