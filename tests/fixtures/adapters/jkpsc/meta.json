@@ -1,0 +1,13 @@
+{
+  "url": "https://jkpsc.nic.in/",
+  "final_url": "https://jkpsc.nic.in/",
+  "http_status": 200,
+  "captured_at": "2026-10-01T06:21:44+00:00",
+  "capture_date": "2026-10-01",
+  "fetch_mode": "HTTP",
+  "fetched_with": "govcareeros.backend.sources.generic_notices.PageFetcher.fetch_http",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "robots_txt": "https://jkpsc.nic.in/robots.txt returned 404 (no rules); allowed=True",
+  "file": "home.html",
+  "note": "Registry listing page for JKPSC (homepage). Notices are in the scrolling ticker (#notification) and the 'Whats New....' list (#whatsNew)."
+}
