@@ -1,0 +1,35 @@
+{
+  "source": "CGPSC",
+  "official_domain": "psc.cg.gov.in",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "fetcher": "govcareeros.backend.sources.generic_notices.PageFetcher.fetch_http (robots.txt + url_guard)",
+  "pages": [
+    {
+      "file": "Advertisement.html",
+      "url": "https://psc.cg.gov.in/Advertisement.php",
+      "final_url": "https://psc.cg.gov.in/Advertisement.php",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "captured_at": "2026-10-01T06:20:47+00:00",
+      "capture_date": "2026-10-01"
+    },
+    {
+      "file": "Notifications.html",
+      "url": "https://psc.cg.gov.in/Notifications.php",
+      "final_url": "https://psc.cg.gov.in/Notifications.php",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "captured_at": "2026-10-01T06:20:47+00:00",
+      "capture_date": "2026-10-01"
+    },
+    {
+      "file": "Result.html",
+      "url": "https://psc.cg.gov.in/Result.php",
+      "final_url": "https://psc.cg.gov.in/Result.php",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "captured_at": "2026-10-01T06:20:47+00:00",
+      "capture_date": "2026-10-01"
+    }
+  ]
+}
