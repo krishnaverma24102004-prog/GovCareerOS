@@ -1,7 +1,7 @@
 """exam versions and post classification
 
 Revision ID: 4742ebe6b1bf
-Revises: 97ba436d4921
+Revises: 9e1d1d0bc0b9
 Create Date: 2026-10-01 11:45:05.900210
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '4742ebe6b1bf'
-down_revision: Union[str, Sequence[str], None] = '97ba436d4921'
+down_revision: Union[str, Sequence[str], None] = '9e1d1d0bc0b9'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

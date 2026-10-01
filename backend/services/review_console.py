@@ -17,13 +17,14 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from sqlalchemy import func, literal, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.documents.pdf_text import PageText, extract_pages
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.extraction import ExtractionDraft
 from govcareeros.backend.models.notice import RecruitmentNotice
+from govcareeros.backend.models.triage import NoticeTriage
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.user import User
 from govcareeros.backend.services import review_audit
@@ -58,10 +59,9 @@ def _sort_key(item: Dict[str, Any]) -> Tuple:
         item["title"] or "",
     )
 
-def _priority_column():
-    # The triage module may add RecruitmentNotice.priority; until then the fallback ordering applies
-    col = getattr(RecruitmentNotice, "priority", None)
-    return col if col is not None and hasattr(col, "expression") else literal(None)
+# Triage keeps its decision in notice_triage (higher priority = sooner); notices it has not seen yet fall back
+# to kind/recency ordering. STALE and NOT_REQUIRED notices leave the default queue but stay listable by status.
+TRIAGED_OUT = ("STALE", "NOT_REQUIRED")
 
 def _status_clause(column, status: str):
     return column.like(f"{FETCH_FAILED}\\_%", escape="\\") if status == FETCH_FAILED else column == status
@@ -73,7 +73,7 @@ async def review_queue(session: AsyncSession, *, source: Optional[str] = None, k
                        status: Optional[str] = None, item_type: Optional[str] = None, q: Optional[str] = None,
                        limit: int = 50, offset: int = 0) -> Tuple[int, List[Dict[str, Any]]]:
     items: List[Dict[str, Any]] = []
-    priority = _priority_column()
+    priority = NoticeTriage.priority
     if item_type in (None, "DRAFT") and status in (None, "PENDING_REVIEW"):
         kind_expr = func.coalesce(RecruitmentNotice.notice_kind, "VACANCY")
         stmt = (select(ExtractionDraft.id, ExtractionDraft.created_at, ExtractionDraft.payload, ExtractionDraft.fields_offered,
@@ -82,6 +82,7 @@ async def review_queue(session: AsyncSession, *, source: Optional[str] = None, k
                        RecruitmentNotice.document_type, RecruitmentNotice.first_seen_at, priority)
                 .join(GovernmentSource, GovernmentSource.id == ExtractionDraft.source_id)
                 .outerjoin(RecruitmentNotice, RecruitmentNotice.id == ExtractionDraft.notice_id)
+                .outerjoin(NoticeTriage, NoticeTriage.notice_id == RecruitmentNotice.id)
                 .where(ExtractionDraft.status == "PENDING_REVIEW"))
         if source:
             stmt = stmt.where(GovernmentSource.name == source)
@@ -100,12 +101,14 @@ async def review_queue(session: AsyncSession, *, source: Optional[str] = None, k
         stmt = (select(RecruitmentNotice.id, RecruitmentNotice.title, RecruitmentNotice.url, RecruitmentNotice.notice_kind,
                        RecruitmentNotice.document_type, RecruitmentNotice.review_status, RecruitmentNotice.first_seen_at,
                        RecruitmentNotice.review_note, RecruitmentNotice.reviewed_at, GovernmentSource.name, priority)
-                .join(GovernmentSource, GovernmentSource.id == RecruitmentNotice.source_id))
+                .join(GovernmentSource, GovernmentSource.id == RecruitmentNotice.source_id)
+                .outerjoin(NoticeTriage, NoticeTriage.notice_id == RecruitmentNotice.id))
         if status:
             stmt = stmt.where(_status_clause(RecruitmentNotice.review_status, status))
         else:
             stmt = stmt.where(or_(RecruitmentNotice.review_status.in_(ATTENTION_STATUSES),
-                                  _status_clause(RecruitmentNotice.review_status, FETCH_FAILED)))
+                                  _status_clause(RecruitmentNotice.review_status, FETCH_FAILED)),
+                              or_(NoticeTriage.triage_status.is_(None), NoticeTriage.triage_status.not_in(TRIAGED_OUT)))
         if source:
             stmt = stmt.where(GovernmentSource.name == source)
         if kind:

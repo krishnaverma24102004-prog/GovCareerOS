@@ -354,3 +354,32 @@ async def test_pages_endpoint_highlights_the_real_bsf_quotes(api, login, db_sess
     assert [(a["action"], a["note"]) for a in audit] == [("DRAFT_REJECT", "GDMO post name not verified"), ("DRAFT_APPROVE", "checked page 1")]
     assert len(audit[1]["detail"]["created_vacancy_ids"]) == 1
     assert all(i["type"] == "NOTICE" for i in await _all_items(api, h))
+
+@pytest.mark.asyncio
+async def test_queue_follows_triage_and_hides_stale_and_not_required(api, login, db_session):
+    """Integration of the triage module with the console, on the 282 real notices."""
+    from govcareeros.backend.models import NoticeTriage
+    from govcareeros.backend.services.triage import triage_notices
+
+    await _load_snapshot(db_session)
+    h = await login("rev@example.com")
+    await _make_reviewer(db_session, "rev@example.com")
+    before = await _all_items(api, h, type="NOTICE")
+
+    # Triage as of the snapshot's capture day, so ageing is reproducible
+    captured = datetime.fromisoformat(json.loads((FIXTURES / "notices_snapshot.json").read_text(encoding="utf-8"))["meta"]["captured_at"])
+    await triage_notices(db_session, now=captured, apply=True)
+    await db_session.commit()
+    triaged = {t.notice_id: t for t in (await db_session.execute(select(NoticeTriage))).scalars()}
+    out = {nid for nid, t in triaged.items() if t.triage_status in ("STALE", "NOT_REQUIRED")}
+    assert out, "the snapshot contains RESULT/RULES/OTHER notices, so some must leave the queue"
+
+    after = await _all_items(api, h, type="NOTICE")
+    ids = [uuid.UUID(i["id"]) for i in after]
+    assert not out & set(ids) and len(after) == len(before) - len(out & {uuid.UUID(i["id"]) for i in before})
+    # Highest triage priority first
+    prios = [triaged[i].priority for i in ids if i in triaged]
+    assert prios == sorted(prios, reverse=True)
+    # Triaged-out notices are still listable explicitly (never deleted)
+    nr = [n for n in SNAPSHOT if n["notice_kind"] in ("RESULT", "RULES", "OTHER") and n["review_status"] == "MANUAL_REVIEW"]
+    assert nr and (await api.get("/review/queue", params={"status": "MANUAL_REVIEW", "limit": 200}, headers=h)).json()["total"] >= len(nr)

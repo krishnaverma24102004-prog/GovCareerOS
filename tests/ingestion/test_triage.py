@@ -252,3 +252,25 @@ async def test_daily_job_runs_triage_before_drafts(db_session):
     assert steps["triage"]["counts"]["applied"] is True
     db_session.expire_all()
     assert await _table_counts(db_session) == [282, 282]
+
+# Regressions found on the live sweep of 1 Oct 2026 (strings copied verbatim from the official listings)
+
+@pytest.mark.parametrize("title,url", [
+    ("23D8C27D35294E888CE27F769E170330.pdf", "https://rpsc.rajasthan.gov.in/Static/RecruitmentAdvertisements/23D8C27D35294E888CE27F769E170330.pdf"),
+    ("8FAB8DD230894E36B8418E2BFAD98E42.pdf", "https://rpsc.rajasthan.gov.in/Static/RecruitmentAdvertisements/8FAB8DD230894E36B8418E2BFAD98E42.pdf"),
+])
+def test_opaque_file_ids_are_not_read_as_dates(title, url):
+    # The digit runs in RPSC's hex ids used to come out as 2030/2094 "dates"
+    assert notice_date(title, url) is None
+
+def test_real_dates_still_read_from_file_names():
+    assert notice_date("ATTACHMENT", "https://gpsc.gujarat.gov.in/Documents/AdvertismentDocument/IN-CD-290926.pdf").date.isoformat() == "2026-09-29"
+
+@pytest.mark.parametrize("title,url", [
+    ("Announcement dated 30.09.2026 regarding schedule of Interview for the post of ADA", "https://hpsc.gov.in/Portals/0/Ann_Int_ADA_30_09_2026.pdf"),
+    ("Announcement dated 28.09.2026 regarding Scheme and Pattern of Examination and Syllabus for SO", "https://hpsc.gov.in/Portals/0/Ann_Sch_Pattern_Syllabus_SO_28_09_2026.pdf"),
+    ("Announcement dated 25.09.2026 regarding Schedule of Physical Measurement Test for DSP", "https://hpsc.gov.in/Portals/0/Ann_Sch_PMT_DSP_25.09.2026.pdf"),
+])
+def test_exam_process_announcements_are_not_vacancies(title, url):
+    from govcareeros.backend.sources.notice_classifier import classify_notice
+    assert classify_notice(title, url) == "EXAM_SCHEDULE"

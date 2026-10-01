@@ -143,12 +143,25 @@ def _single(found: Sequence[Tuple[date, str]]) -> Optional[Tuple[date, str]]:
     distinct = {d for d, _ in found}
     return found[0] if len(distinct) == 1 else None
 
+_OPAQUE_ID = re.compile(r"[0-9a-fA-F]{16,}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
+
+def _plausible(d: date) -> bool:
+    # A publication date can't be before 2000 or more than a year ahead; anything else is a misread number
+    return 2000 <= d.year <= date.today().year + 1
+
 def notice_date(title: str, url: str) -> Optional[NoticeDate]:
+    found = _notice_date(title, url)
+    return found if found and _plausible(found.date) else None
+
+def _notice_date(title: str, url: str) -> Optional[NoticeDate]:
     """The publication date the notice's title or link states, with the rule that read it; None if not stated."""
     title = title or ""
     path = unquote(urlparse(url or "").path)
     filename = path.rsplit("/", 1)[-1]
     stem = re.sub(r"\.(pdf|docx?|html?|aspx|php|pptx?|xlsx?)$", "", filename, flags=re.I)
+    # Opaque ids (e.g. RPSC "23D8C27D35294E888CE27F769E170330.pdf") contain digit runs that are not dates
+    if _OPAQUE_ID.fullmatch(stem):
+        stem = ""
 
     for rule, text, anchor in (("title_dated", title, _DATED), ("title_released_on", title, _RELEASED_ON),
                                ("url_dated", stem, _DATED), ("title_as_on", title, _AS_ON)):

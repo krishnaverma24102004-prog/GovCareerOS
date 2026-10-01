@@ -1,7 +1,7 @@
 """notice triage
 
 Revision ID: 9e1d1d0bc0b9
-Revises: 97ba436d4921
+Revises: 5ed456cbb68b
 Create Date: 2026-10-01 11:32:57.367936
 
 Backlog triage (backend/services/triage.py): notice_triage holds the current automatic decision per
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '9e1d1d0bc0b9'
-down_revision: Union[str, Sequence[str], None] = '97ba436d4921'
+down_revision: Union[str, Sequence[str], None] = '5ed456cbb68b'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
