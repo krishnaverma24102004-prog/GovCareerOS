@@ -1,0 +1,2876 @@
+<!DOCTYPE html>
+<html lang="hi" >
+
+
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Vacancies</title>
+    <!-- <title>Home | Department of Consumer Affairs | Ministry of Consumer Affairs Food and Public Distribution | Government of India</title>  -->
+    <meta name="keywords" content="consumer, affairs, jago, grahak, food, swachh">
+    <meta name="description" content="Department of Consumer Affairs, Ministry of Consumer Affairs, Food and Public Distribution, Government of India">
+    <meta name="title" content="Home | Department of Consumer Affairs | Ministry of Consumer Affairs Food and Public Distribution | Government of India">
+
+    <link rel="stylesheet"
+        href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/bootstrap-icons.min.css"
+        integrity="sha512-oAvZuuYVzkcTc2dH5z1ZJup5OmSQ000qlfRvuoTTiyTBjwX1faoyearj8KdMq0LgsBTHMrRuMek7s+CxF8yE+w=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/bootstrap.min.css" />
+
+    <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/animate.min.css" />
+    <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/fontawesome.css" />
+    <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/fontawesome.min.css" />
+    <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/fontawesome-free-6.5.2-web/css/all.min.css" />
+    <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/remixicon.css" />
+    <link
+        href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/google_fonts.css"
+        rel="stylesheet">
+        <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/orange.css" id="orange-css" disabled>
+        <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/BW-css.css" id="BW-css" disabled>
+        <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/Comman.css">
+        <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/blue.css" >
+        <link href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/outrageous_orange.css" rel="alternate stylesheet"
+        media="screen" title="outrageous_orange">
+        <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/style.css" id="theme">
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.0/css/bootstrap.min.css" integrity="sha512-XWTTruHZEYJsxV3W/lSXG1n3Q39YIWOstqvmFsdNEEQfHoZ6vm6E9GK2OrF6DSJSpIbRbi+Nn0WDPID9O7xB2Q==" crossorigin="anonymous" referrerpolicy="no-referrer" /> -->
+    <link href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/boxicons.min.css" rel='stylesheet'>
+    <link href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/owl.carousel.min.css" rel="stylesheet">
+	
+
+
+
+
+    <!-- ----------------------font size script Start-------------------------- -->
+    <script type="text/javascript">
+    $(document).ready(function() {
+        var maxFontSizeChange = 3; // Set the maximum font size change allowed
+
+        $('#fontincrease').click(function() {
+            modifyFontSize('increase');
+        });
+        $('#fontdecrease').click(function() {
+            modifyFontSize('decrease');
+        });
+        $('#fontreset').click(function() {
+            modifyFontSize('reset');
+        });
+
+        function modifyFontSize(flag) {
+            var divElement = $('body');
+            var currentFontSize = parseInt(divElement.css('font-size'));
+
+            if (flag == 'increase') {
+                currentFontSize += 3;
+                if (currentFontSize > 22) { // Limit to a maximum of 24px
+                    currentFontSize = 22;
+                }
+            } else if (flag == 'decrease') {
+                currentFontSize -= 3;
+                if (currentFontSize < 11) { // Limit to a minimum of 12px
+                    currentFontSize = 11;
+                }
+            } else {
+                currentFontSize = 16; // Reset to the default font size
+            }
+
+            divElement.css('font-size', currentFontSize + 'px');
+        }
+    });
+    </script>
+
+
+
+</head>
+<script>
+function noBack(){ window.history.forward(); }
+</script>
+<body id="fontSize" onload="applyStoredTheme()">
+    <div id="app1">
+      <div class="main-wrapper main-wrapper-1">
+        <div class="navbar-bg"></div>
+        <head>
+  <link rel="stylesheet" href="https://consumeraffairs.gov.in/public/themes/th3/assets/CSS/owl.theme.default.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+
+  <!--<link rel="stylesheet" href="/dca/public/themes/th3/assets/CSS/style.css">-->
+  <!-- <link rel="stylesheet" href="index.css"> -->
+  <style>
+    #randomImage {
+      width: 200px;
+      height: 100px;
+      object-fit: contain;
+    }
+
+    .social_icons:hover i {
+      color: #fff !important;
+    }
+  </style>
+
+
+  <script>
+    let originalFontSize = 16;
+    let currentFontSize = originalFontSize;
+
+    function increaseFontSize() {
+      if (currentFontSize < originalFontSize + 2 * 2) { // Allow only 2 steps increase
+        currentFontSize += 2;
+        document.body.style.fontSize = currentFontSize + 'px';
+      }
+    }
+
+    function decreaseFontSize() {
+      if (currentFontSize > originalFontSize - 2 * 2) { // Allow only 2 steps decrease
+        currentFontSize -= 2;
+        document.body.style.fontSize = currentFontSize + 'px';
+      }
+    }
+
+    function resetFontSize() {
+      currentFontSize = originalFontSize;
+      document.body.style.fontSize = originalFontSize + 'px';
+    }
+  </script>
+  <script>
+
+    function themeSwitcher(theme) {
+      let orange_theme = document.getElementById('orange-css');
+      let BW_theme = document.getElementById('BW-css');
+      console.log(localStorage.getItem('orange'));
+      if (theme === 'orange') {
+        orange_theme.removeAttribute("disabled")
+        BW_theme.setAttribute("disabled", true)
+        localStorage.setItem('theme', 'orange')
+      }
+      else if (theme === 'BW') {
+        BW_theme.removeAttribute("disabled")
+        orange_theme.setAttribute("disabled", true)
+        localStorage.setItem('theme', 'BW')
+
+      }
+      if (theme == 'default') {
+        BW_theme.setAttribute("disabled", true)
+        orange_theme.setAttribute("disabled", true)
+        localStorage.setItem('theme', 'default')
+      }
+    }
+
+    function applyStoredTheme() {
+      let storedTheme = localStorage.getItem('theme');
+      if (storedTheme) {
+        themeSwitcher(storedTheme);
+      }
+      else {
+        themeSwitcher('default')
+      }
+    }
+
+  </script>
+</head>
+
+<body calss="bhashini-skip-translation" onload="applyStoredTheme()">
+
+  <!-- header section  -->
+  <header>
+
+    <!-- Top Bar  -->
+    <div class="header_top header_top2 header_top3 header_topblack">
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 col-xs-6  head-top-left-cor my-auto">
+            <aside class="link-group gap-2 d-flex">
+
+              <a tabindex="-1" class="links links-right" href="https://www.india.gov.in/" target="_blank">
+                <div class="d-flex flex-column text-right text-dark lh-1">
+                  <span class="">भारत सरकार</span>
+                  <span class="fw-bold header_gov_text">GOVERNMENT OF INDIA</span>
+                </div>
+              </a>
+              <div class="border-start border-2"></div>
+              <a tabindex="-1" class="links" href="#">
+                <div class="d-flex flex-column text-left text-dark lh-1">
+                  <span class="">उपभोक्ता मामले, खाद्य और सार्वजनिक वितरण मंत्रालय</span>
+                  <span class="fw-bold header_gov_text"> MINISTRY OF CONSUMER AFFAIRS, FOOD & PUBLIC DISTRIBUTION</span>
+                </div>
+              </a>
+            </aside>
+
+
+          </div>
+          <!-- Common Features -->
+          <div class="col-md-7 col-xs-6">
+
+            <ul id="access" class="common_feature pull-right d-flex align-item-center sf-js-enabled pt-md-2 sf-arrows1" style="touch-action: pan-y;">
+
+  <li class="hidden-xs">
+    <a class="text-dark fw-bold show-on-focus" href="#main_banner"
+       title="Skip To Main Content">
+      <i class="fa-solid fa-share my-auto"></i>
+      <span class="tooltip-text">Skip To Main Content</span>
+    </a>
+  </li>
+
+  <li>
+    <a href="https://consumeraffairs.gov.in/site-map"
+       title="Site Map"
+       class="show-on-focus">
+      <img src="https://consumeraffairs.gov.in/public/themes/th3/assets/img/site-map.png"
+           class="img_width"
+           alt="Site Map"
+           title="Site Map">
+      <span class="tooltip-text">Site Map</span>
+    </a>
+  </li>
+
+  <!-- Theme dropdown -->
+  <li class="nav-item dropdown">
+    <button class="nav-link dropdown-toggle show-on-focus"
+            type="button"
+            data-bs-toggle="dropdown"
+            data-bs-auto-close="outside"
+            aria-haspopup="true"
+            aria-expanded="false">
+      <img src="https://consumeraffairs.gov.in/./public/themes/th3/assets/img/theme.png"
+           class="img_width"
+           alt="Themes"
+           title="Themes">
+      <span class="tooltip-text">Themes</span>
+      <i class="fa-solid fa-chevron-down me-1 text-black" aria-hidden="true"></i>
+    </button>
+
+    <ul class="dropdown-menu shadow color_dropdown theme_drop">
+      <li>
+        <button class="dropdown-item red_box show-on-focus"
+                type="button"
+                onclick="themeSwitcher('default')">
+          <img src="https://consumeraffairs.gov.in/./public/themes/th3/assets/img/red_box.jpg" alt="Default"
+               title="Default Theme">
+          <span class="tooltip-text">Default Theme</span>
+        </button>
+      </li>
+
+      <li>
+        <button class="dropdown-item orange_box show-on-focus"
+                type="button"
+                onclick="themeSwitcher('orange')">
+          <img src="https://consumeraffairs.gov.in/./public/themes/th3/assets/img/orange_box.jpg" alt="Orange"
+               title="Outrageous Orange">
+          <span class="tooltip-text">Outrageous Orange</span>
+        </button>
+      </li>
+    </ul>
+  </li>
+
+  <!-- Social Media dropdown -->
+  
+  <li class="nav-item dropdown">
+    <button class="nav-link dropdown-toggle show-on-focus"
+            type="button"
+            data-bs-toggle="dropdown"
+            data-bs-auto-close="outside"
+            aria-haspopup="true"
+            aria-expanded="false">
+      <img src="https://consumeraffairs.gov.in/./public/themes/th3/assets/img/social media icon.png" class="img_width"
+           alt="Social Media"
+           title="Social Media">
+      <span class="tooltip-text">Social Media</span>
+      <i class="fa-solid fa-chevron-down me-1 text-black" aria-hidden="true"></i>
+    </button>
+
+    <ul class="dropdown-menu shadow color_dropdown theme_drop">
+      
+              <li>
+          <a class="dropdown-item red_box social_icons show-on-focus"
+             href="https://www.facebook.com/ConsumerAdvocacy/"
+             title="Facebook">
+            <i class="fa-brands fa-facebook"
+               style="font-size:20px; color: #12609b"></i>
+            <span class="tooltip-text">Facebook</span>
+          </a>
+        </li>
+              <li>
+          <a class="dropdown-item red_box social_icons show-on-focus"
+             href="https://x.com/jagograhakjago"
+             title="X">
+            <i class="fa-brands fa-x-twitter"
+               style="font-size:20px; color: #000"></i>
+            <span class="tooltip-text">X</span>
+          </a>
+        </li>
+              <li>
+          <a class="dropdown-item red_box social_icons show-on-focus"
+             href="https://www.youtube.com/@departmentofconsumeraffair2693"
+             title="Youtube">
+            <i class="fa-brands fa-youtube"
+               style="font-size:20px; color: #ee1111"></i>
+            <span class="tooltip-text">Youtube</span>
+          </a>
+        </li>
+              <li>
+          <a class="dropdown-item red_box social_icons show-on-focus"
+             href="https://www.instagram.com/consumeraffairs_goi/"
+             title="Instagram">
+            <i class="fa-brands fa-instagram"
+               style="font-size:20px; color: #E4405F"></i>
+            <span class="tooltip-text">Instagram</span>
+          </a>
+        </li>
+          </ul>
+  </li>
+
+  <!-- Accessibility dropdown -->
+  <li class="nav-item dropdown">
+    <button class="nav-link dropdown-toggle show-on-focus"
+            type="button"
+            data-bs-toggle="dropdown"
+            data-bs-auto-close="outside"
+            aria-haspopup="true"
+            aria-expanded="false">
+      <img src="https://consumeraffairs.gov.in/./public/themes/th3/assets/img/text-inde.png" class="img_width"
+           alt="Accessibility Option"
+           title="Accessibility Option">
+      <span class="tooltip-text">Accessibility Option</span>
+      <i class="fa-solid fa-chevron-down me-1 text-black" aria-hidden="true"></i>
+    </button>
+
+    <ul class="dropdown-menu shadow color_dropdown theme_drop">
+      <li>
+        <button class="dropdown-item red_box show-on-focus" type="button" onclick="decreaseFontSize()">
+          <img src="https://consumeraffairs.gov.in/./public/themes/th3/assets/img/decrease-font-size.png" alt="Decrease"
+               title="Decrease Font Size">
+          <span class="tooltip-text">Decrease Font Size</span>
+        </button>
+      </li>
+
+      <li>
+        <button class="dropdown-item orange_box show-on-focus" type="button" onclick="resetFontSize()">
+          <img src="https://consumeraffairs.gov.in/./public/themes/th3/assets/img/standard-view.png" alt="Normal"
+               title="Normal Font Size">
+          <span class="tooltip-text">Normal Font Size</span>
+        </button>
+      </li>
+
+      <li>
+        <button class="dropdown-item bw_box show-on-focus" type="button" onclick="increaseFontSize()">
+          <img src="https://consumeraffairs.gov.in/./public/themes/th3/assets/img/increase-text-size.png" alt="Increase"
+               title="Increase Font Size">
+          <span class="tooltip-text">Increase Font Size</span>
+        </button>
+      </li>
+
+      <li>
+        <button class="dropdown-item bw_box show-on-focus" type="button" onclick="themeSwitcher('BW')">
+          <img src="https://consumeraffairs.gov.in/./public/themes/th3/assets/img/high-contrast.png"
+               alt="High Contrast"
+               title="High Contrast">
+          <span class="tooltip-text">High Contrast</span>
+        </button>
+      </li>
+
+      <li>
+        <button class="dropdown-item bw_box show-on-focus" type="button" onclick="themeSwitcher('default')">
+          <img src="https://consumeraffairs.gov.in/./public/themes/th3/assets/img/standard-view.png"
+               alt="Default"
+               title="Default">
+          <span class="tooltip-text">Default</span>
+        </button>
+      </li>
+    </ul>
+  </li>
+
+  <!-- Search -->
+  <li>
+    <div>
+      <form action="https://consumeraffairs.gov.in/search" method="get" id="cse-search-box"
+            class="searchbox searchbox-open searchbox-open2" accept-charset="utf-8">
+        <input type="hidden" name="cx" value="013280925726808751639:juvtcf6w1h4">
+        <input type="hidden" name="cof" value="FORID:10">
+        <input type="hidden" name="ie" value="UTF-8">
+
+        <label for="searchq" style="display: none; margin:0;">Search</label>
+
+        <div class="search-container">
+          <input class="border" type="text" name="q" id="searchq"
+                 placeholder="Search.." required=""
+                 value="" spellcheck="false" data-ms-editor="true">
+
+          <button type="search" name="search" aria-label="Search" class="searchButton">
+            <i class="fa fa-search" aria-hidden="true"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </li>
+
+</ul>
+
+
+
+
+
+          </div>
+          <!--<div class="col-md-1">
+            <ul class="common_feature d-flex align-item-center h-100">
+
+              <li>
+                <select onchange="return change_language(event, this);" name="language" id="language"
+                  class="changeLang show-on-focus" title="Select Language">
+                                    <option value="1" >
+                    English                  </option>
+                                    <option value="2" >
+                    Hindi                  </option>
+                                    <span class="tooltip-text">Select Language</span>
+                </select>
+
+              </li>
+
+            </ul>
+          </div>-->
+		  <div class="col-md-1">
+           <!-- <ul class="common_feature d-flex align-item-center h-100">
+
+              <li>
+                <select onchange="return change_language(event, this);" name="language" id="language"
+                  class="changeLang show-on-focus" title="Select Language">
+                                    <option value="1" >
+                    English                  </option>
+                                    <option value="2" >
+                    Hindi                  </option>
+                                    <span class="tooltip-text">Select Language</span>
+                </select>
+
+              </li>
+
+            </ul>-->
+            
+            <div class="bhashini-plugin-container col-md-1">
+          </div>
+		
+    
+    
+     
+  
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Top Bar end -->
+
+    <div class="container">
+      <div class="d-flex flex-md-row flex-column-reverse header justify-content-between">
+        <div class="website_logo my-2">
+          <img class="img-fluid" src="https://consumeraffairs.gov.in/public/themes/th3/assets/images/Logo.png"
+            alt="Department of Consumer Affairs logo" srcset>
+        </div>
+        <div>
+          <div>
+
+          </div>
+
+          
+          <!--             <div class="header_img d-md-flex d-none gap-3 my-2">
+                <a id="randomImageLink" href="https://www.anumati.co.in/" target="_blank">
+                    <img id="randomImage" src="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/logo/thumbnail/अनुमति_logo.png" alt="Logo 1">
+                </a>
+                <a href="https://jagograhakjago.gov.in/"><img class="img-fluid" src="/dca/public/themes/th3/assets/images/Jago-Grahak-Jago.png" alt srcset></a>
+                <a href="https://consumerhelpline.gov.in/public/"><img class="img-fluid" src="/dca/public/themes/th3/assets/images/nch-logo.png" alt srcset></a>
+            </div>
+         -->
+
+          <div class="header_img d-md-flex d-none gap-3 my-2">
+            <!-- <a target="_blank" href="https://swachhbharatmission.ddws.gov/" class="mt-2"><img class="img-fluid" src="/dca/public/upload/admin/cmsfiles/logo/thumbnail/Gandhi_Jayanti_logo.png" alt="Swachh Bharat Mission" title="Swachh Bharat Mission" srcset></a>
+            <a target="_blank" href="https://amritmahotsav.nic.in/"><img class="img-fluid" src="/dca/public/upload/admin/cmsfiles/logo/thumbnail/Seventy_five_years_of_hindi_logo.png" alt="Azadi Ka Amrit Mahotsav" title="Azadi Ka Amrit Mahotsav" srcset></a> -->
+            <a target="_blank" href="https://jagograhakjago.gov.in/" class="show-on-focus"><img class="img-fluid"
+                src="https://consumeraffairs.gov.in/public/themes/th3/assets/images/Jago-Grahak-Jago.png"
+                alt="Jago Grahak Jago"
+                title="Jago Grahak Jago" srcset>
+              <span class="tooltip-text">Jago Grahak Jago</span></a>
+            <a target="_blank" href="https://consumerhelpline.gov.in/public/" class="show-on-focus"><img
+                class="img-fluid" src="https://consumeraffairs.gov.in/public/themes/th3/assets/images/nch-logo.png"
+                alt="Consumer Helpline"
+                title="Consumer Helpline" srcset>
+              <span class="tooltip-text">Consumer Helpline</span></a>
+          </div>
+
+
+          <script>
+            const randomLogos = ["https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u0905\u0928\u0941\u092e\u0924\u093f_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u091c\u093e\u0917\u094b_\u0917\u094d\u0930\u093e\u0939\u0915_\u091c\u093e\u0917\u094b_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/Make_in_india_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u090f\u0928_\u0938\u0940_\u0921\u0940_\u0906\u0930_\u0938\u0940_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/Indian_Emblem_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u092c\u0940_\u0906\u0908_\u090f\u0938_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/Digital_India_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/Seventy_five_years_of_hindi_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u092e\u0942\u0932\u094d\u092f_\u0928\u093f\u0917\u0930\u093e\u0928\u0940_\u092a\u094d\u0930\u0923\u093e\u0932\u0940_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/G_Twenty_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u0908-\u0926\u093e\u0916\u093f\u0932_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u0909\u092a\u092d\u094b\u0915\u094d\u0924\u093e_\u0915\u0932\u094d\u092f\u093e\u0923_\u0915\u094b\u0937_logo.jpg","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u092e\u0947\u0915_\u0907\u0928_\u0907\u0902\u0921\u093f\u092f\u093e_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/NCH_logo.jpg","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u090f\u0928_\u0938\u0940_\u090f\u091a_logo.jpg","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/Jago_Grahak_Jago_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/NTH_logo.jpg","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/e-Jagriti_logo.jpg","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/NCCF_logo.jpg","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u090f\u0928_\u091f\u0940_\u090f\u091a_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/Consumer_Welfare_Fund_logo.jpg","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/Gandhi_Jayanti_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u0921\u093f\u091c\u093f\u091f\u0932_\u0907\u0902\u0921\u093f\u092f\u093e_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/Anumati_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/BIS_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u0917\u093e\u0902\u0927\u0940_\u091c\u092f\u0902\u0924\u0940_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/E-Daakhil_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u0932\u0940\u0917\u0932_\u092e\u0947\u091f\u094d\u0930\u094b\u0932\u0949\u091c\u0940_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u090f\u0928_\u0938\u0940_\u0938\u0940_\u090f\u092b_logo.jpg","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u0908-\u091c\u093e\u0917\u0943\u0924\u093f_logo.jpg","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/NCDRC_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u092d\u093e\u0930\u0924\u0940\u092f_\u092a\u094d\u0930\u0924\u0940\u0915_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/\u0939\u093f\u0902\u0926\u0940_\u0926\u093f\u0935\u0938_\u0915\u0947_\u092a\u091a\u0939\u0924\u094d\u0924\u0930_\u0935\u0930\u094d\u0937_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/Price_Monitoring_System_logo.png","https:\/\/consumeraffairs.gov.in\/public\/upload\/admin\/cmsfiles\/logo\/thumbnail\/Legal_Metrology_logo.png"];
+            const randomLinks = ["https:\/\/www.anumati.co.in\/","https:\/\/jagograhakjago.gov.in\/","https:\/\/www.makeinindia.com\/","https:\/\/ncdrc.nic.in\/","https:\/\/www.india.gov.in\/","https:\/\/www.bis.gov.in\/","https:\/\/www.digitalindia.gov.in\/","https:\/\/amritmahotsav.nic.in\/","https:\/\/fcainfoweb.nic.in\/","https:\/\/www.g20.org\/en\/g20-india-202","https:\/\/edaakhil.nic.in\/index.html","https:\/\/consumeraffairs.nic.in\/organisation-and-units\/division\/consumer-welfare-fund","https:\/\/www.makeinindia.com\/","https:\/\/consumerhelpline.gov.in\/public\/","https:\/\/consumerhelpline.gov.in\/public\/","https:\/\/jagograhakjago.gov.in\/","https:\/\/nth.gov.in\/","https:\/\/e-jagriti.gov.in\/","https:\/\/nccf-india.com\/","https:\/\/nth.gov.in\/","https:\/\/consumeraffairs.nic.in\/organisation-and-units\/division\/consumer-welfare-fund","https:\/\/swachhbharatmission.ddws.gov","https:\/\/www.digitalindia.gov.in\/","https:\/\/www.anumati.co.in\/","https:\/\/www.bis.gov.in\/","https:\/\/swachhbharatmission.ddws.gov","https:\/\/edaakhil.nic.in\/index.html","https:\/\/lm.doca.gov.in\/","https:\/\/nccf-india.com\/","https:\/\/e-jagriti.gov.in\/","https:\/\/ncdrc.nic.in\/","https:\/\/www.india.gov.in\/","https:\/\/amritmahotsav.nic.in\/","https:\/\/fcainfoweb.nic.in\/","https:\/\/lm.doca.gov.in\/"];
+            let currentIndex = 0;
+
+            function reloadRandomImage() {
+              currentIndex = (currentIndex + 1) % randomLogos.length;
+
+              // Update image src
+              document.getElementById('randomImage').src = randomLogos[currentIndex];
+
+              // Update the link href
+              document.getElementById('randomImageLink').href = randomLinks[currentIndex];
+            }
+
+            setInterval(reloadRandomImage, 5000);
+          </script>
+
+
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+
+  <!-- ----------------------Navbar Start-------------------------- -->
+
+  <section class="position-relative">
+    <!-- <nav class="navbar navbar-expand-lg shadow position-absolute top-0 end-0 start-0 z-2 bg-megenta_tr"> -->
+    <!-- <nav id="main_banner" class="navbar top-navbar navbar-expand-lg shadow bg-maroon py-0" id="skip" aria-label="Main Navigation"> -->
+    <nav class="navbar top-navbar navbar-expand-lg shadow bg-maroon py-0" id="skip" aria-label="Navigation">
+      <div class="container">
+
+        <div class>
+          <button class="navbar-toggler float-end float-md-none" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbar-content" aria-expanded="true">
+            <div class="hamburger-toggle active">
+              <i class="fa-solid fa-bars"></i>
+            </div>
+          </button>
+        </div>
+        <div class="collapse navbar-collapse justify-content-between" id="navbar-content">
+          <ul class="navbar-nav mr-auto mb-2 mb-lg-0 w-100 justify-content-between text-dark">
+            
+                                  <li lang="en" class="nav-item dropdown ">
+                                                  <a lang="en"
+                            class="nav-link show-on-focus    "
+                            data-bs-toggle=""
+                            data-bs-auto-close=""
+                            href=" https://consumeraffairs.gov.in/pages/home ">
+                            Home
+                            <span lang="en" class="tooltip-text" aria-hidden="true">Home</span>
+                          </a>
+                                                                      </li>
+                                                        <li lang="en" class="nav-item dropdown ">
+                                                  <a lang="en"
+                            class="nav-link show-on-focus  dropdown-toggle  "
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            href=" https://consumeraffairs.gov.in/pages/about-us ">
+                            About Us
+                            <span lang="en" class="tooltip-text" aria-hidden="true">About Us</span>
+                          </a>
+                                                                        <!-- <i class='bx bxs-chevron-down htmlcss-arrow arrow  '></i> -->
+                        
+                        <ul class="dropdown-menu shadow ">
+
+                                                            
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/about-department ">
+                                        About Us
+                                        <span class="tooltip-text" aria-hidden="true">About Us</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/vision-and-mission ">
+                                        Vision and Mission
+                                        <span class="tooltip-text" aria-hidden="true">Vision and Mission</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank"
+                                        href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/menus/Citizen_Chartermenu.pdf">
+                                        Citizen Charter
+                                        <span class="tooltip-text" aria-hidden="true">Citizen Charter</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/whos-who ">
+                                        Who&#039;s Who
+                                        <span class="tooltip-text" aria-hidden="true">Who&#039;s Who</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank"
+                                        href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/menus/Organisation_Chart_29July2026_2026-07-29_10-02-18.pdf">
+                                        Organisation Chart
+                                        <span class="tooltip-text" aria-hidden="true">Organisation Chart</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                                                                <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/meet-the-minister-and-secretary ">
+                                        Meet the Minister and Secretary
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Meet the Minister and Secretary</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://sansad.in/ls/members/biography/3982?from=members">
+                                                      Hon’ble Union Minister Shri Prahlad Joshi
+                                                      <span class="tooltip-text" aria-hidden="true">Hon’ble Union Minister Shri Prahlad Joshi</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://sansad.in/rs/members/biography/2491">
+                                                      Hon’ble Minister of State Shri B L Verma
+                                                      <span class="tooltip-text" aria-hidden="true">Hon’ble Minister of State Shri B L Verma</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://sansad.in/ls/members/biography/5614?from=members">
+                                                      Hon’ble Minister of State Smt Nimuben Jayantibhai Bambhaniya
+                                                      <span class="tooltip-text" aria-hidden="true">Hon’ble Minister of State Smt Nimuben Jayantibhai Bambhaniya</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/secretaryyy ">
+                                                      Secretary Smt Nidhi Khare
+                                                      <span class="tooltip-text" aria-hidden="true">Secretary Smt Nidhi Khare</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                            
+                        </ul>
+                                              </li>
+                                                        <li lang="en" class="nav-item dropdown ">
+                                                  <a lang="en"
+                            class="nav-link show-on-focus  dropdown-toggle  "
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            href=" https://consumeraffairs.gov.in/pages/organisation-and-unit ">
+                            Organisation and Unit
+                            <span lang="en" class="tooltip-text" aria-hidden="true">Organisation and Unit</span>
+                          </a>
+                                                                        <!-- <i class='bx bxs-chevron-down htmlcss-arrow arrow  '></i> -->
+                        
+                        <ul class="dropdown-menu shadow ">
+
+                                                                                              <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/divison ">
+                                        Division
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Division</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/consumer-protection-unit ">
+                                                      Consumer Protection Unit
+                                                      <span class="tooltip-text" aria-hidden="true">Consumer Protection Unit</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/price-monitoring-division ">
+                                                      Price Monitoring Division
+                                                      <span class="tooltip-text" aria-hidden="true">Price Monitoring Division</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/legal-metrology-overview ">
+                                                      Legal Metrology
+                                                      <span class="tooltip-text" aria-hidden="true">Legal Metrology</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/bureau-of-indian-standards ">
+                                                      Bureau of Indian Standards
+                                                      <span class="tooltip-text" aria-hidden="true">Bureau of Indian Standards</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/national-test-house ">
+                                                      National Test House
+                                                      <span class="tooltip-text" aria-hidden="true">National Test House</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/consumer-welfare-fund ">
+                                                      Consumer Welfare Fund
+                                                      <span class="tooltip-text" aria-hidden="true">Consumer Welfare Fund</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/emblems-and-names ">
+                                                      Emblems and Names
+                                                      <span class="tooltip-text" aria-hidden="true">Emblems and Names</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/ecree ">
+                                                      Essential Commodities Regulation and Enforcement
+                                                      <span class="tooltip-text" aria-hidden="true">Essential Commodities Regulation and Enforcement</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/co-operation-division ">
+                                                      Cooperation Division
+                                                      <span class="tooltip-text" aria-hidden="true">Cooperation Division</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/organization-and-method ">
+                                                      Organization and Method
+                                                      <span class="tooltip-text" aria-hidden="true">Organization and Method</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/e-governance ">
+                                                      e-Governance
+                                                      <span class="tooltip-text" aria-hidden="true">e-Governance</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/parliament-and-coordination ">
+                                                      Parliament and Coordination
+                                                      <span class="tooltip-text" aria-hidden="true">Parliament and Coordination</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/establishments ">
+                                                      Establishment
+                                                      <span class="tooltip-text" aria-hidden="true">Establishment</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/general-administration ">
+                                                      General Administration
+                                                      <span class="tooltip-text" aria-hidden="true">General Administration</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/division-publicity ">
+                                                      Publicity
+                                                      <span class="tooltip-text" aria-hidden="true">Publicity</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/official-language ">
+                                                      Official Language
+                                                      <span class="tooltip-text" aria-hidden="true">Official Language</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/vigilance ">
+                                                      Vigilance
+                                                      <span class="tooltip-text" aria-hidden="true">Vigilance</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/integrated-finance ">
+                                                      Integrated Finance
+                                                      <span class="tooltip-text" aria-hidden="true">Integrated Finance</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/nch ">
+                                                      National Consumer Helpline
+                                                      <span class="tooltip-text" aria-hidden="true">National Consumer Helpline</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/costing-cell ">
+                                                      Cost Cell
+                                                      <span class="tooltip-text" aria-hidden="true">Cost Cell</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                                                                                                <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/quasi-judicial-body ">
+                                        Quasi Judicial Body
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Quasi Judicial Body</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://ncdrc.nic.in/">
+                                                      NCDRC
+                                                      <span class="tooltip-text" aria-hidden="true">NCDRC</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                                                                                                <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/autonomous-body ">
+                                        Statutory and Autonomous Body
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Statutory and Autonomous Body</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://www.bis.gov.in/">
+                                                      Bureau of Indian Standards
+                                                      <span class="tooltip-text" aria-hidden="true">Bureau of Indian Standards</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                                                                                                <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/consumer-cooperative ">
+                                        Consumer Cooperative
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Consumer Cooperative</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://nccf-india.com/">
+                                                      National Cooperative Consumers Federation of India
+                                                      <span class="tooltip-text" aria-hidden="true">National Cooperative Consumers Federation of India</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                                                                                                <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/attached-offices ">
+                                        Attached Offices
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Attached Offices</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://iilm.gov.in/">
+                                                      Indian Insitute of Legal Metrology
+                                                      <span class="tooltip-text" aria-hidden="true">Indian Insitute of Legal Metrology</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                                                                                                <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/subordinate-office ">
+                                        Subordinate Office
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Subordinate Office</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://nth.gov.in/">
+                                                      National Test House
+                                                      <span class="tooltip-text" aria-hidden="true">National Test House</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                                                                                                <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/central-consumer-protection-authorit ">
+                                        Central Consumer Protection Authority
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Central Consumer Protection Authority</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://doca.gov.in/ccpa/">
+                                                      CCPA Website
+                                                      <span class="tooltip-text" aria-hidden="true">CCPA Website</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                            
+                        </ul>
+                                              </li>
+                                                        <li lang="en" class="nav-item dropdown ">
+                                                  <a lang="en"
+                            class="nav-link show-on-focus  dropdown-toggle  "
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            href=" https://consumeraffairs.gov.in/pages/acts-rules ">
+                            Acts and Rules
+                            <span lang="en" class="tooltip-text" aria-hidden="true">Acts and Rules</span>
+                          </a>
+                                                                        <!-- <i class='bx bxs-chevron-down htmlcss-arrow arrow  '></i> -->
+                        
+                        <ul class="dropdown-menu shadow ">
+
+                                                            
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/consumer-protection-acts ">
+                                        Consumer Protection Act
+                                        <span class="tooltip-text" aria-hidden="true">Consumer Protection Act</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/legal-metrology-act ">
+                                        The Legal Metrology Act
+                                        <span class="tooltip-text" aria-hidden="true">The Legal Metrology Act</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/the-bureau-of-india-standards ">
+                                        Bureau of India Standards Act
+                                        <span class="tooltip-text" aria-hidden="true">Bureau of India Standards Act</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank" href="https://www.indiacode.nic.in/handle/123456789/1896?view_type=sea">
+                                        The Emblems and Names PIU Act
+                                        <span class="tooltip-text" aria-hidden="true">The Emblems and Names PIU Act</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank" href="https://www.indiacode.nic.in/handle/123456789/1579?view_type=sea">
+                                        The Essential Commodities Act
+                                        <span class="tooltip-text" aria-hidden="true">The Essential Commodities Act</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank" href="https://www.indiacode.nic.in/handle/123456789/1781?view_type=sea">
+                                        PBMSEC Act, 1980
+                                        <span class="tooltip-text" aria-hidden="true">PBMSEC Act, 1980</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/recruitment-rules ">
+                                        Recruitment Rules
+                                        <span class="tooltip-text" aria-hidden="true">Recruitment Rules</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank"
+                                        href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/menus/Allocation_of_Business_Rulesmenu.pdf">
+                                        Allocation of Business Rules
+                                        <span class="tooltip-text" aria-hidden="true">Allocation of Business Rules</span>
+                                      </a>
+                                                                                                          </li>
+                                                            
+                        </ul>
+                                              </li>
+                                                        <li lang="en" class="nav-item dropdown ">
+                                                  <a lang="en"
+                            class="nav-link show-on-focus  dropdown-toggle  "
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            href=" https://consumeraffairs.gov.in/pages/price-monitoring ">
+                            Price Monitoring
+                            <span lang="en" class="tooltip-text" aria-hidden="true">Price Monitoring</span>
+                          </a>
+                                                                        <!-- <i class='bx bxs-chevron-down htmlcss-arrow arrow  '></i> -->
+                        
+                        <ul class="dropdown-menu shadow ">
+
+                                                            
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank" href="https://fcainfoweb.nic.in/Reports/DB/Dailyprices.aspx">
+                                        Daily Prices
+                                        <span class="tooltip-text" aria-hidden="true">Daily Prices</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank" href="https://fcainfoweb.nic.in/Reports/DB/DailySummary.aspx">
+                                        Daily Summary
+                                        <span class="tooltip-text" aria-hidden="true">Daily Summary</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank" href="https://fcainfoweb.nic.in/reports/report_menu_web.aspx">
+                                        Daily Retail  Wholesale Prices
+                                        <span class="tooltip-text" aria-hidden="true">Daily Retail  Wholesale Prices</span>
+                                      </a>
+                                                                                                          </li>
+                                                            
+                        </ul>
+                                              </li>
+                                                        <li lang="en" class="nav-item dropdown ">
+                                                  <a lang="en"
+                            class="nav-link show-on-focus  dropdown-toggle  "
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            href=" https://consumeraffairs.gov.in/pages/rti ">
+                            RTI
+                            <span lang="en" class="tooltip-text" aria-hidden="true">RTI</span>
+                          </a>
+                                                                        <!-- <i class='bx bxs-chevron-down htmlcss-arrow arrow  '></i> -->
+                        
+                        <ul class="dropdown-menu shadow ">
+
+                                                                                              <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/proactive-disclosure ">
+                                        Proactive Disclosure
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Proactive Disclosure</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/functions-and-duties-of-the-department ">
+                                                      Functions and Duties of the Department
+                                                      <span class="tooltip-text" aria-hidden="true">Functions and Duties of the Department</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/power-and-duties-of-officers ">
+                                                      Power and Duties of Officers
+                                                      <span class="tooltip-text" aria-hidden="true">Power and Duties of Officers</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/channel-of-submission ">
+                                                      Channel of Submission
+                                                      <span class="tooltip-text" aria-hidden="true">Channel of Submission</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/list-of-cpios ">
+                                                      List of CPIOs
+                                                      <span class="tooltip-text" aria-hidden="true">List of CPIOs</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank"
+                                                      href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/menus/Domestic_and_Foreign_tours_of_JS_and_above_level_officersmenu.pdf">
+                                                      Domestic and Foreign tours of JS and above level officers
+                                                      <span class="tooltip-text" aria-hidden="true">Domestic and Foreign tours of JS and above level officers</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/employees-against-displinary-action ">
+                                                      No. of employees against whom disciplinary action are pending
+                                                      <span class="tooltip-text" aria-hidden="true">No. of employees against whom disciplinary action are pending</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/monthly-remuneration ">
+                                                      Monthly Remuneration
+                                                      <span class="tooltip-text" aria-hidden="true">Monthly Remuneration</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank"
+                                                      href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/menus/GA_AMC_July26_2026-07-22_15-26-24.pdf">
+                                                      Details of Contract under General Admin Section
+                                                      <span class="tooltip-text" aria-hidden="true">Details of Contract under General Admin Section</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank"
+                                                      href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/menus/Information_as_per_GFR_230_for_the_year_2025-26menu.pdf">
+                                                      Information as per GFR 230 for the year 2025-26
+                                                      <span class="tooltip-text" aria-hidden="true">Information as per GFR 230 for the year 2025-26</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/report-of-central-information ">
+                                        Report of Central Information
+                                        <span class="tooltip-text" aria-hidden="true">Report of Central Information</span>
+                                      </a>
+                                                                                                          </li>
+                                                            
+                        </ul>
+                                              </li>
+                                                        <li lang="en" class="nav-item dropdown  current">
+                                                  <a lang="en"
+                            class="nav-link show-on-focus  dropdown-toggle  "
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            href=" https://consumeraffairs.gov.in/pages/announcements ">
+                            Announcements
+                            <span lang="en" class="tooltip-text" aria-hidden="true">Announcements</span>
+                          </a>
+                                                                        <!-- <i class='bx bxs-chevron-down htmlcss-arrow arrow  '></i> -->
+                        
+                        <ul class="dropdown-menu shadow ">
+
+                                                                                              <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/downloadss ">
+                                        Downloads
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Downloads</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/annual-report ">
+                                                      Annual Report
+                                                      <span class="tooltip-text" aria-hidden="true">Annual Report</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/forms ">
+                                                      Forms
+                                                      <span class="tooltip-text" aria-hidden="true">Forms</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank"
+                                                      href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/menus/Compendium_of_National_Commission_Judgements_on_Consumer_Protection_Act,_1986menu.pdf">
+                                                      Compendium of National Commission Judgements
+                                                      <span class="tooltip-text" aria-hidden="true">Compendium of National Commission Judgements</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/circulars ">
+                                        Circulars
+                                        <span class="tooltip-text" aria-hidden="true">Circulars</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/vacancy ">
+                                        Vacancies
+                                        <span class="tooltip-text" aria-hidden="true">Vacancies</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/tenders ">
+                                        Tenders
+                                        <span class="tooltip-text" aria-hidden="true">Tenders</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/achievements ">
+                                        Achievements
+                                        <span class="tooltip-text" aria-hidden="true">Achievements</span>
+                                      </a>
+                                                                                                          </li>
+                                                            
+                        </ul>
+                                              </li>
+                                                        <li lang="en" class="nav-item dropdown ">
+                                                  <a lang="en"
+                            class="nav-link show-on-focus  dropdown-toggle  "
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            href=" https://consumeraffairs.gov.in/pages/media ">
+                            Media
+                            <span lang="en" class="tooltip-text" aria-hidden="true">Media</span>
+                          </a>
+                                                                        <!-- <i class='bx bxs-chevron-down htmlcss-arrow arrow  '></i> -->
+                        
+                        <ul class="dropdown-menu shadow ">
+
+                                                            
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/press-release ">
+                                        Press release
+                                        <span class="tooltip-text" aria-hidden="true">Press release</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/photo-gallery ">
+                                        Photo Gallery
+                                        <span class="tooltip-text" aria-hidden="true">Photo Gallery</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                                                                <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/video-gallery ">
+                                        Video Gallery
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Video Gallery</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://jagograhakjago.gov.in/ConsumerAwareness/new/video/index.html">
+                                                      Consumer Awareness
+                                                      <span class="tooltip-text" aria-hidden="true">Consumer Awareness</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item dropdown-toggle show-on-focus"
+                                                      href=" https://consumeraffairs.gov.in/pages/video-gallery ">
+                                                      Video Gallery
+                                                      <span class="tooltip-text" aria-hidden="true">Video Gallery</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/rap-songs ">
+                                        Rap Songs
+                                        <span class="tooltip-text" aria-hidden="true">Rap Songs</span>
+                                      </a>
+                                                                                                          </li>
+                                                            
+                        </ul>
+                                              </li>
+                                                        <li lang="en" class="nav-item dropdown ">
+                                                  <a lang="en"
+                            class="nav-link show-on-focus  dropdown-toggle  "
+                            data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside"
+                            href=" https://consumeraffairs.gov.in/pages/more ">
+                            More
+                            <span lang="en" class="tooltip-text" aria-hidden="true">More</span>
+                          </a>
+                                                                        <!-- <i class='bx bxs-chevron-down htmlcss-arrow arrow  '></i> -->
+                        
+                        <ul class="dropdown-menu shadow ">
+
+                                                            
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/user-guidelines ">
+                                        Guidelines
+                                        <span class="tooltip-text" aria-hidden="true">Guidelines</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/national-consumer-day-2025 ">
+                                        National Consumer Day 2025
+                                        <span class="tooltip-text" aria-hidden="true">National Consumer Day 2025</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/swachh-bharat-mission ">
+                                        Swachh Bharat Mission
+                                        <span class="tooltip-text" aria-hidden="true">Swachh Bharat Mission</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/parliament-question ">
+                                        Parliament Questions
+                                        <span class="tooltip-text" aria-hidden="true">Parliament Questions</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                                                                <li lang="hi" class="left_or_right ">
+                                                                          <a lang="hi" class="dropdown-item dropdown-toggle show-on-focus" data-bs-toggle="dropdown"
+                                        href=" https://consumeraffairs.gov.in/pages/public-grivance ">
+                                        Public Grievance
+                                        <span lang="hi" class="tooltip-text" aria-hidden="true">Public Grievance</span>
+                                      </a>
+                                                                        <!-- <i class='bx bxs-chevron-right arrow more-arrow'></i> -->
+
+                                    <ul class="dropdown-menu shadow">
+                                                                                                                            <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://consumerhelpline.gov.in/public/">
+                                                      Consumer Helpline
+                                                      <span class="tooltip-text" aria-hidden="true">Consumer Helpline</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                                      <li class="dropdown-item" >
+                                                                                                      <a class="dropdown-item show-on-focus" target="_blank" href="https://pgportal.gov.in/">
+                                                      PG Portal
+                                                      <span class="tooltip-text" aria-hidden="true">PG Portal</span>
+                                                    </a>
+                                                                                                  </li>
+                                                                          </ul>
+                                                                      </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank" href="https://egazette.gov.in/">
+                                        e Gazette
+                                        <span class="tooltip-text" aria-hidden="true">e Gazette</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/archiveall ">
+                                        Archives
+                                        <span class="tooltip-text" aria-hidden="true">Archives</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item dropdown-toggle show-on-focus" target="_blank"
+                                        href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/menus/ICC_06072026_2026-07-16_14-05-07.pdf">
+                                        Internal Committee on Sexual Harassment
+                                        <span class="tooltip-text" aria-hidden="true">Internal Committee on Sexual Harassment</span>
+                                      </a>
+                                                                                                          </li>
+                                                                                              
+                                  <li>
+                                                                          <a class="dropdown-item show-on-focus"
+                                        href=" https://consumeraffairs.gov.in/pages/studyreports ">
+                                        Study Reports
+                                        <span class="tooltip-text" aria-hidden="true">Study Reports</span>
+                                      </a>
+                                                                                                          </li>
+                                                            
+                        </ul>
+                                              </li>
+                                            </ul>
+        </div>
+      </div>
+    </nav>
+  </section>
+  <script>
+
+    // Add class to last 3 li tags
+    document.querySelectorAll('.navbar-nav .nav-item:nth-last-child(-n+3)>.dropdown-menu .left_or_right').forEach(element => {
+      element.classList.add('dropstart');
+    });
+
+    // Add class to all other li tags (except last 3)
+    document.querySelectorAll('.navbar-nav li:not(:nth-last-child(-n+3))>.dropdown-menu .left_or_right').forEach(element => {
+      element.classList.add('dropend');
+    })[1][2]
+
+  </script>
+  <script>
+    const checkbox = document.getElementById('checkbox');
+    const dropdownContainer = document.querySelector('.theme-popup__list-container');
+
+    // Add a click event listener to the checkbox
+    checkbox.addEventListener('click', function (event) {
+      event.stopPropagation(); // Prevent the click event from propagating to the document
+      dropdownContainer.style.display = dropdownContainer.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // Add a click event listener to the document to close the dropdown
+    document.addEventListener('click', function (event) {
+      if (dropdownContainer.style.display === 'block' && event.target !== checkbox) {
+        dropdownContainer.style.display = 'none';
+      }
+    });
+  </script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const captchaFooterLink = document.querySelector('a[href*="captcha.org/captcha.html?laravel"]');
+      if (captchaFooterLink) {
+        captchaFooterLink.style.display = 'none';
+      }
+    });
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // Get all the anchor links in the menu (you can use a specific class to target only menu items)
+      const links = document.querySelectorAll('a');
+
+      // Get the current domain of the website (you can customize this if needed)
+      const currentDomain = window.location.hostname;
+
+      links.forEach(function (link) {
+        link.addEventListener('click', function (event) {
+          const href = link.getAttribute('href');
+
+          // Check if the link is external (not part of the same domain or IP address)
+          const isExternal = href && (href.startsWith('http') || href.startsWith('https')) &&
+            !href.includes(currentDomain);
+
+          // Show a confirmation message if it's an external link
+          if (isExternal && !confirm('This is an external link. Are you sure you want to open it?')) {
+            link.setAttribute('target', '_blank');
+            // Prevent the default action (navigation) if the user cancels
+            event.preventDefault();
+          }
+        });
+      });
+    });
+  </script>
+  
+   <script>
+(function () {
+    var ENGLISH_URL = "https://consumeraffairs.gov.in/lang/change?lang=1";
+
+    function interceptEnglish(e) {
+        var opt = e.target.closest && e.target.closest(".language-option");
+        if (!opt || opt.getAttribute("data-value") !== "en") return;
+        if (e.type === "keydown" && e.key !== "Enter") return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();      // Bhashini's handler never runs
+        window.location.href = ENGLISH_URL;
+    }
+
+    // true = capture phase — must run before the plugin's listener on the dropdown
+    document.addEventListener("click",   interceptEnglish, true);
+    document.addEventListener("keydown", interceptEnglish, true);
+})();
+</script>
+  
+        
+ <style>
+    a.tender_link {
+        color: rgba(var(--bs-link-color-rgb), 1) !important;
+    }
+ </style>
+ 
+ <section>
+    <div class="px-3 mt-3 container">
+       <div class="container mt-2">
+<div class="d-flex justify-content-between align-items-center">
+  
+  <!-- Breadcrumb Left -->
+  <nav class="navbar p-0" aria-label="breadcrumb navigation">
+    <ul class="breadcrumb mb-0" role="list">
+      <li class="breadcrumb-item">
+        <a href="https://consumeraffairs.gov.in" class="show-on-focus">
+          Home
+          <span class="tooltip-text" aria-hidden="true">
+            Home > Home
+          </span>
+        </a>
+      </li>
+
+              <li class="breadcrumb-item">
+          <a class="show-on-focus" href="https://consumeraffairs.gov.in/pages/announcements">
+            Announcements
+            <span class="tooltip-text" aria-hidden="true">Announcements</span>
+          </a>
+        </li>
+      
+      <li class="breadcrumb-item active" aria-current="page">Vacancies</li>
+    </ul>
+  </nav>
+
+  <!-- Buttons Right (in nav + list) -->
+  <nav class="navbar p-0" aria-label="page utility navigation">
+    <ul class="d-flex align-items-center list-unstyled mb-0 gap-2">
+      <li>
+        <a href="javascript:void(0)" class="btn bg-maroon btn-xs show-on-focus" onclick="goBack()">
+          Back
+          <span class="tooltip-text" aria-hidden="true">
+            back > Back
+          </span>
+        </a>
+      </li>
+      <li><span aria-hidden="true">|</span></li>
+      <li>
+        <a href="javascript:void(0)" class="btn bg-maroon btn-xs show-on-focus" onclick="window.print();">
+          Print
+          <span class="tooltip-text" aria-hidden="true">
+            print > Print
+          </span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+
+</div>
+
+<script>
+  function goBack() {
+    window.history.back();
+  }
+</script>
+
+
+
+</section>
+    <!-- Page Header End -->
+  
+             
+<!--************************breadcrumb********************-->
+
+
+<div class="container mx-auto">
+<div class="row inner_page">
+    <div class="flex-shrink-0 col-lg-3 col-xs-12 pb-3 pe-lg-0">
+    <style>
+    a {
+        color: #000
+    }
+
+    .page header {
+        border: #005a9c solid 2px;
+        background: #005a9c;
+        color: white;
+        text-align: center;
+    }
+
+    .page header .title {
+        font-size: 2.5em;
+        font-weight: bold;
+        font-family: serif;
+    }
+
+    .page header .tagline {
+        font-style: italic;
+    }
+
+    .page footer {
+        border: #005a9c solid 2px;
+        background: #005a9c;
+        font-family: serif;
+        color: white;
+        font-style: italic;
+        padding-left: 1em;
+    }
+
+    .page .body {
+        display: grid;
+        grid-template-columns: auto auto;
+        border: #eee solid 2px;
+    }
+
+    .page .body nav {
+        margin: 0;
+        padding: 6px;
+        width: 17em;
+        height: 60em;
+        background: #eee;
+    }
+
+    .page .body nav.focus {
+        padding: 4px;
+        border: 2px solid #005a9c;
+    }
+
+    .page .body .page {
+        margin: 0.25em;
+        padding: 0.25em;
+        height: 30em;
+    }
+
+    .page .body .page h1 {
+        margin: 0;
+        padding: 0;
+    }
+
+    .page .main {
+        padding: 1em;
+    }
+
+    .treeview-navigation ul,
+    .treeview-navigation li {
+        margin: 0;
+        padding: 0;
+    }
+
+    .treeview-navigation li li span.label {
+        padding-left: 1em;
+    }
+
+    .treeview-navigation li li li span.label {
+        padding-left: 2em;
+    }
+
+    .treeview-navigation[role="tree"] {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .treeview-navigation[role="tree"] li {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .treeview-navigation a[role="treeitem"] ul {
+        margin: 0;
+        padding: 0;
+    }
+
+    .treeview-navigation a[role="treeitem"][aria-expanded="false"]+[role="group"] {
+        display: none;
+    }
+
+    .treeview-navigation a[role="treeitem"][aria-expanded="true"]+[role="group"] {
+        display: block;
+    }
+
+    .treeview-navigation a[role="treeitem"]>span svg {
+        transform: translate(0, 0);
+    }
+
+    .treeview-navigation a[role="treeitem"][aria-expanded="false"]>span svg {
+        transform: rotate(270deg) translate(2px, 2px);
+    }
+
+    .treeview-navigation a[role="treeitem"] {
+        margin: 0;
+        padding: 4px;
+        padding-left: 9px;
+        text-decoration: none;
+        color: #c00404;
+        border: none;
+        display: block;
+    }
+
+    .treeview-navigation a[role="treeitem"][aria-current] {
+        border-left: 5px solid #c00404;
+        padding-left: 4px;
+        background-color: #ddd;
+    }
+
+    .treeview-navigation a[role="treeitem"] span.icon svg polygon {
+        stroke-width: 2px;
+        fill: currentcolor;
+        stroke: transparent;
+    }
+
+    /* disable default keyboard focus styling for treeitems
+   Keyboard focus is styled with the following CSS */
+
+    .treeview-navigation a[role="treeitem"]:focus {
+        outline: 0;
+        padding: 2px;
+        padding-left: 7px;
+        border: 2px #005a9c solid;
+    }
+
+    .treeview-navigation a[role="treeitem"][aria-current]:focus {
+        padding-left: 4px;
+        border-left-width: 5px;
+    }
+
+    .treeview-navigation a[role="treeitem"]:hover {
+        background-color: #adddff;
+        text-decoration: underline;
+        padding-left: 4px;
+        border-left: 5px solid #333;
+    }
+
+    .treeview-navigation a[role="treeitem"] span.icon:hover {
+        color: #333;
+    }
+
+    .treeview-navigation a[role="treeitem"] span.icon svg polygon:hover {
+        stroke: currentcolor;
+    }
+</style>
+
+
+
+
+<nav aria-label="aside">
+    <ul class="treeview-navigation" role="tree" aria-label="aside">
+
+                    <li role="none">
+                
+                                            <a lang="hi" role="treeitem" aria-expanded="false" aria-owns="id-about-subtree-459"
+                            aria-current=""
+                            href=" https://consumeraffairs.gov.in/pages/downloadss "
+                            title="Downloads">
+
+                            <span class="label">
+                                <span class="icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="10" viewBox="0 0 13 10">
+                                        <polygon points="2 1, 12 1, 7 9"></polygon>
+                                    </svg>
+                                </span>
+                                Downloads
+                            </span>
+							<!-- <span lang="hi" class="tooltip-text" aria-hidden="true">Downloads</span> -->
+                        </a>
+
+                    
+                
+                
+                                    <ul id="id-about-subtree-459" role="group"
+                        aria-label=" https://consumeraffairs.gov.in/pages/downloadss "
+                        title="Downloads">
+
+                                                    <li role="none">
+                                                                    <a role="treeitem"
+                                        href=" https://consumeraffairs.gov.in/pages/annual-report "
+                                        title="Annual Report">
+                                        <span class="label">Annual Report</span>
+										<!-- <span lang="hi" class="tooltip-text" aria-hidden="true">Annual Report</span> -->
+                                    </a>
+                                                            </li>
+                                                    <li role="none">
+                                                                    <a role="treeitem"
+                                        href=" https://consumeraffairs.gov.in/pages/forms "
+                                        title="Forms">
+                                        <span class="label">Forms</span>
+										<!-- <span lang="hi" class="tooltip-text" aria-hidden="true">Forms</span> -->
+                                    </a>
+                                                            </li>
+                                                    <li role="none">
+                                                                    <a role="treeitem" href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/menus/Compendium_of_National_Commission_Judgements_on_Consumer_Protection_Act,_1986menu.pdf"
+                                        title="Compendium of National Commission Judgements">
+                                        <span class="label">Compendium of National Commission Judgements</span>
+										<!-- <span lang="hi" class="tooltip-text" aria-hidden="true">Compendium of National Commission Judgements</span> -->
+                                    </a>
+
+                                                            </li>
+                        
+                    </ul>
+                
+            </li>
+                                <li role="none">
+                
+                                            <a role="treeitem" 
+                            class=""
+                            data-bs-toggle=""
+                            data-bs-auto-close=""
+                            href=" https://consumeraffairs.gov.in/pages/circulars "
+                            title="Circulars">
+                            Circulars
+                            <!-- <span lang="hi" class="tooltip-text" aria-hidden="true">Circulars</span> -->
+                        </a>
+                    
+                
+                
+                
+            </li>
+                                <li role="none">
+                
+                                            <a role="treeitem" 
+                            class=""
+                            data-bs-toggle=""
+                            data-bs-auto-close=""
+                            href=" https://consumeraffairs.gov.in/pages/vacancy "
+                            title="Vacancies">
+                            Vacancies
+                            <!-- <span lang="hi" class="tooltip-text" aria-hidden="true">Vacancies</span> -->
+                        </a>
+                    
+                
+                
+                
+            </li>
+                                <li role="none">
+                
+                                            <a role="treeitem" 
+                            class=""
+                            data-bs-toggle=""
+                            data-bs-auto-close=""
+                            href=" https://consumeraffairs.gov.in/pages/tenders "
+                            title="Tenders">
+                            Tenders
+                            <!-- <span lang="hi" class="tooltip-text" aria-hidden="true">Tenders</span> -->
+                        </a>
+                    
+                
+                
+                
+            </li>
+                                <li role="none">
+                
+                                            <a role="treeitem" 
+                            class=""
+                            data-bs-toggle=""
+                            data-bs-auto-close=""
+                            href=" https://consumeraffairs.gov.in/pages/achievements "
+                            title="Achievements">
+                            Achievements
+                            <!-- <span lang="hi" class="tooltip-text" aria-hidden="true">Achievements</span> -->
+                        </a>
+                    
+                
+                
+                
+            </li>
+                    
+    </ul>
+</nav>
+
+
+
+<script>
+    /*
+ *   This content is licensed according to the W3C Software License at
+ *   https://www.w3.org/Consortium/Legal/2015/copyright-software-and-document
+ *
+ *   File: treeview-navigation.js
+ *   Desc: Tree item object for representing the state and user interactions for a
+ *       tree widget for navigational links
+ */
+
+    'use strict';
+
+    class NavigationContentGenerator {
+        constructor(siteURL, siteName) {
+            this.siteName = siteName;
+            this.siteURL = siteURL;
+            this.fillerTextSentences = [];
+
+            this.fillerTextSentences.push(
+                'The content on this page is associated with the <a href="$linkURL">$linkName</a> link for <a href="$siteURL">$siteName</a>.'
+            );
+            //  this.fillerTextSentences.push('The text content in this paragraph is filler text providing a detectable change of content when the <a href="$linkURL">$linkName</a> link is selected from the menu.  ');
+            //  this.fillerTextSentences.push('<a href="$siteURL">$siteName</a> doesn\'t really exist, but the use of an organizational name is useful to provide context for the <a href="$linkURL">$linkName</a> link.  ');
+            //  this.fillerTextSentences.push('Since $siteName doesn\'t exist there really is no real content associated with the <a href="$linkURL">$linkName</a> link.');
+        }
+
+        renderParagraph(linkURL, linkName) {
+            var content = '';
+            this.fillerTextSentences.forEach(
+                (s) =>
+                (content += s
+                    .replace('$siteName', this.siteName)
+                    .replace('$siteURL', this.siteURL)
+                    .replace('$linkName', linkName)
+                    .replace('$linkURL', linkURL))
+            );
+            return content;
+        }
+    }
+
+    class TreeViewNavigation {
+        constructor(node) {
+            var linkURL, linkTitle;
+
+            // Check whether node is a DOM element
+            if (typeof node !== 'object') {
+                return;
+            }
+
+            document.body.addEventListener('focusin', this.onBodyFocusin.bind(this));
+            document.body.addEventListener('mousedown', this.onBodyFocusin.bind(this));
+
+            this.treeNode = node;
+            this.navNode = node.parentElement;
+
+            this.treeitems = this.treeNode.querySelectorAll('[role="treeitem"]');
+            for (let i = 0; i < this.treeitems.length; i++) {
+                let ti = this.treeitems[i];
+                ti.addEventListener('keydown', this.onKeydown.bind(this));
+                ti.addEventListener('click', this.onLinkClick.bind(this));
+                // first tree item is in tab sequence of page
+                if (i == 0) {
+                    ti.tabIndex = 0;
+                } else {
+                    ti.tabIndex = 0;
+                }
+                var groupNode = this.getGroupNode(ti);
+                if (groupNode) {
+                    var span = ti.querySelector('span.icon');
+                    span.addEventListener('click', this.onIconClick.bind(this));
+                }
+            }
+
+            // Initial content for page
+            if (location.href.split('#').length > 1) {
+                linkURL = location.href;
+                linkTitle = getLinkNameFromURL(location.href);
+            } else {
+                // linkURL = location.href + '#home';
+                linkURL = location.href;
+                linkTitle = 'Home';
+            }
+
+            this.contentGenerator = new NavigationContentGenerator(
+                '#home',
+                'Mythical University'
+            );
+            this.updateContent(linkURL, linkTitle, false);
+
+            function getLinkNameFromURL(url) {
+                function capitalize(str) {
+                    return str.charAt(0).toUpperCase() + str.slice(1);
+                }
+
+                var name = url.split('#')[1];
+                if (typeof name === 'string') {
+                    name = name.split('-').map(capitalize).join(' ');
+                } else {
+                    name = 'Home';
+                }
+                return name;
+            }
+        }
+
+        updateContent(linkURL, linkName, moveFocus) {
+            var h1Node, paraNodes;
+
+            if (typeof moveFocus !== 'boolean') {
+                moveFocus = true;
+            }
+
+            // Update content area
+            h1Node = document.querySelector('.page .main h1');
+            if (h1Node) {
+                h1Node.textContent = linkName;
+            }
+            paraNodes = document.querySelectorAll('.page .main p');
+            paraNodes.forEach(
+                (p) =>
+                    (p.innerHTML = this.contentGenerator.renderParagraph(linkURL, linkName))
+            );
+
+            // move focus to the content region
+            if (moveFocus && h1Node) {
+                h1Node.tabIndex = -1;
+                h1Node.focus();
+            }
+
+            // Update aria-current
+            this.updateAriaCurrent(linkURL);
+        }
+
+        getAriaCurrentURL() {
+            let url = false;
+            let node = this.treeNode.querySelector('[aria-current]');
+            if (node) {
+                url = node.href;
+            }
+            return url;
+        }
+
+        updateAriaCurrent(url) {
+            if (typeof url !== 'string') {
+                url = this.getAriaCurrentURL();
+            }
+
+            this.treeitems.forEach((item) => {
+                if (item.href === url) {
+                    item.setAttribute('aria-current', 'page');
+                    // Make sure link is visible
+                    this.showTreeitem(item);
+                    this.setTabIndex(item);
+                } 
+                else {
+                    item.removeAttribute('aria-current');
+                }
+            });
+        }
+
+        showTreeitem(treeitem) {
+            var parentNode = this.getParentTreeitem(treeitem);
+
+            while (parentNode) {
+                parentNode.setAttribute('aria-expanded', 'true');
+                parentNode = this.getParentTreeitem(parentNode);
+            }
+        }
+
+        setTabIndex(treeitem) {
+            this.treeitems.forEach((item) => (item.tabIndex = 0));
+            treeitem.tabIndex = 0;
+        }
+
+        getParentTreeitem(treeitem) {
+            var node = treeitem.parentNode;
+
+            if (node) {
+                node = node.parentNode;
+                if (node) {
+                    node = node.previousElementSibling;
+                    if (node && node.getAttribute('role') === 'treeitem') {
+                        return node;
+                    }
+                }
+            }
+            return false;
+        }
+
+        isVisible(treeitem) {
+            var flag = true;
+            if (this.isInSubtree(treeitem)) {
+                treeitem = this.getParentTreeitem(treeitem);
+                if (!treeitem || treeitem.getAttribute('aria-expanded') === 'false') {
+                    return false;
+                }
+            }
+            return flag;
+        }
+
+        isInSubtree(treeitem) {
+            if (treeitem.parentNode && treeitem.parentNode.parentNode) {
+                return treeitem.parentNode.parentNode.getAttribute('role') === 'group';
+            }
+            return false;
+        }
+
+        isExpandable(treeitem) {
+            return treeitem.hasAttribute('aria-expanded');
+        }
+
+        isExpanded(treeitem) {
+            return treeitem.getAttribute('aria-expanded') === 'true';
+        }
+
+        getGroupNode(treeitem) {
+            var groupNode = false;
+            var id = treeitem.getAttribute('aria-owns');
+            if (id) {
+                groupNode = document.getElementById(id);
+            }
+            return groupNode;
+        }
+
+        getVisibleTreeitems() {
+            var items = [];
+            for (var i = 0; i < this.treeitems.length; i++) {
+                var ti = this.treeitems[i];
+                if (this.isVisible(ti)) {
+                    items.push(ti);
+                }
+            }
+            return items;
+        }
+
+        collapseTreeitem(treeitem) {
+            if (treeitem.getAttribute('aria-owns')) {
+                var groupNode = document.getElementById(
+                    treeitem.getAttribute('aria-owns')
+                );
+                if (groupNode) {
+                    treeitem.setAttribute('aria-expanded', 'false');
+                }
+            }
+        }
+
+        expandTreeitem(treeitem) {
+            if (treeitem.getAttribute('aria-owns')) {
+                var groupNode = document.getElementById(
+                    treeitem.getAttribute('aria-owns')
+                );
+                if (groupNode) {
+                    treeitem.setAttribute('aria-expanded', 'true');
+                }
+            }
+        }
+
+        expandAllSiblingTreeitems(treeitem) {
+            var parentNode = treeitem.parentNode.parentNode;
+
+            if (parentNode) {
+                var siblingTreeitemNodes = parentNode.querySelectorAll(
+                    ':scope > li > a[aria-expanded]'
+                );
+
+                for (var i = 0; i < siblingTreeitemNodes.length; i++) {
+                    siblingTreeitemNodes[i].setAttribute('aria-expanded', 'true');
+                }
+            }
+        }
+
+        setFocusToTreeitem(treeitem) {
+            treeitem.focus();
+        }
+
+        setFocusToNextTreeitem(treeitem) {
+            var visibleTreeitems = this.getVisibleTreeitems();
+            var nextItem = false;
+
+            for (var i = visibleTreeitems.length - 1; i >= 0; i--) {
+                var ti = visibleTreeitems[i];
+                if (ti === treeitem) {
+                    break;
+                }
+                nextItem = ti;
+            }
+            if (nextItem) {
+                this.setFocusToTreeitem(nextItem);
+            }
+        }
+
+        setFocusToPreviousTreeitem(treeitem) {
+            var visibleTreeitems = this.getVisibleTreeitems();
+            var prevItem = false;
+
+            for (var i = 0; i < visibleTreeitems.length; i++) {
+                var ti = visibleTreeitems[i];
+                if (ti === treeitem) {
+                    break;
+                }
+                prevItem = ti;
+            }
+
+            if (prevItem) {
+                this.setFocusToTreeitem(prevItem);
+            }
+        }
+
+        setFocusToParentTreeitem(treeitem) {
+            if (this.isInSubtree(treeitem)) {
+                var ti = treeitem.parentNode.parentNode.previousElementSibling;
+                this.setFocusToTreeitem(ti);
+            }
+        }
+
+        setFocusByFirstCharacter(treeitem, char) {
+            var start,
+                i,
+                ti,
+                index = -1;
+            var visibleTreeitems = this.getVisibleTreeitems();
+            char = char.toLowerCase();
+
+            // Get start index for search based on position of treeitem
+            start = visibleTreeitems.indexOf(treeitem) + 1;
+            if (start >= visibleTreeitems.length) {
+                start = 0;
+            }
+
+            // Check remaining items in the tree
+            for (i = start; i < visibleTreeitems.length; i++) {
+                ti = visibleTreeitems[i];
+                if (char === ti.textContent.trim()[0].toLowerCase()) {
+                    index = i;
+                    break;
+                }
+            }
+
+            // If not found in remaining slots, check from beginning
+            if (index === -1) {
+                for (i = 0; i < start; i++) {
+                    ti = visibleTreeitems[i];
+                    if (char === ti.textContent.trim()[0].toLowerCase()) {
+                        index = i;
+                        break;
+                    }
+                }
+            }
+
+            // If match was found...
+            if (index > -1) {
+                this.setFocusToTreeitem(visibleTreeitems[index]);
+            }
+        }
+
+        // Event handlers
+
+        onBodyFocusin(event) {
+            var tgt = event.target;
+
+            if (this.treeNode.contains(tgt)) {
+                this.navNode.classList.add('focus');
+            } else {
+                this.navNode.classList.remove('focus');
+                this.updateAriaCurrent();
+            }
+        }
+
+        onIconClick(event) {
+            var tgt = event.currentTarget;
+
+            if (this.isExpanded(tgt.parentNode.parentNode)) {
+                this.collapseTreeitem(tgt.parentNode.parentNode);
+            } else {
+                this.expandTreeitem(tgt.parentNode.parentNode);
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        onLinkClick(event) {
+            var tgt = event.currentTarget;
+            var href = tgt.getAttribute('href') || tgt.href || '';
+
+            // If href is blank (# or ''), prevent navigation
+            if (href === '' || href === '#' || href === 'javascript:void(0)') {
+                event.preventDefault();
+                return;
+            }
+        }
+
+        onKeydown(event) {
+            var tgt = event.currentTarget,
+                flag = false,
+                key = event.key;
+
+            function isPrintableCharacter(str) {
+                return str.length === 1 && str.match(/\S/);
+            }
+
+            if (event.altKey || event.ctrlKey || event.metaKey) {
+                return;
+            }
+
+            if (event.shift) {
+                if (
+                    event.keyCode == this.keyCode.SPACE ||
+                    event.keyCode == this.keyCode.RETURN
+                ) {
+                    event.stopPropagation();
+                } else {
+                    if (isPrintableCharacter(key)) {
+                        if (key == '*') {
+                            this.expandAllSiblingTreeitems(tgt);
+                            flag = true;
+                        } else {
+                            this.setFocusByFirstCharacter(tgt, key);
+                        }
+                    }
+                }
+            } else {
+                switch (key) {
+                    // NOTE: Return key is supported through the click event
+                    case ' ':
+                        this.updateContent(tgt.href, tgt.textContent.trim());
+                        flag = true;
+                        break;
+
+                    case 'Up':
+                    case 'ArrowUp':
+                        this.setFocusToPreviousTreeitem(tgt);
+                        flag = true;
+                        break;
+
+                    case 'Down':
+                    case 'ArrowDown':
+                        this.setFocusToNextTreeitem(tgt);
+                        flag = true;
+                        break;
+
+                    case 'Right':
+                    case 'ArrowRight':
+                        if (this.isExpandable(tgt)) {
+                            if (this.isExpanded(tgt)) {
+                                this.setFocusToNextTreeitem(tgt);
+                            } else {
+                                this.expandTreeitem(tgt);
+                            }
+                        }
+                        flag = true;
+                        break;
+
+                    case 'Left':
+                    case 'ArrowLeft':
+                        if (this.isExpandable(tgt) && this.isExpanded(tgt)) {
+                            this.collapseTreeitem(tgt);
+                            flag = true;
+                        } else {
+                            if (this.isInSubtree(tgt)) {
+                                this.setFocusToParentTreeitem(tgt);
+                                flag = true;
+                            }
+                        }
+                        break;
+
+                    case 'Home':
+                        this.setFocusToTreeitem(this.treeitems[0]);
+                        flag = true;
+                        break;
+
+                    case 'End':
+                        var visibleTreeitems = this.getVisibleTreeitems();
+                        this.setFocusToTreeitem(
+                            visibleTreeitems[visibleTreeitems.length - 1]
+                        );
+                        flag = true;
+                        break;
+
+                    default:
+                        if (isPrintableCharacter(key)) {
+                            if (key == '*') {
+                                this.expandAllSiblingTreeitems(tgt);
+                                flag = true;
+                            } else {
+                                this.setFocusByFirstCharacter(tgt, key);
+                            }
+                        }
+                        break;
+                }
+            }
+
+            if (flag) {
+                event.stopPropagation();
+                // event.preventDefault();
+                //$('a').click(function (e) { e.preventDefault(); })
+            }
+        }
+    }
+
+
+    window.addEventListener('load', function () {
+        var trees = document.querySelectorAll('nav [role="tree"]');
+
+        for (let i = 0; i < trees.length; i++) {
+            new TreeViewNavigation(trees[i]);
+        }
+    });
+</script>    </div>
+
+  <div class="col-lg-9">
+    <div class="content-div px-3">
+        <h1 class="">Vacancies</h1>
+        
+        <!-- publish and arcive date # Himanshi -->
+       <form action="" method="post" id="filterForm" name="filterForm" accept-charset="utf-8">
+    <style>
+      
+       #filterForm .form-label {
+            font-size: 0.85rem; 
+       }
+    </style>
+    
+            <input type="hidden" name="_token" value="8I1ZnTwv9PYKHcGqfk5KRg6wgQ1KOe76QT4dW3u5" autocomplete="off">            <div class="row">
+                <div class="col-lg-3 col-md-3 col-xm-12">
+                    <div class="form-floating d-block mb-3">
+                        <input 
+                            type="text" 
+                            name="keywords" 
+                            id="keywords" 
+                            class="form-control alphNumDasSpcDotCommaBcsc" 
+                            autocomplete="off"  
+                            value="" 
+                            placeholder="Enter title" 
+                        />
+                        <label for="keywords"> Title</label>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-3 col-sm-12">
+                    <div class="form-floating mb-3 error-startdate">
+                        <input 
+                        type="date" 
+                        name="startdate" 
+                        id="startdate1" 
+                        class="form-control input_class validDate1" 
+                        autocomplete="off" 
+                        value="" 
+                        placeholder="From Date" 
+                        title="Show Start Date Picker" 
+                        />
+                        <label for="startdate1">Publish on Date</label>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-3 col-sm-12">
+                    <div class="form-floating mb-3 error-enddate">
+                        <input 
+                        type="date" 
+                        name="enddate" 
+                        id="enddate1" 
+                        class="form-control input_class validDate1" 
+                        autocomplete="off" 
+                        value="" 
+                        placeholder="To Date" 
+                        title="Show End Date Picker" 
+                        />
+                        <label for="enddate1">Archive Date</label>
+                    </div>
+                </div>
+
+                <div class="col-lg-2 col-md-2 col-xm-12 d-flex align-items-end">
+                    <input name="cmdsubmit" 
+                        type="submit" 
+                        class="btn btn-primary w-100" 
+                        id="cmdsubmit" 
+                        value="Search" />
+                </div>
+            </div>
+        </form>
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered mt-3 table_whoswho">
+                <caption class="caption-top">Vacancies</caption>
+                <thead class="table-danger">
+                    <tr>
+                        <th> S.No</th>
+                        <th> Title</th>
+                        <th> Download</th>
+                        <th> Published On</th>
+                        <th width="12%"> Archive Date</th>
+                        <th> Corrigendum Doc </th>
+                    </tr>
+                </thead>
+                <tbody id="list">
+                	                                                                        <tr>
+                                <td>1</td>
+                                <td title="Engagement of Experts and Professionals [Level-II] by the Central Consumer Protection Authority for assisting the Central Authority for works related to Regulatory Compliances"> 
+                                    Engagement of Experts and Professionals [Level-II] by the Central Consumer Protection Authority for assisting the Central Authority for works related to Regulatory Compliances
+                                </td>
+                   
+                                <td> 
+                                                                            <img src="https://consumeraffairs.gov.in/public/assets/img/icons/application-pdf.png" alt="PDF Icon" /> 
+                                                                                                                <a target="_blank" class="link-primary" href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/circulars/Vacancy_CCPA_2026-09-28_12-09-28.pdf" title="Engagement of Experts and Professionals [Level-II] by the Central Consumer Protection Authority for assisting the Central Authority for works related to Regulatory Compliances" > download
+                                    
+                                                                            (1.64 MB)
+                                                                        </a>
+                                </td>
+                                <td>26-09-2026</td>
+                                <td>25-10-2026</td>
+                                <td>
+                                                                                                        </td>
+                            </tr>
+                                                    <tr>
+                                <td>2</td>
+                                <td title="Filling up of 02 Two posts of Scientist-B Chemical in National Test House, NTH Department of Consumer Affairs, Ministry of Consumer Affairs, Food  Public Distribution in Level-10  Rs. 56100-177500/- of the pay matrix by deputation including short term contract-reg."> 
+                                    Filling up of 02 Two posts of Scientist-B Chemical in National Test House, NTH Department of Consumer Affairs, Ministry of Consumer Affairs, Food  Public Distribution in Level-10  Rs. 56100-177500/- of the pay matrix by deputation including short term contract-reg.
+                                </td>
+                   
+                                <td> 
+                                                                            <img src="https://consumeraffairs.gov.in/public/assets/img/icons/application-pdf.png" alt="PDF Icon" /> 
+                                                                                                                <a target="_blank" class="link-primary" href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/circulars/NTH_Vacancy_Sep26_2026-09-03_09-45-24.pdf" title="Filling up of 02 Two posts of Scientist-B Chemical in National Test House, NTH Department of Consumer Affairs, Ministry of Consumer Affairs, Food  Public Distribution in Level-10  Rs. 56100-177500/- of the pay matrix by deputation including short term contract-reg." > download
+                                    
+                                                                            (2.78 MB)
+                                                                        </a>
+                                </td>
+                                <td>02-09-2026</td>
+                                <td>01-11-2026</td>
+                                <td>
+                                                                                                                                                            <a class="link-primary" href="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/corrigendum/Corrigendum_corrigendum.pdf" target="_blank">1. Corrigendum</a>
+                                                                                                            </td>
+                            </tr>
+                                                                
+                </tbody>
+            </table>
+        </div>
+
+
+         
+    </div>
+
+    <span class="page-updated-date px-3 text-align-right position-sticky top-100">Last updated on: 22-06-2026 </span>
+  </div>
+</div>
+</div>
+
+
+
+
+
+
+
+      </div>
+    </div>
+    <!-- ******************* footer section ******************* -->
+
+<footer role="contentinfo">
+
+  
+
+
+
+  <!-- Logo slider -->
+  <div class="py-3 brand-logo bg-white position-relative z-4">
+    <div class="logos container">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="gallery-section text-center heading  border-red border-3 w-25">
+          <h2 class="mb-1">
+                        External link
+                      </h2>
+        </div>
+      </div>
+
+      <div class="logo-slider" data-v-4ef8651c="">
+        <div class="logos-slide" data-v-4ef8651c="">
+
+                              <a href="https://www.india.gov.in/" target="_blank" class="show-on-focus"><img
+              src="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/logo/thumbnail/Indian_Emblem_logo.png" data-v-4ef8651c=""
+              alt="Indian Emblem" title="">
+            <span class="tooltip-text" aria-hidden="true">Indian Emblem</span>
+          </a>
+                    <a href="https://www.makeinindia.com/" target="_blank" class="show-on-focus"><img
+              src="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/logo/thumbnail/Make_in_india_logo.png" data-v-4ef8651c=""
+              alt="Make in india" title="">
+            <span class="tooltip-text" aria-hidden="true">Make in india</span>
+          </a>
+                    <a href="https://swachhbharatmission.ddws.gov" target="_blank" class="show-on-focus"><img
+              src="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/logo/thumbnail/Gandhi_Jayanti_logo.png" data-v-4ef8651c=""
+              alt="Gandhi Jayanti" title="">
+            <span class="tooltip-text" aria-hidden="true">Gandhi Jayanti</span>
+          </a>
+                    <a href="https://www.g20.org/en/g20-india-202" target="_blank" class="show-on-focus"><img
+              src="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/logo/thumbnail/G_Twenty_logo.png" data-v-4ef8651c=""
+              alt="G Twenty" title="">
+            <span class="tooltip-text" aria-hidden="true">G Twenty</span>
+          </a>
+                    <a href="https://www.digitalindia.gov.in/" target="_blank" class="show-on-focus"><img
+              src="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/logo/thumbnail/Digital_India_logo.png" data-v-4ef8651c=""
+              alt="Digital India" title="">
+            <span class="tooltip-text" aria-hidden="true">Digital India</span>
+          </a>
+                    <a href="https://amritmahotsav.nic.in/" target="_blank" class="show-on-focus"><img
+              src="https://consumeraffairs.gov.in/public/upload/admin/cmsfiles/logo/thumbnail/Seventy_five_years_of_hindi_logo.png" data-v-4ef8651c=""
+              alt="Azadi ka Amrit Mahotsav" title="">
+            <span class="tooltip-text" aria-hidden="true">Azadi ka Amrit Mahotsav</span>
+          </a>
+          
+        </div>
+      </div>
+      <script>
+        var copy = document.querySelector(".logos-slide").cloneNode(true);
+        document.querySelector(".logo-slider").appendChild(copy);
+      </script>
+    </div>
+  </div>
+
+
+  <div class="footer_links bg-footer-dark">
+    <div class="container">
+      <div class="">
+        <nav aria-label="Footer links">
+          <ul class="d-flex flex-column flex-md-row justify-content-between text-dark py-2">
+                                    <li>
+              <a href=" https://consumeraffairs.gov.in/pages/website-policies " class="show-on-focus"
+                aria-current="page">
+                Website Policies <span class="tooltip-text" aria-hidden="true">Website Policies</span> </a></a>
+            </li>
+                                                            <li>
+              <a href=" https://consumeraffairs.gov.in/pages/help " class="show-on-focus"
+                aria-current="page">
+                Help <span class="tooltip-text" aria-hidden="true">Help</span> </a></a>
+            </li>
+                                                            <li>
+              <a href=" https://consumeraffairs.gov.in/pages/web-information-manager " class="show-on-focus"
+                aria-current="page">
+                Web Information Manager <span class="tooltip-text" aria-hidden="true">Web Information Manager</span> </a></a>
+            </li>
+                                                            <li>
+              <a href=" https://consumeraffairs.gov.in/pages/visitor-analytics " class="show-on-focus"
+                aria-current="page">
+                Visitor Analytics <span class="tooltip-text" aria-hidden="true">Visitor Analytics</span> </a></a>
+            </li>
+                                                            <li>
+              <a href=" https://consumeraffairs.gov.in/pages/disclaimer " class="show-on-focus"
+                aria-current="page">
+                Disclaimer <span class="tooltip-text" aria-hidden="true">Disclaimer</span> </a></a>
+            </li>
+                                                            <li>
+              <a href=" https://consumeraffairs.gov.in/pages/terms-and-conditions " class="show-on-focus"
+                aria-current="page">
+                Terms and Conditions <span class="tooltip-text" aria-hidden="true">Terms and Conditions</span> </a></a>
+            </li>
+                                                            <li>
+              <a href=" https://consumeraffairs.gov.in/pages/feedback " class="show-on-focus"
+                aria-current="page">
+                Feedback <span class="tooltip-text" aria-hidden="true">Feedback</span> </a></a>
+            </li>
+                                                            <li>
+              <a href=" https://consumeraffairs.gov.in/pages/screen-reader-access " class="show-on-focus"
+                aria-current="page">
+                Screen Reader Access <span class="tooltip-text" aria-hidden="true">Screen Reader Access</span> </a></a>
+            </li>
+                                              </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <div class="container footer_mid">
+
+    <div class="row">
+
+      <!-- ****** logo section ****** -->
+      <div class="col-12 col-md-4">
+
+        <div class="bg-white d-flex justify-content-center h-100">
+          <img class="my-auto py-2 footer_logo img-fluid" src="https://consumeraffairs.gov.in/public/themes/th3/assets/images/Logo.png"
+            alt="Department of Consumer Affairs logo" srcset>
+        </div>
+      </div>
+
+      <!-- ******useful links section  ****** -->
+      <div class="col-12 col-md-4 text-white py-3">
+        <!-- <himanshi h5 convert to heading 2> -->
+        <h2>  Contact Us </h2>
+        <!-- <a href="https://consumerhelpline.gov.in" class="fsize_btn">https://consumerhelpline.gov.in</a> -->
+        <p>
+                    Department of Consumer Affairs, Krishi Bhawan <br> New Delhi 110001
+                  </p>
+        <p>  Phone No : 011-23386189</p>
+
+        <p>  Email : uspc-ca@nic.in</p>
+      </div>
+
+      <div class="col-12 col-md-4 text-white py-3">
+        <!-- <himanshi h5 convert to heading 2> -->
+        <h3 class="">
+           National Consumer Helpline         </h3>
+        <p class="footer_para">
+          
+          Department of Consumer Affairs, Govt. of India<br>
+          Toll Free No.
+          <span class="fw-bold">1800-11-4000 OR 1915</span> <br>
+          WhatsApp No. 8800001915<br>
+          Register your grievance through NCH APP
+        </p>
+        
+      </div>
+    </div>
+  </div>
+
+  <div class="footer_end bg-footer-dark">
+    <div class="container">
+      <div class="d-md-flex justify-content-between text-white py-2">
+        <p>
+                    Content Owned by Department of Consumer Affairs
+                  </p>
+
+                <p>
+                    Last Updated on - 30th September 2026
+                  </p>
+
+        <p>Total Site Visitors - 1,210,820 </p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+<script>
+  // Runs before Bhashini loads. The server already renders Hindi/English,
+  // so a saved en/hi choice must never make Bhashini re-translate the page.
+  (function () {
+    try {
+      var p = localStorage.getItem("preferredLanguage");
+      if (p === "en" || p === "hi" || p === "en") {
+        localStorage.removeItem("preferredLanguage");
+      }
+      localStorage.setItem("siteLang", "en");
+      localStorage.removeItem("bhashiniKeyMigrated");
+    } catch (e) { }
+  })();
+</script>
+
+<script src="https://translation-plugin.bhashini.co.in/v3/website_translation_utility.js"
+  page-source-language="en"></script>
+
+
+
+
+
+<!-- ***************Code ended here*************** -->
+<!--<script src="https://translation-plugin.bhashini.co.in/v3/website_translation_utility.js"></script>-->
+<!--<script src="https://consumeraffairs.gov.in/public/themes/th3/assets/JS/website_translation_utility.js"></script>-->
+<script src="https://consumeraffairs.gov.in/public/themes/th3/assets/JS/bootstrap.bundle.min.js"
+  integrity="sha512-VK2zcvntEufaimc+efOYi622VN5ZacdnufnmX7zIhCPmjhKnOi9ZDMtg1/ug5l183f19gG1/cBstPO4D8N/Img=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script src="https://consumeraffairs.gov.in/public/themes/th3/assets/JS/jquery.min.js"
+  integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://consumeraffairs.gov.in/public/themes/th3/assets/JS/owl.carousel.min.js"></script>
+<script src="https://consumeraffairs.gov.in/public/themes/th3/assets/JS/main.js"></script>
+
+
+
+
+<script>
+  $(function () {
+    // Owl Carousel - First Carousel (banner_carousel)
+    var owl1 = $(".banner_carousel");
+    owl1.owlCarousel({
+      items: 1,
+      margin: 10,
+      autoplay: true,
+      autoplayTimeout: 6000, // First slider slide every 5 seconds
+      autoplaySpeed: 2000,
+      loop: true,
+      nav: true,
+      autoplayHoverPause: true
+    });
+
+    // Owl Carousel - Second Carousel (images_slider)
+    var owl2 = $(".images_slider");
+
+    // Sync second slider with delay
+    owl1.on('changed.owl.carousel', function (event) {
+      setTimeout(function () {
+        owl2.trigger('next.owl.carousel');
+      }, 1000); // Add 1-second delay after first slider slides
+    });
+
+    owl2.owlCarousel({
+      items: 1,
+      margin: 10,
+      autoplay: false, // We are controlling the autoplay manually
+      loop: true,
+      nav: true
+    });
+  });
+</script>
+
+<script src="https://consumeraffairs.gov.in/public/themes/th3/JS/clientside.validation.js"></script>
+
+<!--<script src="https://translation-plugin.bhashini.co.in/v3/website_translation_utility.js"
+        page-source-language="en"></script>-->
+
+
+<script>
+  function sitevisit() {
+    var ret_val = confirm("This is an external link. Do you wish to open in new window.");
+    if (ret_val == true) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+  function myFunction() {
+    window.print();
+  }
+</script>
+<!-- <script type="text/javascript">
+    var url = "https://consumeraffairs.gov.in/lang/change";
+
+    $(".changeLang").change(function(event){
+        
+        var lang = $(this).val(); 
+        var confirmationMessage = lang == 1 ? "Switch To English?" : "Switch To Hindi?";
+
+        
+        var ret_val = confirm(confirmationMessage);
+
+        
+        if (ret_val) {
+            
+            window.location.href = url + "?lang=" + lang;
+        } else {
+            
+            event.preventDefault();
+            return false;
+        }
+    });
+</script> -->
+
+<script>
+  (function () {
+    var LANG_URL = "https://consumeraffairs.gov.in/lang/change";
+    var MAP = { en: 1, hi: 2 };          // Bhashini code -> your lang id
+
+    function intercept(e) {
+      var opt = e.target.closest && e.target.closest(".language-option");
+      if (!opt) return;
+      var code = opt.getAttribute("data-value");
+      if (!(code in MAP)) return;      // every other language: let Bhashini translate
+      if (e.type === "keydown" && e.key !== "Enter") return;
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      try {
+        localStorage.removeItem("preferredLanguage");
+        localStorage.setItem("siteLang", code);
+      } catch (err) { }
+      window.location.href = LANG_URL + "?lang=" + MAP[code];
+    }
+
+    document.addEventListener("click", intercept, true);
+    document.addEventListener("keydown", intercept, true);
+  })();
+</script>
+
+<script type="text/javascript">
+  var url = "https://consumeraffairs.gov.in/lang/change";
+
+  // One-time cleanup: earlier code stored the site language under
+  // "preferredLanguage", which is the Bhashini plugin's own key — it was
+  // telling the plugin to machine-translate this Hindi page into English.
+  if (localStorage.getItem("preferredLanguage") && !localStorage.getItem("bhashiniKeyMigrated")) {
+    localStorage.removeItem("preferredLanguage");
+    localStorage.setItem("bhashiniKeyMigrated", "1");
+  }
+
+  $(".changeLang").change(function (event) {
+    var lang = $(this).val();
+    if (!confirm((lang == 1) ? "Switch To English?" : "Switch To Hindi?")) {
+      event.preventDefault();
+      return false;
+    }
+    localStorage.removeItem("preferredLanguage");
+    localStorage.setItem("siteLang", (lang == 1) ? "en" : "hi");
+    window.location.href = url + "?lang=" + lang;
+  });
+</script>
+
+<!-- <script>
+    const modal = document.getElementById("myModal");
+    const modalImg = document.getElementById("img01");
+    let images = [];
+    let currentImageIndex = 0;
+
+    function openModal(imageSrc, categoryImages) {
+        modal.style.display = "block";
+        setTimeout(() => {
+            modal.classList.add("show");
+            modalImg.src = imageSrc;
+            images = categoryImages;
+            currentImageIndex = categoryImages.indexOf(imageSrc);
+        }, 10);
+    }
+
+    function closeModal() {
+        modal.classList.remove("show");
+        setTimeout(() => {
+            modal.style.display = "none";
+        }, 500);
+    }
+
+
+function nextSlide() {
+    if (images.length === 0) return;
+    currentImageIndex = (currentImageIndex + 1) % images.length;
+    document.getElementById('img01').src = images[currentImageIndex];
+}
+
+function prevSlide() {
+    if (images.length === 0) return;
+    currentImageIndex = (currentImageIndex - 1 + images.length) % images.length;
+    document.getElementById('img01').src = images[currentImageIndex];
+}
+
+function closeModal() {
+    document.getElementById('myModal').style.display = 'none';
+}
+
+
+    // Close the modal if the user clicks outside of it
+    window.onclick = function (event) {
+        if (event.target == modal) {
+            closeModal();
+        }
+    };
+</script> -->
+
+</body>
+
+</html></body>
+</html>

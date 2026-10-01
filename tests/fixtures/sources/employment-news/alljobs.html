@@ -1,0 +1,1165 @@
+
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>
+	   Employment News
+</title>
+
+<style>
+.scrollable-top-right {
+  position: fixed; /* Positions the div relative to the viewport */
+  top: 20px;       /* Distance from the top of the viewport */
+  right: 20px;     /* Distance from the right of the viewport */
+  width: 250px;    /* Set a fixed width for the div */
+  height: 80px;   /* Set a fixed height for the div */
+  place-items: flex-end;
+ background-blend-mode: luminosity; /* Optional: background color for visibility */
+  //border: 1px solid #ccc;    /* Optional: border for visibility */
+ // overflow-y: auto; /* Enables vertical scrolling when content exceeds height */
+  padding: 10px;   /* Optional: padding inside the div */
+}
+    .box {
+  width: 227px;
+  height: 227px;
+  background-color: #f6f6f6;
+}  
+.box a {
+  color: #461e52;
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-size: 22px;
+  font-weight: 700;
+  padding: 30% 30px 0 30px;
+  text-align: center;
+  transition: none;
+  line-height: 1;
+  font-family: 'Open Sans Condensed', Arial, Verdana, sans-serif;
+}
+.box:hover{
+  background-color: #461e52;
+}
+.box:hover a{
+ color:#fff;
+ text-decoration:none;
+}
+.mission-next-arrow {
+  position: absolute;
+  background: url(https://raw.githubusercontent.com/solodev/icon-box-slider/master/nextarrow2.png) no-repeat center;
+  background-size: contain;
+  top: 50%;
+  transform: translateY(-50%);
+  right: -36px;
+  height: 17px;
+  width: 10px;
+  border:none;
+}
+.mission-next-arrow:hover {
+  cursor: pointer;	
+}
+.mission-prev-arrow {
+  background: url(https://raw.githubusercontent.com/solodev/icon-box-slider/master/prevarrow2.png) no-repeat center;
+  background-size: contain;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: -6px;
+  height: 17px;
+  width: 10px;
+  border:none;
+} 
+.mission-prev-arrow:hover {
+  cursor: pointer;	
+}
+.box a.more-links {
+  color: #fff;
+  padding: 70px 110px 0 20px;
+  background: #a89269 url(https://raw.githubusercontent.com/solodev/icon-box-slider/master/rightarrow.png) no-repeat 155px 170px;
+}
+</style>
+    <script>
+
+        $(document).ready(function () {
+            $('.box-carousel').slick({
+                dots: false,
+                arrows: true,
+                slidesToShow: 5,
+                slidesToScroll: 1,
+                prevArrow: "<button type='button' class='mission-prev-arrow'></button>",
+                nextArrow: "<button type='button' class='mission-next-arrow'></button>"
+            });
+
+        });
+    </script>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<!--===============================================================================================-->	
+	<link rel="icon" type="image/png" href="images/icons/favicon.png" />
+<!--===============================================================================================-->
+	<link rel="stylesheet" type="text/css" href="vendor/bootstrap/css/bootstrap.min.css" />
+<!--===============================================================================================-->
+	<link rel="stylesheet" type="text/css" href="fonts/fontawesome-5.0.8/css/fontawesome-all.min.css" />
+<!--===============================================================================================-->
+	<link rel="stylesheet" type="text/css" href="fonts/iconic/css/material-design-iconic-font.min.css" />
+<!--===============================================================================================-->
+	<link rel="stylesheet" type="text/css" href="vendor/animate/animate.css" />
+<!--===============================================================================================-->	
+	<link rel="stylesheet" type="text/css" href="vendor/css-hamburgers/hamburgers.min.css" />
+<!--===============================================================================================-->
+	<link rel="stylesheet" type="text/css" href="vendor/animsition/css/animsition.min.css" />
+<!--===============================================================================================-->
+	<link rel="stylesheet" type="text/css" href="css/util.min.css" />
+<!--===============================================================================================-->	
+	<link rel="stylesheet" type="text/css" href="css/main.css" /> 
+ 
+<!--===============================================================================================-->
+   <style>
+       .p-all-30, .p-l-30, .p-rl-30
+       {
+           padding-left:0px;
+           padding-right:0px;
+       }
+       .p-all-10, .p-b-10, .p-tb-10 {
+    padding-bottom: 5px !important;
+    padding-top: 5px !important;
+}
+       .wrap-logo
+       {
+           padding-top:2px;
+           height:130px;
+       }
+       .p-all-20, .p-b-20, .p-tb-20
+       {
+           padding-bottom:7px !important;
+       }
+       .container {
+    width: 100% !important;
+}
+   </style>
+    <script>
+        function EnterEvent(e) {
+            if (e.keyCode == 13) {
+                __doPostBack('ctl00$btnRun', "");
+        }
+    }
+    </script>
+    
+        <link href="css/divstyle.css" rel="stylesheet" />
+</head>
+<body>
+    
+    <form method="post" action="./AllJobs.aspx?k=All" id="form1">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="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" />
+
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="CD229302" />
+<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="/wEdAAVc3HZdzccPU6jo1+MnRdu8Tb2KuHBAOchRqwMwAAq0flQb+qTfyUxOX7z1a3AY91MqMgEydy5mCBnOsqzqbQ5wgUFlgNU1eucH/1aaMMUqPrk6XhAEZ/8C4tWTepv1JJiJqyT58fHBcd+Sr4SJTCav" />
+          <header role="Empanelment News Header" style="line-height: 1.2">
+		<!-- Header desktop -->
+		<div class="container-menu-desktop" >
+            	
+			<div class="topbar" style="height:28px">
+				<div class="content-topbar h-100 p-rl-30">
+					<div class="align-self-stretch size-w-0 pos-relative m-r-30">
+						<div class="f2-s-1 flex-wr-s-c s-full ab-t-l p-b-2">
+                              <span class="  cl0 p-r-8"></span>
+							<span class=" cl0 p-r-8">
+								<!-- <a href="http://rojgarsamachar.gov.in/NewRS/Home.aspx" style="color:white;font-weight:bold"> Hindi Website |</a> &nbsp;!-->
+                              
+							</span>
+                            <span class="  cl0 p-r-8">
+								 <a href="https://publicationsdivision.nic.in" style="color:white;font-weight:bold"> Buy Books From Publications Division Website |</a> &nbsp;
+                              
+							</span>
+                            <span class="  cl0 p-r-8">
+								 <a href="http://www.eneversion.nic.in/membership/login" style="color:white;font-weight:bold"> e-Subscription </a> &nbsp;
+                              
+							</span>
+						 
+							 
+							 
+						</div>
+					</div>
+						
+ <div class="flex-wr-e-c">
+						<div class="left-topbar">
+							<span class="left-topbar-item flex-wr-s-c">
+								<span>
+									 
+								</span>
+                                 	 
+								<span>
+								 
+								</span>
+							</span>
+
+							<a href="#" class="left-topbar-item">
+								 
+							</a>
+
+							<a href="#" class="left-topbar-item">
+								 
+							</a>
+
+							<a href="#" class="left-topbar-item">
+							 
+							</a>
+
+							<a href="#" class="left-topbar-item">
+								 
+							</a>
+                                 <div class="left-topbar-item">
+				<input name="ctl00$txtsearch" type="text" id="txtsearch" class="f1-s-1 cl6 plh9 s-full p-l-25 p-r-45" placeholder="Search" onkeypress="return EnterEvent(event)" />
+<a id="btnRun" class="flex-c-c size-a-1 ab-t-r fs-20 cl2 hov-cl10 trans-03" href="javascript:__doPostBack(&#39;ctl00$btnRun&#39;,&#39;&#39;)"><i class='zmdi zmdi-search'></i>  </a>
+				
+			 </div>  
+							<a href="#" class="left-topbar-item"></a>
+						</div>
+
+						<div class="right-topbar p-l-18">
+
+							<a href="https://www.facebook.com/director.employmentnews/">
+								<span class="fab fa-facebook-f" title="E-employment News Facebook"></span>
+							</a>
+
+							<a href="https://twitter.com/Employ_News" >
+								<img src="images/twitter-logo.png" alt="twiiter-logo" width="25px" height="25px" style="margin-right:30px;">
+							</a>
+
+						 <span ></span>
+						</div>
+					</div>	
+				</div>
+			</div>
+
+		 	<div class="wrap-header-mobile">
+				<!-- Logo moblie -->		
+				<div class="logo-mobile">
+					<a href=" http://employmentnews.gov.in/"><img src="images/ENLogo.jpg" alt="Employment News"></a>
+                    
+				</div>
+
+				<!-- Button show menu -->
+				<div class="btn-show-menu-mobile hamburger hamburger--squeeze m-r--8">
+					<span class="hamburger-box">
+						<span class="hamburger-inner"></span>
+					</span>
+				</div>
+			</div>
+
+			<!-- Menu Mobile -->
+			<div class="menu-mobile">
+				<ul class="topbar-mobile">
+					<li class="left-topbar">
+						<span class="left-topbar-item flex-wr-s-c">
+							<span>
+								 <a href="http://rojgarsamachar.gov.in/NewRS/Home.aspx" style="color:white;font-weight:bold"> Hindi Website |</a> &nbsp;
+							</span>
+
+						 
+
+							<span>
+									 <a href="www.publicationsdivision.nic.in" style="color:white;font-weight:bold"> Buy Books From Publications Division Website |</a> &nbsp;
+							</span>
+                            	<span>
+                             <a href="http://www.eneversion.nic.in/membership/login" style="color:white;font-weight:bold"> e-Subscription </a> &nbsp;
+                                    </span>
+						</span>
+					</li>
+
+					<li class="left-topbar">
+						<a href="#" class="left-topbar-item">
+							 
+						</a>
+
+						<a href="#" class="left-topbar-item">
+						 
+						</a>
+
+						<a href="#" class="left-topbar-item">
+						 
+						</a>
+
+						<a href="#" class="left-topbar-item">
+							<input name="ctl00$Text1" type="text" id="Text1" class="f1-s-1 cl6 plh9 s-full p-l-25 p-r-45" placeholder="Search" onkeypress="return EnterEvent(event)" />
+<a id="LinkButton1" class="flex-c-c size-a-1 ab-t-r fs-20 cl2 hov-cl10 trans-03" href="javascript:__doPostBack(&#39;ctl00$LinkButton1&#39;,&#39;&#39;)"><i class='zmdi zmdi-search'></i>  </a>
+						</a>
+					</li>
+
+					<li class="right-topbar">
+					 
+					</li>
+				</ul>
+
+				<ul class="main-menu-m">
+					<li>
+				<a href="Home.aspx">Home</a>
+						 
+
+						<span class="arrow-main-menu-m">
+							<i class="fa fa-angle-right" aria-hidden="true"></i>
+						</span>
+					</li>
+
+					<li>
+							<a href="AboutUs.aspx">About Us</a>
+					</li>
+
+					<li class="main-menu-m">
+						 <a href="#">Subscribe</a>
+                                 <ul class="sub-menu-m">
+									<li><a href="AnnualSubcription.aspx">e-Employment News Subscription</a></li>
+									<li><a href="AnnualSubcriptionPrint.aspx">Print Employment News Subscription</a></li>
+					 
+									 
+								</ul> 
+					</li>
+
+					<li>
+							<a href="#">How To Advertise</a>
+                                 <ul class="sub-menu-m">
+									<li><a href="http://employmentnews.gov.in/rate%20card01Jan.pdf">Rate Card</a></li>
+									
+									<li><a href="HowtoadvertiseinEmploymentNews.aspx">Advertise on EN test </a></li>
+									
+								</ul> 
+					</li>
+
+					<li>
+						<a href="MoreContentS.aspx?n=WebAdvertisement">Web Advertisement</a>
+					</li>
+
+					<li>
+				<a href="#">How To Advertise</a>
+                                 <ul class="sub-menu-m">
+									<li><a href="http://employmentnews.gov.in/rate%20card01Jan.pdf">Rate Card</a></li>
+							
+									<li><a href="HowtoadvertiseinEmploymentNews.aspx">Advertise on EN</a></li>
+	 <li><a href="http://employmentnews.gov.in/writereaddata/Modified%20Policy%20Guidelines%20for%20Publication%20of%20Advertisement%20in%20Employment%20News%20and%20Rozgar%20Samachar.pdf">New Advertisement Policy</a></li>
+	 
+									 
+								</ul> 
+					</li>
+
+					<li>
+					<a href="footer.aspx?n=tender">Tender</a>
+
+					</li>
+
+					<li >
+						<a href="#">Editorial</a>
+								 <ul class="sub-menu-m">
+                                     <li><a href="MoreContentS.aspx?n=Editorial">Lead Article</a></li>
+                                     <li><a href="MoreContentS.aspx?n=InDepthJobs">Career Article</a></li>
+									<li><a href="MoreContentS.aspx?n=WebExclusive">Web Exclusive</a></li>
+									
+									
+									 
+								</ul> 
+                        </li >
+                    <li>
+                        <a href="Grievance.aspx">Grievance</a>
+                                <ul class="sub-menu-m">
+									<li>	<a href="rti.aspx">RTI</a></li>
+									 <li>	<a href="Grievance.aspx">Feedback/Grievance</a></li>
+									 
+								</ul>
+                        </li>
+<li >
+								<a href="">Policies</a>
+                                <ul class="sub-menu-m">
+									<li>	<a href="Policy.aspx">Policy</a></li>
+									 <li>	<a href="">Business Policy</a>
+      <ul class="sub-menu-m">
+<li>	<a href="Business Policy 2020.pdf" target="_blank">Amendment in Discount Structure 2020</a></li>
+									 <li>	<a href="Revised Business Policy.pdf" target="_blank">Business Policy 2019</a>
+
+</ul>
+
+</li>
+									 
+								</ul>
+						 
+							</li>
+                    <li>
+                        <a href="contact.aspx">Contact Us</a>
+						<span class="arrow-main-menu-m">
+							<i class="fa fa-angle-right" aria-hidden="true"></i>
+						</span>
+					</li>
+				</ul>
+			</div>
+			
+			
+		 
+			<div class="wrap-logo no-banner container">
+                	<!--<a href="https://www.publicationsdivision.nic.in/index.php?route=page/miscellaneous" target="_blank"><img src="images/logo1.png" alt="IMG" style=" width:150px; height:120px;padding-top:15px;" ></a>-->
+					<!--<a href="https://www.g20.org/en/" target="_blank"><img src="images/G20_logo.png" alt="IMG" style=" width:150px; height:120px;padding-top:15px;" ></a>
+				<div class="logo">-->
+					<a href=" http://employmentnews.gov.in/"><img src="images/EN1.jpg" alt="IMG" style=" width:100%; height:130px;padding-top:5px" ></a>
+				</div>
+				
+                
+			</div>
+			
+			
+
+			
+			
+			<!--  -->
+					<div class="wrap-main-nav">
+				<div class="main-nav">
+					<!-- Menu desktop -->
+					<nav class="menu-desktop">
+						<a class="logo-stick" href="index.html">
+							<img src="images/icons/logo-01.png" alt="LOGO">
+						</a>
+
+						<ul class="main-menu">
+							<li class="main-menu-active">
+								<a href="Home.aspx">Home</a>
+							 
+							</li>
+
+							<li class="mega-menu-item">
+								<a href="AboutUs.aspx">About Us</a>
+
+						 
+                 
+							</li>
+
+							<li >
+								 
+ <a href="#">Subscribe</a>
+                                 <ul class="sub-menu">
+									<li><a href="AnnualSubcription.aspx">e-Employment News Subscription</a></li>
+									<li><a href="AnnualSubcriptionPrint.aspx">Print Employment News Subscription</a></li>
+					 
+									 
+								</ul> 
+										 
+							</li>
+
+							<li  >
+								<a href="#">How To Advertise</a>
+                                 <ul class="sub-menu">
+									<li><a href="http://employmentnews.gov.in/rate%20card01Jan.pdf" target="_blank">Rate Card</a></li>
+									
+									<li><a href="HowtoadvertiseinEmploymentNews.aspx">Advertise on EN</a></li>
+									 
+								</ul> 
+							<!--	<div class="sub-mega-menu">
+									<div class="nav flex-column nav-pills" role="tablist">
+										<a class="nav-link active" data-toggle="pill" href="#business-1" role="tab">All</a>
+										<a class="nav-link" data-toggle="pill" href="#business-2" role="tab">Economy</a>
+									</div>-->
+ 
+							</li>
+ <li  >
+			<li><a href="MoreContentS.aspx?n=WebAdvertisement">Web Advertisement</a></li>
+                            
+							<!--	<div class="sub-mega-menu">
+									<div class="nav flex-column nav-pills" role="tablist">
+										<a class="nav-link active" data-toggle="pill" href="#business-1" role="tab">All</a>
+										<a class="nav-link" data-toggle="pill" href="#business-2" role="tab">Economy</a>
+									</div>-->
+ 
+							</li>
+
+					
+                            <li class="mega-menu-item">
+								<a href="footer.aspx?n=tender">Tender</a>
+
+						 
+							</li>
+                             <li>
+								<a href="#">Editorial</a>
+								 <ul class="sub-menu">
+                                     <li><a href="MoreContentS.aspx?n=Editorial">Lead Article</a></li>
+<li><a href="MoreContentS.aspx?n=SpecialContent">Special Article</a></li>
+                                     <li><a href="MoreContentS.aspx?n=InDepthJobs">Career Article</a></li>
+									<li><a href="MoreContentS.aspx?n=WebExclusive">Success Stories/Interview</a></li>
+
+ 
+									
+									 
+								</ul> </li>
+
+                             		<li  >
+								<a href="Grievance.aspx">Grievance</a>
+                                <ul class="sub-menu">
+									<li>	<a href="rti.aspx">RTI</a></li>
+									 <li>	<a href="Grievance.aspx">Feedback/Grievance</a></li>
+									 
+								</ul>
+						 
+							</li>
+
+
+<li  >
+								<a href="">Policies</a>
+                                <ul class="sub-menu">
+									<li>	<a href="Policy.aspx">Policy</a></li>
+									 <li>	<a href="">Business Policy</a> 
+
+      <ul class="sub-menu">
+<li>	<a href="Business Policy 2020.pdf" target="_blank">Amendment in Discount Structure 2020</a></li>
+ <li>	<a href="Revised Business Policy.pdf" target="_blank">Business Policy 2019</a></li>
+</ul>					 
+							</li>
+</ul>
+</li>
+							<li class="mega-menu-item">
+								<a href="contact.aspx">Contact Us</a>
+
+					 
+							</li>
+
+							
+					 	</li>  
+						 
+					</nav>
+				</div>
+			</div>	
+            <div style="width:100% ;background-color:#00688B;color:white !important; padding-top:2px;height:23px">
+
+ 
+           <a href="http://www.eneversion.nic.in/" style=" "> 
+                <marquee  style=" " > <span style="color:white !important;font-weight:bold">
+<a href="">
+
+</a>
+</span>
+<span style="color:white !important ;font-weight:bold"> 
+ 
+<b>
+<!--<a href="https://www.publicationsdivision.nic.in/system/storage/upload/tender_directory/Book_Disposal_Tender_0001_en.pdf" style="color:white !important;font-weight:bold" > Tender for disposal of old books in DPD HQ, Soochna Bhawan, New Delhi-reg  ||</a> -->
+<!--<a href="#" style="color:white !important;font-weight:bold" >Empanelment as Translators and Proof Readers in the Employment News Headquarters for Employment News (English), Rozgar samachar (Hindi) and Rozgar samachar (Urdu)  on casual assignment basis. ||</a>-->
+<!--<a href="https://www.publicationsdivision.nic.in/assets/documents/Preparation-of-a-panel-of-Artists-Designers-Illustrators.pdf" style="color:white !important;font-weight:bold" >Applications are invited for empanelment of Artists/Designers/Illustrators. ||</a>-->
+<!--<a href="https://www.publicationsdivision.nic.in/assets/documents/casualtypistpanel.pdf" style="color:white !important;font-weight:bold" >Apply for casual typist empanelment ||</a> -->
+<!-- <a href="#" style="color:white !important;font-weight:bold" >Applications are invited for filling up 06 (six) posts of Stenographer on deputation basis. ||</a>
+ <a href="https://www.publicationsdivision.nic.in/assets/documents/casualtypistpanel.pdf" style="color:white !important;font-weight:bold" >Apply for casual typist empanelment ||</a> -->
+ 
+ 
+ <!--
+<a href="https://www.publicationsdivision.nic.in/system/storage/upload/MenuScript/SoftwareDeveloperAdvt.pdf" target="_blank" style="color:white !important;font-weight:bold"> Hiring of one Software Developer at Publications Division Headquarters, New Delhi on contract. </a> ||
+ -->
+ 
+ 
+ <a href="http://www.eneversion.nic.in" style="color:white !important;"> Subscribe print version  @Rs.530 per annum; Subscribe only e-version @Rs.400 per annum.  </a><span id="lblmar"> </span> ||  !! ATTENTION ADVERTISERS !!  Advertisers are requested to give full details of job Vacancies/ Minimum size will now be 200 sq.cm for shorter advertisements </a>||
+ <a href="https://www.publicationsdivision.nic.in/index.php?route=product/ebook"> 
+ <a href="https://www.publicationsdivision.nic.in/index.php?route=page/era" style="color:white !important;">Click here to become an e-resource aggregator of Publications Division</a> ||
+ 
+ 
+<!-- <a  href="https://www.publicationsdivision.nic.in/system/storage/upload/notification_directory/Age%20Appropriate%20Fitness%20Protocols_en.pdf" style="color:white !important"> <span id="lblmar1"> Age Appropriate Fitness Protocols  </span>   !-->
+ <a href="http://employmentnews.gov.in/writereaddata/Modified%20Policy%20Guidelines%20for%20Publication%20of%20Advertisement%20in%20Employment%20News%20and%20Rozgar%20Samachar.pdf" style="color:white !important;font-weight:bold" > New Advertisement Policy</a>   ||
+                				
+                			<a href="https://bharatkosh.gov.in/Product/Product/1/3" style="color:white !important;font-weight:bold" target="_blank">Buy Books from Bharatkosh</a>  ||
+            				
+                				
+                			<a href="https://www.flipkart.com/books/publications-division~contributor/pr?sid=bks" style="color:white !important;font-weight:bold" target="_blank">Buy Books from Flipkart</a> ||
+            				
+                				
+                			<a href="https://www.amazon.in/stores/Publications-Division/author/B08FF2Z1NZ?ref=sr_ntt_srch_lnk_3&qid=1743155626&sr=8-3&isDramIntegrated=true&shoppingPortalEnabled=true" style="color:white !important;font-weight:bold" target="_blank">Buy Books from Amazon</a> ||
+            				
+ <!--<a href="https://employmentnews.gov.in/writereaddata/17032023126565vacancy_compressed.pdf" style="color:white !important;font-weight:bold" > Applications are invited for filling up 02 (two) posts of Business Executives and 1 (one) post of Sales Assistant on deputation basis.</a> -->  ||</marquee></a></b></span>
+
+   
+
+			</div>
+		</div>
+	</header>
+
+
+<br>
+
+  </div>
+    <div>
+        
+        
+        
+    </div>
+    <div>
+        
+    
+       
+
+        <div style="padding-top:30px; padding-left:20px;padding-right:20px">
+                  <div class="row"> 
+           
+                 <div style="padding-top:5px;margin-top:5px;width:100%" class="col-sm-12 col-md-12 col-lg-12" >
+
+                     <div   style="color:#00688B;margin-left:0px; font-weight:bold;text-align:center;font-weight:bold"> <h4 style="margin-top:5px;font-weight:bolder">All JOBS</h4></div>
+                     <br />
+       
+        <div style="padding-top:3px;">
+            
+            <table style= "width:100%;color:#333;border-spacing: 3px; border-collapse: separate; " frame="box"  >
+
+                <tr  style="" >
+
+                    <td style="height:35px ;border :solid; border-width:1px;  text-align:center;background-color:#D6EAF8;font-weight:bold;font-size:13px;padding-right:5px">
+                    ISSUED DATE              (MM/DD/YYYY)
+                    </td>
+                 
+                    <td style="height:35px ;border :solid; border-width:1px; border-bottom-color:#666; text-align:center;background-color:#D6EAF8;font-weight:bold;font-size:13px;padding-right:5px">
+                    ORGANISATION
+                    </td>
+                    <td style="height:35px ;border :solid; border-width:1px; border-bottom-color:#666; text-align:center;background-color:#D6EAF8;font-weight:bold;font-size:13px;padding-right:5px">
+                    POST
+                    </td>
+                    <td style="height:35px ;border :solid; border-width:1px; border-bottom-color:#666; text-align:center;background-color:#D6EAF8;font-weight:bold;font-size:13px;padding-right:5px">
+                    METHOD OF APPOINTMENT
+                    </td>
+               
+                    <td style="height:35px ;border :solid; border-width:1px; border-bottom-color:#666; text-align:center;background-color:#D6EAF8;font-weight:bold;font-size:13px;padding-right:5px">
+                    
+                        LAST DATE (DD/MM/YYYY)
+                    </td>
+                     
+                </tr>
+                
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_0"><b><font color="#333333">12/09/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_0" style="display:inline-block;"><b><font color="#333333">MINERAL EXPLORATION AND CONSULTANCY LIMITED</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_0" style="display:inline-block;"><b><font color="#333333">ACCOUNTANT &amp; OTHERS</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_0" style="display:inline-block;"><b><font color="#333333">Recruitment</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_0" style="display:inline-block;"><b><font color="#333333">11/10/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_1"><b><font color="#333333">12/09/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_1" style="display:inline-block;"><b><font color="#333333">DNS REGIONAL INSTITUTE OF COOPERATIVE MANAGEMENT</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_1" style="display:inline-block;"><b><font color="#333333">LECTURER</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_1" style="display:inline-block;"><b><font color="#333333">Recruitment</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_1" style="display:inline-block;"><b><font color="#333333">27/09/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_2"><b><font color="#333333">12/09/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_2" style="display:inline-block;"><b><font color="#333333">NALANDA UNIVERSITY</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_2" style="display:inline-block;"><b><font color="#333333">TEACHING POSITIONS</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_2" style="display:inline-block;"><b><font color="#333333">Recruitment</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_2" style="display:inline-block;"><b><font color="#333333">15/09/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_3"><b><font color="#333333">07/09/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_3" style="display:inline-block;"><b><font color="#333333">RAMAGUNDAM FERTILIZERS AND CHEMICALS LIMITED</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_3" style="display:inline-block;"><b><font color="#333333">ENGINEER &amp; OTHERS</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_3" style="display:inline-block;"><b><font color="#333333">Recruitment</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_3" style="display:inline-block;"><b><font color="#333333">24/09/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_4"><b><font color="#333333">07/09/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_4" style="display:inline-block;"><b><font color="#333333">NATIONAL INSTITUTE OF PHARMACEUTICAL EDUCATION AND RESEARCH KOLKATA, M/O CHEMICAL AND FERTILIZERS</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_4" style="display:inline-block;"><b><font color="#333333">PROFESSOR</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_4" style="display:inline-block;"><b><font color="#333333">Recruitment</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_4" style="display:inline-block;"><b><font color="#333333">17/09/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_5"><b><font color="#333333">31/08/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_5" style="display:inline-block;"><b><font color="#333333">NATIONAL DISASTER MANAGEMENT AUTHORITY</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_5" style="display:inline-block;"><b><font color="#333333">YOUNG CONSULTANT (FOREST FIRE RISK MANAGEMENT)</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_5" style="display:inline-block;"><b><font color="#333333">Deputation</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_5" style="display:inline-block;"><b><font color="#333333">18/10/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_6"><b><font color="#333333">31/08/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_6" style="display:inline-block;"><b><font color="#333333">NATIONAL BOARD OF EXAMINATIONS IN MEDICAL SCIENCES</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_6" style="display:inline-block;"><b><font color="#333333">EXECUTIVE DIRECTOR</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_6" style="display:inline-block;"><b><font color="#333333">Recruitment</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_6" style="display:inline-block;"><b><font color="#333333">30/10/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_7"><b><font color="#333333">24/08/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_7" style="display:inline-block;"><b><font color="#333333">INDO-RUSSIAN RIFLES PVT LTD, D/O DEFENCE</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_7" style="display:inline-block;"><b><font color="#333333">CHIEF EXECUTIVE OFFICER/ MANAGING DIRECTOR</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_7" style="display:inline-block;"><b><font color="#333333">Recruitment</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_7" style="display:inline-block;"><b><font color="#333333">11/09/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_8"><b><font color="#333333">24/08/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_8" style="display:inline-block;"><b><font color="#333333">SAINIK SCHOOL AMBIKAPUR</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_8" style="display:inline-block;"><b><font color="#333333">LABORATORY ASSISTANT (BIOLOGY) &amp; OTHERS</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_8" style="display:inline-block;"><b><font color="#333333">Contractual</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_8" style="display:inline-block;"><b><font color="#333333">12/09/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_9"><b><font color="#333333">24/08/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_9" style="display:inline-block;"><b><font color="#333333">BRIC- NATIONAL INSTITUTE OF ANIMAL BIOTECHNOLOGY</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_9" style="display:inline-block;"><b><font color="#333333">SCIENTIST-B &amp; OTHERS</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_9" style="display:inline-block;"><b><font color="#333333">Recruitment</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_9" style="display:inline-block;"><b><font color="#333333">11/09/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_10"><b><font color="#333333">20/07/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_10" style="display:inline-block;"><b><font color="#333333">ANDAMAN AND NICOBAR ADMINISTRATION SECRETARIAT</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_10" style="display:inline-block;"><b><font color="#333333">SUPERINTENDING ENGINEER (CIVIL)</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_10" style="display:inline-block;"><b><font color="#333333">Recruitment</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_10" style="display:inline-block;"><b><font color="#333333">02/09/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                    
+                <tr style="text-align:center; padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; padding-left:10px;color:#333333 !important;"  >
+                    
+                    <td style="padding-top:2px;padding-bottom:2px; margin-top:2px; margin-bottom:2px; color:#333333 !important ; ">
+                          <span id="ContentPlaceHolder1_RepDetails_lblCustomerId_11"><b><font color="#333333">13/07/2026</font></b></span>
+
+                    </td> 
+                     
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label3_11" style="display:inline-block;"><b><font color="#333333">LAL BAHADUR SHASTRI NATIONAL ACADEMY OF ADMINISTRATION (LBSNAA), D/O PERSONNEL &amp; TRAINING</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        <span id="ContentPlaceHolder1_RepDetails_Label4_11" style="display:inline-block;"><b><font color="#333333">ADMINISTRATIVE OFFICER &amp; OTHERS</font></b></span>
+
+                    </td>
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label5_11" style="display:inline-block;"><b><font color="#333333">Recruitment</font></b></span>
+
+                    </td>
+                    
+                    <td style="padding-top:2px;padding-bottom:2px;margin-top:2px;margin-bottom:2px; color:#333333 !important">
+                        
+                        <span id="ContentPlaceHolder1_RepDetails_Label6_11" style="display:inline-block;"><b><font color="#333333">11/09/2026</font></b></span>
+
+                    </td>
+                </tr>
+            
+        
+                     
+                    <tr>
+                        <td colspan="5" style="text-align:right;padding-right:5px;"></td>
+                        </tr>
+                       </table>
+        </div>
+                 </div>
+                  </div>
+        </div>
+     
+ 
+
+
+    </div>
+        <br />
+      <footer role="Employ_News-Footer">
+		<div class="bg2 p-t-40 p-b-25">
+			<div class="container" style="width:100% !important;padding-left:20px;padding-right:20px">
+				<div class="row">
+					<div class="col-lg-3 p-b-20" style="padding-left:60px;">
+						<div class="size-h-3 flex-s-c" style="color:#00688B">
+						 <h5 class="f1-m-7 cl0" style="color:#00688B">
+About Us
+						 </h5>
+						</div>
+
+						<div>
+						  <p style="text-align:left;color:#00688B">Employment News is the flagship journal for job seekers published by the Ministry of Information and Broadcasting, Government of India. It was launched in 1976 with a view to provide information on employment opportunities to the unemployed and under employed youth of the country. The journal is published in English(Employment News), Hindi (Rozgar Samachar) and Urdu (Rozgar Samachar).
+                        </p>
+                        <br />
+                        <p style="text-align:left">
+                        <a href="AboutUs.aspx" class="learnmore" >Read More... <i class="fa fa-caret-right"></i></a></p>
+                            <ui>
+
+                                   <li style="font: normal 14px/19px Georgia; ">
+
+                                                        
+                                                             <!-- Counter Code START -->
+                                                                     <!-- Histats.com  START  (standard)-->
+                                                            
+                                                            <script type="text/javascript">                                                                document.write(unescape("%3Cscript src=%27http://s10.histats.com/js15.js%27 type=%27text/javascript%27%3E%3C/script%3E"));</script>
+                                                            <a href="http://www.histats.com" target="_blank" title="hit counter" ><script  type="text/javascript" >
+                                                                                                                                      try {
+                                                                                                                                          Histats.start(1, 2974143, 4, 10, 200, 40, "00011000");
+                                                                                                                                          Histats.track_hits();
+                                                                                                                                      } catch (err) { };
+                                                            </script></a>
+                                                            <noscript><a href="http://www.histats.com" target="_blank"><img  src="http://sstatic1.histats.com/0.gif?2974143&101" alt="hit counter" border="0"></a></noscript>
+                                                          
+                                                            <!-- Histats.com  END  -->
+                                                                       <!-- Counter Code END -->
+                                                        </li>
+                            </ui>
+						</div>
+					</div>
+
+					<div class="col-sm-3 p-b-20">
+						<div class="size-h-3 flex-s-c">
+							<h5 class="f1-m-7 cl0" style="color:#00688B">
+								Related Sites
+							</h5>
+						</div>
+
+						<ul>
+							 
+						    <li class="flex-wr-sb-s p-b-20"><a href="https://mib.gov.in/" style="color:#00688B" target="_blank">Ministry of I & B</a></li>
+                            <li class="flex-wr-sb-s p-b-20"><a href="https://www.publicationsdivision.nic.in/" style="color:#00688B" target="_blank">Publications Division Website </a></li>
+                            <li class="flex-wr-sb-s p-b-20"><a href="http://yojana.gov.in/" style="color:#00688B" target="_blank">DPD Journals</a></li>   
+                            <li class="flex-wr-sb-s p-b-20"><a href="https://pib.gov.in/" style="color:#00688B" target="_blank">Press Information Bureau</a></li>
+                            <li class="flex-wr-sb-s p-b-20"><a href="https://newsonair.gov.in/" style="color:#00688B" target="_blank">All India Radio News</a></li>	
+                            <li class="flex-wr-sb-s p-b-20"><a href="http://www.ddinews.gov.in/" style="color:#00688B" target="_blank">DD News</a></li>		
+                            <li class="flex-wr-sb-s p-b-20"><a href="http://www.davp.nic.in/" style="color:#00688B" target="_blank">Central Bureau of Communication</a></li>	
+                            <li class="flex-wr-sb-s p-b-20"><a href="http://filmsdivision.org/" style="color:#00688B" target="_blank">Films Division</a></li>	
+							
+                                                    
+                            <!-- <li class="flex-wr-sb-s p-b-20"><a href="http://www.davp.nic.in/" style="color:#00688B">Directorate of Field Publicity</a></li>  -->
+                            
+                        </ul>
+			     	</div>
+
+					<div class="col-sm-3   p-b-20">
+						<div class="size-h-3 flex-s-c">
+							<h5 class="f1-m-7 cl0" style="color:#00688B">
+								Information
+							</h5>
+						</div>
+
+						<ul class="m-t--12">
+							<li class="how-bor1 p-rl-5 p-tb-10">
+								  <a href="https://www.publicationsdivision.nic.in/index.php?route=page/gallery_all" style="color:#00688B" target="_blank">Photo Gallery </a> 
+                    
+                            
+							</li>
+
+							<li class="how-bor1 p-rl-5 p-tb-10">
+								<a href="https://www.publicationsdivision.nic.in/index.php?route=eventsandhighlights/eventsandhighlights" style="color:#00688B" target="_blank">Events & Highlights</a>
+							</li>
+                            	<li class="how-bor1 p-rl-5 p-tb-10">
+								<a href="https://www.ncs.gov.in/Pages/default.aspx" style="color:#00688B" target="_blank">Jobs through NCS</a>
+							</li>
+							</li>
+                            	<li class="how-bor1 p-rl-5 p-tb-10">
+								<a href="https://placement.aicte-india.org/" style="color:#00688B" target="_blank">AICTE Placement Portal</a>
+							</li>
+                            </ul>
+                        	<div class="size-h-3 flex-s-c">
+							<h5 class="f1-m-7 cl0" style="color:#00688B">
+							Get In Touch    
+							</h5>
+						</div>
+                        <ul>
+							<li class="how-bor1 p-rl-5 p-tb-10">
+						 
+						<link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" />
+<a href="https://www.facebook.com/director.employmentnews/"><i class="fa fa-facebook"  style="color:#00688B;font-size:15px"></i></a>
+                     <a href="https://twitter.com/Employ_News">   	<img src="images/twitter-logo.png" alt="twitter-logo" width="28px" height="28px" /></a>
+								 
+							</li>
+
+						 
+						</ul>
+					</div>
+                    		<div class="col-sm-3   p-b-20">
+						<div class="size-h-3 flex-s-c">
+							<h5 class="f1-m-7 cl0" style="color:#00688B">
+								Locations
+							</h5>
+						</div>
+
+						     <div class="mapouter"><div class="gmap_canvas">
+                         <iframe width="350" height="350" id="gmap_canvas" src="https://maps.google.com/maps?q=soochna%20bhawan%20delhi&t=&z=13&ie=UTF8&iwloc=&output=embed" frameborder="0" scrolling="no" marginheight="0" marginwidth="0"></iframe>
+      
+                                           </div>
+                         <style>.mapouter{position:relative;text-align:left;height:350px;width:350px;}
+.gmap_canvas {overflow:hidden;background:none!important;height:350px;width:350px;}</style></div>
+					</div>
+				</div>
+               
+		</div>
+     
+								<div>
+<p style="text-align: center;"><strong>Web Information Manager : Anupama Bhatnagar</strong></p>
+<p style="text-align: center;"><strong>email : <a href="mailto:dpd@nic.in">dpd[at]nic.in</a></strong></p>
+<p style="text-align: center;">&nbsp;</p>
+</div>
+	 
+	</footer>
+         <div class ="row" style="background-color:#00688B;">
+                   
+ 
+	<div class="col-sm-12" style="text-align:center">
+	   <!-- carousel-->
+
+
+        <ul class="list-inline">
+    <li><a href="https://india.gov.in/"><img src="images/icons/india-gov-logo.png"</a></li>
+    <li><a href="http://www.internship.aicte-india.org/"><img src="images/icons/logoAICTE.png"</a></li>
+    <li><a href="https://www.mygov.in/"><img src="images/icons/mygov-footer-logo (1).png"</a></li>
+    <li><a href="https://labour.gov.in/nics/"><img src="images/icons/nicsLogo.png" /></a></li>
+            <li><a href="http://www.pmindia.gov.in/en/"><img src="images/icons/pm-india-logo.png" /></a></li>
+            <li><a href="https://skillindia.nsdcindia.org/"><img src="images/icons/pm-skillindia-logo.png" /></a></li>
+     
+            
+     
+  </ul>
+	</div><!--col-->
+ 
+	
+ 
+			</div>
+        <!--===============================================================================================-->	
+	<script src="vendor/jquery/jquery-3.2.1.min.js"></script>
+<!--===============================================================================================-->
+	<script src="vendor/animsition/js/animsition.min.js"></script>
+<!--===============================================================================================-->
+	<script src="vendor/bootstrap/js/popper.js"></script>
+	<script src="vendor/bootstrap/js/bootstrap.min.js"></script>
+<!--===============================================================================================-->
+	<script src="js/main.js"></script>
+    </form>
+
+</body>
+</html>

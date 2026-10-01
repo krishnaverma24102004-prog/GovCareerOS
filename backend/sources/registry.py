@@ -20,6 +20,9 @@ class SourceSpec:
     category: str
     recruitment_url: str
     parser: Optional[str] = None
+    # Probe the configured page in the browser straight away: for pages whose listing is filled in by
+    # JavaScript although the static HTML looks complete enough not to need it
+    force_browser: bool = False
 
     @property
     def official_domain(self) -> str:
@@ -47,7 +50,8 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("NTA", "National Testing Agency", COMMISSION, "https://nta.ac.in/"),
 
     # Official aggregators covering all ministries
-    SourceSpec("EMPLOYMENT-NEWS", "Employment News (Ministry of Information & Broadcasting)", AGGREGATOR, "https://www.employmentnews.gov.in/NewEmp/Home.aspx"),
+    # The www host returns 404 site-wide; the bare host's "All Jobs" table lists current adverts (re-probed 2026-10-01)
+    SourceSpec("EMPLOYMENT-NEWS", "Employment News (Ministry of Information & Broadcasting)", AGGREGATOR, "https://employmentnews.gov.in/NewEmp/AllJobs.aspx?k=All"),
     SourceSpec("NCS", "National Career Service (Ministry of Labour & Employment)", AGGREGATOR, "https://www.ncs.gov.in/"),
 
     # Ministries / departments — vacancy & deputation circular pages
@@ -59,12 +63,16 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("DFS", "Department of Financial Services, Ministry of Finance", MINISTRY, "https://financialservices.gov.in/beta/en/vacancies"),
     SourceSpec("MOHFW", "Ministry of Health & Family Welfare", MINISTRY, "https://mohfw.gov.in/?q=vacancies"),
     SourceSpec("MOE", "Ministry of Education", MINISTRY, "https://www.education.gov.in/vacancies"),
-    SourceSpec("DOPT", "Department of Personnel & Training", MINISTRY, "https://dopt.gov.in/vacancies"),
+    # dopt.gov.in/vacancies is rejected by the site's WAF; the dopt.gov.in menu "Vacancy Circular > Issued by DoPT"
+    # points to DoPT's circulars portal on NIC
+    SourceSpec("DOPT", "Department of Personnel & Training", MINISTRY, "https://doptcirculars.nic.in/Default.aspx?URL=UWnd5SMSSkgG"),
     SourceSpec("LEGAL-AFFAIRS", "Department of Legal Affairs, Ministry of Law & Justice", MINISTRY, "https://legalaffairs.gov.in/vacancies"),
     SourceSpec("MEITY", "Ministry of Electronics & IT", MINISTRY, "https://www.meity.gov.in/vacancies"),
     SourceSpec("MORTH", "Ministry of Road Transport & Highways", MINISTRY, "https://morth.nic.in/vacancies"),
     SourceSpec("LABOUR", "Ministry of Labour & Employment", MINISTRY, "https://labour.gov.in/vacancies"),
-    SourceSpec("AGRIWELFARE", "Department of Agriculture & Farmers Welfare", MINISTRY, "https://agriwelfare.gov.in/en/Recruitment"),
+    # The table is filled by an AJAX call after load; the static page has enough text that the HTTP probe
+    # reports NO_NOTICES instead of asking for the browser
+    SourceSpec("AGRIWELFARE", "Department of Agriculture & Farmers Welfare", MINISTRY, "https://agriwelfare.gov.in/en/recruitmentDetail", force_browser=True),
     SourceSpec("POWER", "Ministry of Power", MINISTRY, "https://powermin.gov.in/en/vacancies"),
     SourceSpec("MOEFCC", "Ministry of Environment, Forest & Climate Change", MINISTRY, "https://moef.gov.in/vacancies"),
     SourceSpec("MOSPI", "Ministry of Statistics & Programme Implementation", MINISTRY, "https://www.mospi.gov.in/vacancies"),
@@ -75,25 +83,31 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("MNRE", "Ministry of New & Renewable Energy", MINISTRY, "https://mnre.gov.in/en/vacancies/"),
     SourceSpec("DST", "Department of Science & Technology", MINISTRY, "https://dst.gov.in/administrationfinance/recruitment-cell"),
     SourceSpec("DBT", "Department of Biotechnology", MINISTRY, "https://dbtindia.gov.in/vacancies"),
-    SourceSpec("CULTURE", "Ministry of Culture", MINISTRY, "https://www.indiaculture.gov.in/vacancies"),
+    # indiaculture.gov.in no longer accepts connections; the bare culture.gov.in host serves the page (www does not)
+    SourceSpec("CULTURE", "Ministry of Culture", MINISTRY, "https://culture.gov.in/offering/vacancies"),
     SourceSpec("TOURISM", "Ministry of Tourism", MINISTRY, "https://tourism.gov.in/vacancies"),
     SourceSpec("COAL", "Ministry of Coal", MINISTRY, "https://coal.gov.in/en/vacancies"),
     SourceSpec("MINES", "Ministry of Mines", MINISTRY, "https://mines.gov.in/webportal/vacancies"),
     SourceSpec("MOWR", "Department of Water Resources, Ministry of Jal Shakti", MINISTRY, "https://jalshakti-dowr.gov.in/vacancies/"),
     SourceSpec("RURAL", "Ministry of Rural Development", MINISTRY, "https://rural.gov.in/en/vacancies"),
     SourceSpec("MOHUA", "Ministry of Housing & Urban Affairs", MINISTRY, "https://mohua.gov.in/cms/vacancies.php"),
-    SourceSpec("WCD", "Ministry of Women & Child Development", MINISTRY, "https://wcd.gov.in/vacancies"),
+    # No vacancies page any more; the homepage "What's New" block carries the recruitment notices
+    SourceSpec("WCD", "Ministry of Women & Child Development", MINISTRY, "https://wcd.gov.in/"),
     SourceSpec("SOCIAL-JUSTICE", "Ministry of Social Justice & Empowerment", MINISTRY, "https://socialjustice.gov.in/vacancies"),
-    SourceSpec("TRIBAL", "Ministry of Tribal Affairs", MINISTRY, "https://tribal.nic.in/vacancies.aspx"),
+    # Moved to tribal.gov.in. The current "Tenders, Vacancies & Advertisement" page is usually empty; its archive
+    # lists the notices with unquoted hrefs, which only the rendered page gives back as links
+    SourceSpec("TRIBAL", "Ministry of Tribal Affairs", MINISTRY, "https://tribal.gov.in/TendersAdvertismentArc.aspx", force_browser=True),
     SourceSpec("MSME", "Ministry of Micro, Small & Medium Enterprises", MINISTRY, "https://msme.gov.in/vacancies"),
     SourceSpec("COMMERCE", "Department of Commerce", MINISTRY, "https://commerce.gov.in/vacancies/"),
     SourceSpec("DPIIT", "Department for Promotion of Industry & Internal Trade", MINISTRY, "https://dpiit.gov.in/vacancies"),
-    SourceSpec("PETROLEUM", "Ministry of Petroleum & Natural Gas", MINISTRY, "https://mopng.gov.in/en/vacancies"),
+    # /en/vacancies is answered by the WAF's "Request Rejected" page; current selection adverts are under What's New
+    SourceSpec("PETROLEUM", "Ministry of Petroleum & Natural Gas", MINISTRY, "https://mopng.gov.in/en/home/whatsnew"),
     SourceSpec("STEEL", "Ministry of Steel", MINISTRY, "https://steel.gov.in/vacancies"),
     SourceSpec("TELECOM", "Department of Telecommunications", MINISTRY, "https://dot.gov.in/vacancies"),
     SourceSpec("POSTS", "Department of Posts", MINISTRY, "https://www.indiapost.gov.in/VAS/Pages/Recruitment.aspx"),
-    SourceSpec("CONSUMER-AFFAIRS", "Department of Consumer Affairs", MINISTRY, "https://consumeraffairs.nic.in/vacancies"),
-    SourceSpec("FOOD-PD", "Department of Food & Public Distribution", MINISTRY, "https://dfpd.gov.in/vacancies.htm"),
+    SourceSpec("CONSUMER-AFFAIRS", "Department of Consumer Affairs", MINISTRY, "https://consumeraffairs.gov.in/pages/vacancy"),
+    # No vacancies page; the What's New list carries the department's vacancy circulars (JavaScript-rendered)
+    SourceSpec("FOOD-PD", "Department of Food & Public Distribution", MINISTRY, "https://dfpd.gov.in/whats-new/en"),
     # No vacancies page; the English homepage lists the ministry's recruitment notices
     SourceSpec("YAS", "Ministry of Youth Affairs & Sports", MINISTRY, "https://yas.gov.in/en"),
     SourceSpec("PANCHAYATI-RAJ", "Ministry of Panchayati Raj", MINISTRY, "https://panchayat.gov.in/vacancies"),
@@ -112,7 +126,8 @@ SOURCES: List[SourceSpec] = [
 
     # Banking regulators / PSU banks / insurance
     SourceSpec("RBI", "Reserve Bank of India", BANK, "https://opportunities.rbi.org.in/Scripts/Vacancies.aspx"),
-    SourceSpec("SBI", "State Bank of India", BANK, "https://sbi.co.in/web/careers/current-openings"),
+    # sbi.co.in redirects to the bank's .bank.in domain
+    SourceSpec("SBI", "State Bank of India", BANK, "https://sbi.bank.in/web/careers/current-openings"),
     # Found through the site's sitemap.xml
     SourceSpec("NABARD", "National Bank for Agriculture & Rural Development", BANK, "https://www.nabard.org/careers-notices1.aspx?cid=693&id=26"),
     SourceSpec("LIC", "Life Insurance Corporation of India", BANK, "https://licindia.in/careers"),
@@ -122,9 +137,12 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("DRDO", "Defence Research & Development Organisation", BODY, "https://drdo.gov.in/drdo/en/"),
     SourceSpec("ISRO", "Indian Space Research Organisation", BODY, "https://www.isro.gov.in/Careers.html"),
     SourceSpec("BARC", "Bhabha Atomic Research Centre", BODY, "https://www.barc.gov.in/careers/"),
-    SourceSpec("AIIMS", "All India Institute of Medical Sciences, New Delhi", BODY, "https://www.aiimsexams.ac.in/"),
+    # aiimsexams.ac.in is the exam cell; the institute's own site lists the recruitment notices
+    SourceSpec("AIIMS", "All India Institute of Medical Sciences, New Delhi", BODY, "https://www.aiims.edu/index.php/en/notices/recruitment/aiims-recruitment"),
     SourceSpec("ESIC", "Employees' State Insurance Corporation", BODY, "https://www.esic.gov.in/recruitments"),
-    SourceSpec("EPFO", "Employees' Provident Fund Organisation", BODY, "https://www.epfindia.gov.in/site_en/Recruitments.php"),
+    # epfindia.gov.in redirects to epfo.gov.in. The current-openings page (/recruitments/) is empty today and
+    # refuses the browser (403); the archive lists the notices over plain HTTP
+    SourceSpec("EPFO", "Employees' Provident Fund Organisation", BODY, "https://www.epfo.gov.in/archive-recruitments/"),
     SourceSpec("FCI", "Food Corporation of India", BODY, "https://fci.gov.in/recruitments.php"),
     SourceSpec("KVS", "Kendriya Vidyalaya Sangathan", BODY, "https://kvsangathan.nic.in/"),
     SourceSpec("NVS", "Navodaya Vidyalaya Samiti", BODY, "https://navodaya.gov.in/nvs/en/Recruitment/"),
