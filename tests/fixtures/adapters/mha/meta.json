@@ -1,0 +1,38 @@
+{
+  "url": "https://www.mha.gov.in/en/notifications/vacancies",
+  "captured_on": "2026-10-01",
+  "fetch_mode": "HTTP",
+  "fetched_with": "govcareeros.backend.sources.generic_notices.PageFetcher.fetch_http (robots.txt + url_guard, honest User-Agent)",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "robots_txt": "https://www.mha.gov.in/robots.txt returned 404 (no restrictions); PageFetcher.robots_allows was True for every page",
+  "pages": [
+    {
+      "url": "https://www.mha.gov.in/en/notifications/vacancies",
+      "final_url": "https://www.mha.gov.in/en/notifications/vacancies",
+      "file": "vacancies.html",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "sha256": "853918888af9a786577a8d7b5a4fb2f9fcfe0895049b418dd3702a3a6806673f",
+      "bytes": 84354
+    },
+    {
+      "url": "https://www.mha.gov.in/en/notifications/vacancies?page=1",
+      "final_url": "https://www.mha.gov.in/en/notifications/vacancies?page=1",
+      "file": "vacancies_page1.html",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "sha256": "8501670199e178441e10c62e3e57e5a25f40ab2da6c68b0cb61dda027aec6f30",
+      "bytes": 84752
+    },
+    {
+      "url": "https://www.mha.gov.in/en/notifications/vacancies?page=2",
+      "final_url": "https://www.mha.gov.in/en/notifications/vacancies?page=2",
+      "file": "vacancies_page2.html",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "sha256": "bae66bdb58693920b489b0932a7816b6dab88e8b0db1ad68d8e8751ebeb983a0",
+      "bytes": 73678
+    }
+  ],
+  "notes": "HTML stored exactly as returned by FetchResult.html, UTF-8 encoded (LF line endings). Static server-rendered Drupal view: no browser needed. The listing is one table (SR-No | Keyword | Download/Link) with 20 rows per page; the page's own pager links ?page=1 and ?page=2 (49 rows in all on the capture date). The page shows no published or closing dates for any row."
+}
