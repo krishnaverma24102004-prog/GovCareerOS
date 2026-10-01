@@ -117,6 +117,9 @@ def host_of(value: str) -> Tuple[str, List[str]]:
     notes = []
     v = value.strip()
     v = re.sub(r"\s*[\(\[]\s*dot\s*[\)\]]\s*", ".", v, flags=re.I)
+    # Browsers read '\' as '/' in http(s) links, so 'https://evil.com\@upsc.gov.in' opens evil.com, while urlparse
+    # would take upsc.gov.in as the host
+    v = v.replace("\\", "/")
     if "://" not in v:
         v = "http://" + v.lstrip("/")
     try:
@@ -190,10 +193,14 @@ def check_domain(value: str, official: Optional[Set[str]] = None) -> DomainCheck
     return DomainCheck(value, host, "UNOFFICIAL", None,
                        reasons + [f"{host} is not an official domain in our registry, nor under .gov.in / .nic.in / .bank.in"])
 
-_URL_RE = re.compile(r"(?:https?://|www\.)[^\s<>\"'()\[\]]+|\b[a-z0-9\-]+(?:\.[a-z0-9\-]+)*\s*[\(\[]dot[\)\]]\s*[a-z]{2,}\b", re.I)
+# The '(dot)' form starts only where a run of domain characters starts: with \b it also started after every '-'
+# and '.', so a pasted 'a-a-a-...' was rescanned from each position (quadratic, minutes for 100k characters)
+# Curly quotes end a link too: the UPSC advertisements print "https://upsconline.nic.in.”"
+_URL_RE = re.compile(r"(?:https?://|www\.)[^\s<>\"'()\[\]“”‘’«»]+|(?<![a-z0-9.\-])[a-z0-9\-]{1,63}(?:\.[a-z0-9\-]{1,63}){0,10}"
+                     r"\s*[\(\[]dot[\)\]]\s*[a-z]{2,}\b", re.I)
 
 def urls_in(text: str) -> List[str]:
-    return list(dict.fromkeys(m.group(0).rstrip(".,;:") for m in _URL_RE.finditer(text)))
+    return list(dict.fromkeys(m.group(0).rstrip(".,;:!?") for m in _URL_RE.finditer(text)))
 
 # ------------------------------------------------------------------ red flags
 
@@ -448,13 +455,18 @@ async def verify(session: AsyncSession, text: Optional[str] = None, url: Optiona
     matches = await match_official(session, text, [c.input for c in [url_check, *links] if c])
     flags = red_flags(text)
 
-    if any("official link" in m.matched_on for m in matches):
-        verdict = FOUND
-    elif (url_check and url_check.status == "LOOKALIKE") or any(c.status == "LOOKALIKE" for c in links):
+    # A stored official link vouches for itself only: a fake notice that quotes a genuine link next to its own
+    # look-alike (payment) link, or is submitted with an unofficial link, is not found by the genuine one
+    official_links = {v for m in matches if "official link" in m.matched_on and m.official_url
+                      for v in _url_variants(m.official_url)}
+    def unvouched(c: Optional[DomainCheck]) -> bool:
+        return c is not None and not (_url_variants(c.input) & official_links)
+
+    if any(unvouched(c) and c.status == "LOOKALIKE" for c in [url_check, *links]):
         verdict = LOOKALIKE
-    elif url_check and url_check.status in ("UNOFFICIAL", "INVALID"):
+    elif unvouched(url_check) and url_check.status in ("UNOFFICIAL", "INVALID"):
         verdict = UNOFFICIAL
-    elif matches or (url_check and url_check.status == "OFFICIAL"):
+    elif official_links or matches or (url_check and url_check.status == "OFFICIAL"):
         verdict = FOUND
     else:
         verdict = NOT_FOUND

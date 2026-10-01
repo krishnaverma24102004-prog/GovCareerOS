@@ -230,3 +230,29 @@ async def test_api_rejects_bad_uploads(api, db_session, monkeypatch):
     monkeypatch.setattr(notice_verifier, "MAX_PDF_BYTES", len(body) - 1)
     r = await api.post("/verify", files={"file": (ADVT_12, body, "application/pdf")})
     assert r.status_code == 413
+
+# ------------------------------------------------------------------ evasions built from the fixture's real values
+
+def test_backslash_before_userinfo_is_read_as_a_browser_reads_it():
+    # Browsers open 'http://<fake>\@<official>' on <fake>; the official domain after '@' is only a path there
+    fake, genuine = ITEMS["indiapostgds-online"]["value"], "indiapost.gov.in"
+    check = check_domain(f"https://{fake}\\@{genuine}")
+    assert check.host == fake and check.status == "LOOKALIKE"
+
+@pytest.mark.asyncio
+async def test_genuine_link_quoted_next_to_a_lookalike_does_not_vouch_for_it(db_session):
+    await load_official(db_session)
+    text = f"{ITEMS['field-assistant-1736']['value']} {NOTICES[0]['url']} https://{ITEMS['indiapostgds-online']['value']}"
+    result = await verify(db_session, text=text)
+    assert any("official link" in m.matched_on for m in result.matches)
+    assert result.verdict == LOOKALIKE
+    # Submitted with an unofficial link, the genuine link in the text does not make it found either
+    result = await verify(db_session, url=ITEMS["rsby-ind-in"]["value"], text=NOTICES[0]["url"])
+    assert result.verdict == UNOFFICIAL
+
+@pytest.mark.parametrize("name", [ADVT_12, ADVT_11])
+def test_links_printed_in_genuine_upsc_advertisements_are_official(name):
+    # They print "https://upsconline.nic.in.”": the closing quote is not part of the host
+    text = notice_verifier.pdf_text((UPSC_DIR / name).read_bytes())
+    checks = [check_domain(u) for u in notice_verifier.urls_in(text)]
+    assert checks and all(c.status == "OFFICIAL" for c in checks), [(c.input, c.status) for c in checks]
