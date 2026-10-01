@@ -1,0 +1,13 @@
+{
+  "url": "https://dst.gov.in/administrationfinance/recruitment-cell",
+  "final_url": "https://dst.gov.in/administrationfinance/recruitment-cell",
+  "captured_on": "2026-10-01",
+  "fetch_mode": "HTTP",
+  "http_status": 200,
+  "fetched_with": "govcareeros.backend.sources.generic_notices.PageFetcher.fetch_http (robots.txt + url_guard, honest User-Agent)",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "file": "recruitment-cell.html",
+  "sha256": "7c12b553141b4320b3d8ca6fa3145e85e143379d9f1e3a4b9666558c67a79968",
+  "bytes": 75244,
+  "notes": "HTML stored exactly as returned by FetchResult.html (httpx text), UTF-8 encoded. The page is static HTML (no JavaScript needed); the listing is the body of the 'administration_finance' view: one <p> link per notice plus a 'Links:' list of PDFs. It shows no dates and no pager."
+}
