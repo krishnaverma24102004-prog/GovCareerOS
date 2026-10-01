@@ -18,7 +18,7 @@ Each notice is rendered as two consecutive anchors:
 
 The dd/mm/yyyy date in front of a notice is the date the page shows for it; it is read as
 `published_on`. The date is only attached when the hidden copy's title matches the linked title.
-The page does not show closing dates, so `last_date` stays None unless a title states one.
+The page does not show closing dates, so `last_date` is never set (it stays None).
 """
 import re
 from datetime import date
