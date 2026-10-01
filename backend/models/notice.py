@@ -22,5 +22,10 @@ class RecruitmentNotice(Base, TimestampMixin):
     first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
     last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
     # NEW -> MANUAL_REVIEW (no parser for this source) | PARSED (turned into Vacancy rows)
+    # Reviewer console: SKIPPED, NOT_REQUIRED, or back to MANUAL_REVIEW (requeue)
     review_status: Mapped[str] = mapped_column(String(30), default="NEW", index=True)
     raw_document_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("raw_documents.id"))
+    # Last human decision on the notice itself (bulk skip / not required / requeue); history is in review_audit_log
+    reviewer_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", name="fk_recruitment_notices_reviewer_id_users"))
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
+    review_note: Mapped[Optional[str]] = mapped_column(Text)

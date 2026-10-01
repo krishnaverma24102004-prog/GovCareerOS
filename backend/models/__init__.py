@@ -17,3 +17,4 @@ from govcareeros.backend.models.exam import Exam, ExamPost, ExamRequirement, Exa
 from govcareeros.backend.models.exam_prep import Syllabus, QuestionPaper, StudyPlan, StudyPlanItem
 from govcareeros.backend.models.application import Application, ApplicationRequirement, ApplicationStatusHistory
 from govcareeros.backend.models.resume import Resume, ResumeClaim
+from govcareeros.backend.models.audit import ReviewAuditLog

@@ -15,7 +15,7 @@ from govcareeros.backend.models.extraction import ExtractionDraft
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.user import User
-from govcareeros.backend.services import exam_drafts, extraction_drafts
+from govcareeros.backend.services import exam_drafts, extraction_drafts, review_audit
 
 router = APIRouter(prefix="/review", tags=["review"])
 
@@ -96,6 +96,9 @@ async def approve(draft_id: uuid.UUID, body: ApproveIn, user: User = Depends(cur
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except IntegrityError:  # a concurrent approval already created this vacancy
         raise HTTPException(status.HTTP_409_CONFLICT, "vacancy already approved")
+    review_audit.record(session, user, "DRAFT_APPROVE", "DRAFT", draft.id, body.note,
+                        {"vacancy_indexes": body.vacancy_indexes, "to": draft.status,
+                         "created_vacancy_ids": json.loads(draft.created_vacancy_ids or "[]")})
     return _detail(draft, source, title, url)
 
 @router.post("/drafts/{draft_id}/reject", response_model=DraftDetail)
@@ -107,4 +110,5 @@ async def reject(draft_id: uuid.UUID, body: RejectIn, user: User = Depends(curre
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     except extraction_drafts.DraftError as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    review_audit.record(session, user, "DRAFT_REJECT", "DRAFT", draft.id, body.note, {"to": draft.status})
     return _detail(draft, source, title, url)
