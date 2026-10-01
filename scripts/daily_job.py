@@ -5,6 +5,8 @@ Steps, in this order; each runs in its own session and transaction, so a failing
 logged, and the next step still runs:
   discover  every registered official source (services.source_discovery.discover_all, PageFetcher)
   upsc      UPSC advertisements + notices (document_ingestion.run_upsc_pipeline)
+  triage    fixed-rule backlog triage of every notice (services.triage): QUEUED / STALE / NOT_REQUIRED + priority,
+            so drafts take the highest-priority fresh vacancies first; never deletes or edits a notice
   drafts    LLM review drafts for pending VACANCY notices - only when an LLM is configured
             (LLM_PROVIDER=nvidia with NVIDIA_API_KEY, or a reachable Ollama); drafts still need review
   radar     eligibility radar for every user (services.radar.run_radar)
@@ -43,7 +45,7 @@ import httpx
 from govcareeros.backend.config.settings import settings
 from govcareeros.backend.services import run_log
 
-STEPS = ("discover", "upsc", "drafts", "radar", "digest")
+STEPS = ("discover", "upsc", "triage", "drafts", "radar", "digest")
 _DIGEST_MODULE = "govcareeros.backend.services.digest"
 # backend.services.digest.run_all writes digest files only; emailing stays an explicit send_digests.py --send
 _DIGEST_FUNCS = ("run_all", "run_weekly_digest", "generate_weekly_digests", "run_digest")
@@ -70,13 +72,14 @@ async def llm_configured() -> Optional[str]:
 
 class DailyJob:
     def __init__(self, session_factory, *, fetcher_factory=None, upsc_client: Optional[httpx.AsyncClient] = None,
-                 provider=None, now: Optional[datetime] = None, limit_drafts: int = 5):
+                 provider=None, now: Optional[datetime] = None, limit_drafts: int = 5, stale_days: Optional[int] = None):
         self.session_factory = session_factory
         self.fetcher_factory = fetcher_factory
         self.upsc_client = upsc_client
         self.provider = provider
         self.now = now
         self.limit_drafts = limit_drafts
+        self.stale_days = stale_days
         self.source_health: Dict[str, Any] = {}
 
     def _fetcher(self, **kw):
@@ -103,6 +106,11 @@ class DailyJob:
                 "vacancies_created": sum(len(d.created_vacancy_ids) for d in run.documents),
                 "vacancies_reparsed": sum(len(d.reparsed_vacancy_ids) for d in run.documents),
                 "pipeline_errors": run.errors}
+
+    async def triage(self, session) -> Dict[str, Any]:
+        from govcareeros.backend.services.triage import DEFAULT_STALE_DAYS, triage_notices
+        run = await triage_notices(session, now=self.now, stale_days=self.stale_days or DEFAULT_STALE_DAYS, apply=True)
+        return run.summary()
 
     async def drafts(self, session) -> Dict[str, Any]:
         from govcareeros.backend.services.extraction_drafts import draft_pending_notices
@@ -164,6 +172,7 @@ def parse_args(argv: Optional[List[str]]) -> argparse.Namespace:
     p.add_argument("--only", action="append", choices=STEPS, metavar="STEP", help=f"run only this step (repeatable): {', '.join(STEPS)}")
     p.add_argument("--skip", action="append", choices=STEPS, metavar="STEP", help="skip this step (repeatable)")
     p.add_argument("--limit-drafts", type=int, default=5, help="at most N LLM drafts per run (default 5)")
+    p.add_argument("--stale-days", type=int, default=None, help="triage: VACANCY/CORRIGENDUM notices older than this are STALE (default 120)")
     return p.parse_args(argv)
 
 async def main(argv: Optional[List[str]] = None, *, session_factory=None, log_path: Optional[Path] = None,
@@ -187,7 +196,7 @@ async def main(argv: Optional[List[str]] = None, *, session_factory=None, log_pa
     try:
         if lock.took_over:
             record["took_over_stale_lock"] = lock.took_over
-        job = DailyJob(session_factory, limit_drafts=args.limit_drafts, **job_kwargs)
+        job = DailyJob(session_factory, limit_drafts=args.limit_drafts, stale_days=args.stale_days, **job_kwargs)
         for name in STEPS:
             if name not in steps:
                 record["steps"].append({"name": name, "status": "skipped", "reason": "not selected"})
