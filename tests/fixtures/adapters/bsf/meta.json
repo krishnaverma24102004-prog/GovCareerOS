@@ -1,0 +1,21 @@
+{
+  "source": "BSF",
+  "url": "https://rectt.bsf.gov.in/",
+  "captured_on": "2026-10-01",
+  "fetch_mode": "HTTP",
+  "fetched_with": "govcareeros.backend.sources.generic_notices.PageFetcher.fetch_http (robots.txt + url_guard, honest User-Agent)",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "robots_txt": "https://rectt.bsf.gov.in/robots.txt returned 200: 'User-agent: *\\nAllow: /'; robots allows / = True",
+  "pages": [
+    {
+      "url": "https://rectt.bsf.gov.in/",
+      "final_url": "https://rectt.bsf.gov.in/",
+      "file": "home.html",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "sha256": "2910595ed1067f7c9b7debb2623a797169791d65586f4f809180837007c2c191",
+      "bytes": 33288
+    }
+  ],
+  "notes": "HTML stored exactly as returned by FetchResult.html, UTF-8 encoded. Server-rendered page (Yii); no browser needed. On this capture the 'Current Recruitment Openings' list shows only its empty state ('No Job(s) Available.'), and every live notice button links off the official domain (d3t79nicn48uzj.cloudfront.net PDFs, digialm.com exam-agency portals); older on-domain /static/bsf/pdf/ buttons appear only inside HTML comments."
+}
