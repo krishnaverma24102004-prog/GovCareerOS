@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from govcareeros.backend.api.deps import current_user, get_session
 from govcareeros.backend.eligibility import exam_engine
 from govcareeros.backend.eligibility.engine import EligibilityInputError
+from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.exam import Exam, ExamEligibilityResult
 from govcareeros.backend.models.user import User
 from govcareeros.backend.schemas.api import EligibilityEvidenceOut, ProvenanceOut, RequirementOut
@@ -107,7 +108,12 @@ async def get_exam(exam_id: uuid.UUID, session: AsyncSession = Depends(get_sessi
     # Filter on the response, never on the ORM relationship (that would detach rows on commit)
     detail = ExamDetail.model_validate(exam)
     active = {r.id for r in exam.requirements if r.superseded_at is None}
-    return detail.model_copy(update={"requirements": [r for r in detail.requirements if r.id in active]})
+    doc_ids = {p.raw_document_id for p in detail.provenance}
+    urls = dict((await session.execute(select(RawDocument.id, RawDocument.url).where(RawDocument.id.in_(doc_ids)))).all()) if doc_ids else {}
+    return detail.model_copy(update={
+        "requirements": [r for r in detail.requirements if r.id in active],
+        "provenance": [p.model_copy(update={"document_url": urls.get(p.raw_document_id)}) for p in detail.provenance],
+    })
 
 @router.post("/{exam_id}/eligibility", response_model=ExamEligibilityOut, status_code=status.HTTP_201_CREATED)
 async def evaluate(exam_id: uuid.UUID, body: ExamEligibilityIn, user: User = Depends(current_user),

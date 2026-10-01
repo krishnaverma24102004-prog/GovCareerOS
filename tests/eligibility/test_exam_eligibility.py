@@ -72,6 +72,8 @@ async def test_exam_eligibility_over_the_api(api, login, db_session):
     assert [e["id"] for e in listing] == [exam_id]
     detail = (await api.get(f"/exams/{exam_id}", headers=h)).json()
     assert detail["fee_amount"] == 100 and len(detail["posts"]) == 3
+    # Each stored value links back to the official notice it was read from
+    assert detail["provenance"] and {p["document_url"] for p in detail["provenance"]} == {URL}
 
     # OBC, 29 on 01-08-2026: within 27 + 3; 12th pass meets para 8.2 (8.1 wants Science with Maths: reported, not counted)
     r, v_obc = await evaluate(_profile("OBC"))
