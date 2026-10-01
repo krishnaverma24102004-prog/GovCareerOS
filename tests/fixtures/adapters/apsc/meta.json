@@ -1,0 +1,69 @@
+{
+  "source": "APSC",
+  "official_domain": "apsc.nic.in",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "fetcher": "govcareeros.backend.sources.generic_notices.PageFetcher.fetch_http (robots.txt + url_guard)",
+  "robots_txt": "https://apsc.nic.in/robots.txt answered HTTP 404 (no rules: nothing disallowed)",
+  "pages": [
+    {
+      "file": "index.html",
+      "url": "https://apsc.nic.in/",
+      "final_url": "https://apsc.nic.in/",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "probe_status": "OK",
+      "captured_at": "2026-10-01T06:33:58+00:00",
+      "capture_date": "2026-10-01"
+    },
+    {
+      "file": "advt_2026.html",
+      "url": "https://apsc.nic.in/advt_2026.php",
+      "final_url": "https://apsc.nic.in/advt_2026.php",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "probe_status": "OK",
+      "captured_at": "2026-10-01T06:33:58+00:00",
+      "capture_date": "2026-10-01"
+    },
+    {
+      "file": "notifications_2026.html",
+      "url": "https://apsc.nic.in/notifications_2026.php",
+      "final_url": "https://apsc.nic.in/notifications_2026.php",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "probe_status": "OK",
+      "captured_at": "2026-10-01T06:33:58+00:00",
+      "capture_date": "2026-10-01"
+    },
+    {
+      "file": "corig_2026.html",
+      "url": "https://apsc.nic.in/corig_2026.php",
+      "final_url": "https://apsc.nic.in/corig_2026.php",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "probe_status": "OK",
+      "captured_at": "2026-10-01T06:33:58+00:00",
+      "capture_date": "2026-10-01"
+    },
+    {
+      "file": "scr_tst_result_2026.html",
+      "url": "https://apsc.nic.in/scr_tst_result_2026.php",
+      "final_url": "https://apsc.nic.in/scr_tst_result_2026.php",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "probe_status": "OK",
+      "captured_at": "2026-10-01T06:33:59+00:00",
+      "capture_date": "2026-10-01"
+    },
+    {
+      "file": "final-results-2026.html",
+      "url": "https://apsc.nic.in/final-results-2026.php",
+      "final_url": "https://apsc.nic.in/final-results-2026.php",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "probe_status": "OK",
+      "captured_at": "2026-10-01T06:33:59+00:00",
+      "capture_date": "2026-10-01"
+    }
+  ]
+}
