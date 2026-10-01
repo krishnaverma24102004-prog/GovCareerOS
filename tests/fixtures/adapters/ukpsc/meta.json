@@ -1,0 +1,40 @@
+{
+  "_note": "Unmodified HTML of psc.uk.gov.in pages, fetched with govcareeros PageFetcher.fetch_http (robots.txt checked: 404 at capture time; url_guard policy psc.uk.gov.in over https; User-Agent 'GovCareerOS/0.1 (personal government-job tracker)'). No JavaScript needed: the tables are server-rendered. The site opens in its default (Hindi) locale, where the listing carries no titles; the *_en pages were fetched in the same client session after one GET of the site's own language switch https://psc.uk.gov.in/local/lang (link text 'In English').",
+  "files": {
+    "recruitment_default_locale.html": {
+      "url": "https://psc.uk.gov.in/candidate-corner/recruitment",
+      "captured_at": "2026-10-01T06:36:16Z",
+      "fetch_mode": "HTTP",
+      "session": "fresh session, site default locale (Hindi)",
+      "http_status": 200
+    },
+    "recruitment_en.html": {
+      "url": "https://psc.uk.gov.in/candidate-corner/recruitment",
+      "captured_at": "2026-10-01T06:36:16Z",
+      "fetch_mode": "HTTP",
+      "session": "English locale (after GET https://psc.uk.gov.in/local/lang)",
+      "http_status": 200
+    },
+    "admitcards_en.html": {
+      "url": "https://psc.uk.gov.in/candidate-corner/admitcards",
+      "captured_at": "2026-10-01T06:36:16Z",
+      "fetch_mode": "HTTP",
+      "session": "English locale (after GET https://psc.uk.gov.in/local/lang)",
+      "http_status": 200
+    },
+    "results_en.html": {
+      "url": "https://psc.uk.gov.in/candidate-corner/results",
+      "captured_at": "2026-10-01T06:36:17Z",
+      "fetch_mode": "HTTP",
+      "session": "English locale (after GET https://psc.uk.gov.in/local/lang)",
+      "http_status": 200
+    },
+    "answerkey_en.html": {
+      "url": "https://psc.uk.gov.in/candidate-corner/answerkey",
+      "captured_at": "2026-10-01T06:36:17Z",
+      "fetch_mode": "HTTP",
+      "session": "English locale (after GET https://psc.uk.gov.in/local/lang)",
+      "http_status": 200
+    }
+  }
+}
