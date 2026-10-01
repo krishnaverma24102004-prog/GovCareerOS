@@ -1,0 +1,315 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head id="Head1"><meta charset="utf-8" /><meta content="width=device-width, initial-scale=1.0" name="viewport" /><title>
+	TNPSC
+</title>
+    <!-- Favicons -->
+    <link rel="icon" href="../theme/assets/img/tnpsc_32x32.png" sizes="32x32" /><link rel="icon" href="../theme/assets/img/tnpsc_192x192.png" sizes="192x192" /><link rel="apple-touch-icon" href="../theme/assets/img/tnpsc_180x180.png" /><meta name="description" /><meta name="keywords" />
+    <!-- Google Fonts -->
+    <link href="https://fonts.gstatic.com" rel="preconnect" /><link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet" />
+    <!-- Vendor CSS Files -->
+    <link href="../theme/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet" /><link href="../theme/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet" />
+    <!-- Template Main CSS File -->
+    <link href="../theme/assets/css/style.css" rel="stylesheet" />
+     
+	<style>
+        
+        body
+        {            
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .card
+        {
+            /* transition: transform 0.3s ease-in-out; */
+            cursor: pointer;
+        }
+        .card-new
+        {
+            border-top: 3px solid #F44336;
+        }
+        /* .card:hover {
+            transform: scale(1.05);
+        } */
+        
+        .bi
+        {
+            position: relative;
+            font-size: 24px;
+        }
+        
+            header
+        {
+            background-color: #fff;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center; /* Centers the content horizontally */
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 10px;
+        }
+        .header-content
+        {
+            display: flex;
+            align-items: left;
+        }
+        .header-logo img
+        {
+            max-height: 80px; /* Adjust logo size */
+            margin-right: 10px; /* Space between logo and text */
+        }
+        .header-text
+        {
+            vertical-align: top;
+            text-align: left;
+        }
+        .header-line1
+        {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .header-line2
+        {
+            font-size: 24px;
+            margin: 5px 0;
+            color: #555;
+            font-weight: bold;
+        }
+        .header-line3
+        {
+            font-size: 15px;
+            margin: 5px 0;
+            color: #555;
+            font-weight: bold;
+        }
+        
+        .footer1 {
+            background-color: #fff;
+            color: #fff;
+            text-align: center;
+            padding: 10px 0;
+        }
+        
+        .container {
+            
+            margin: 10px auto;
+            padding: 0 10px;
+        }
+
+        .section {
+            padding: 20px;
+            background-color: #fff;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .content {
+            flex: 1; /* Allows the content to take up remaining space */
+            padding: 0px 10px;
+        }
+        
+    </style>
+</head>
+<body class="toggle-sidebar">
+    
+    <!-- ======= Header ======= -->
+  
+   <header>
+        <div class="header-content">
+            <div class="header-logo">
+                <img src="/web/theme/assets/img/tnpsc_logo.jpg" alt="Logo" />
+            </div>
+            <div class="header-text">
+                <div class="header-line1">தமிழ்நாடு அரசுப் பணியாளர் தேர்வாணையம்</div>
+                <div class="header-line2">TAMIL NADU PUBLIC SERVICE COMMISSION</div>
+            </div>
+        </div>
+    </header>
+
+
+    <!-- End Header -->
+    <div class="content">
+        <div class="container">
+            <form method="post" action="./index.aspx" id="form1" autocomplete="off" enctype="multipart/form-data">
+<input type="hidden" name="__CSRF_TOKEN" id="__CSRF_TOKEN" value="hT6nSi4sXuH/hz2CvBeDFs0NbibIFmQeM1zM0DX2AAA=" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="o48psPT1C+K1TO9KlSywnOKECR0b6buIS2x9xZDxzeL6+D+Z9JGoEGUatHIAILMIODINvgds4etqPlTJKCauco9FD+KA7nl3f+8o22I0p+Lwdu1bNkAi618otgH9E3tpFQFTLyTzpvXo5br9ljUY1j/kaPAf5yRRnLAQwhhtooHIQaPm/YalAk+8dYKfEqmt90tvPGaR8o/gGZRvHXaSc/u+qRRqfBKaDfn4aUx39rk6mzYy5Z/lFgLYZlLC4D/KzbHd8TdWAG3CDO3HAW+/zNOIzgGy4DekEAi2s1vLR4WUrEg7U8bywMXzJfWxoBaariYgyaDR2SuKlkzgbYRTe8ErGZ18rQDCnZA/vHrjaMI3F7VWZt4swrz7vLEe02Lw2vphhuSwGKD5lQ9GMJZx+A+3cwfGMWu9TMdf9DccwrPVUTaTMiRAZzq7ANlvKp4cq3yQx7sZzJdkeV9Wr+BylHE+eLwMEz0mAJ29iNPNRLG/9ZTRk9ZHMaJolZQVhM7+WvjnaTooObZkjMqrk+B86ppkaA88VY1agS430UV4mVe4RblgUY9Fxi31ZrDOBCXCDp996qQcPbI67Nk5heujN0U68RCHqft4ihL+Wtu6wh6fhseJjOR8FOqUM5bpKxHqJjJzk0nIHUWnEYA+H7ExyqpFjZjq3E2J/GyPiT11Z3rIn91/0Ktu0NY3JGnTcxbTwIdbIF0FoDWVzq+2XbzuJruPUxhSKTvYBJop/7Sgh6i4cMCwYkMlVKXr2uwYlQs2D1j2xMBjrvZyr13RJJA19CuzZ6Mr/T4Tcx4PrdgrW5nqG9yrCo+v+rEOl/DT1wlOf777herX2CLGngMZdPxsIhNSof38WSs1F3plU6K89Qr5zwCYx2mfA8Bx0RJ2fTbRl5fAgTPnl2zm6/yvF1+ajEP1RnGz4bqQmsc8PywNPZOighR5nstM6o8mUgEm+YE/GOAbo7aNxqy1g6PvV4Brob+ZzAwJ8EFfYCkaneiT21S4XdjxgnkO1lq0wUEG+4wwy8Z176lyLeLmceRGo0JJT1Xy9cSXnwbO6Bb/UpuHsfUD4xuBp9mEPqSSznSm6KRhKSgRRrF1J4VE8y2hY0fbFhfwsiXaLugCpHCeK4s4JVLsZcLarhaLaGZgERnFi6mSBsRfqlAm5S3elC4lVD71nuOFeCZQha2wo8XQBE4IxWeAIEMA" />
+
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="C82A4DB7" />
+<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="fWn3dsCSVoKXcsnPkXFRTm5ekYO4JvNeoMUktKWZ8gQSvR16giV9bK7Wl+9MgFCQvbZ+dVp/kzshnWE6mG6ERfXakK9cGn3wF9QXKaE79f+W3U3elY/ARSt6VwiRUoCxsYZZug==" />
+                <div class="pagetitle"  style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>Exam Dashboard</h1>
+
+
+                    <!-- change here -->
+               <div class="text-right"> 
+    Year :
+    <select name="ddlYear" id="ddlYear" class="form-select" style="display: inline; width: auto;">
+	<option selected="selected" value="2026">2026</option>
+	<option value="2025">2025</option>
+
+</select>
+    <a href="https://tnpsc.gov.in/English/Examdashboard.aspx" target="_blank" class="btn btn-primary">Archives</a>
+    <a href="https://tnpsc.gov.in/home.aspx" class="btn btn-warning">Home Page</a>
+    <a href="indextamil.aspx" class="btn btn-success">தமிழ்</a>
+    
+</div>
+
+                     <!-- change here -->
+                      
+            </div>             
+ 
+                
+                        <div id="examlist" class="container mt-4">
+                            <div class="row row-cols-1 row-cols-md-4 g-2">
+                    
+                        <div class="col">
+                            <div class="card h-100 text-center">
+                                <div class="card-body">
+                                  <h5 class="card-title">
+                                      <a style="color:#012970" 
+                                      href="index.aspx?notid=16f23df0-a669-4855-a718-8083a5745077" 
+                                      target="_self">1. RASHTRIYA INDIAN MILITARY COLLEGE, DEHRADUN (JANUARY-2027 TERM) - 01/2026
+
+                                      </a>
+                                  </h5>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="col">
+                            <div class="card h-100 text-center">
+                                <div class="card-body">
+                                  <h5 class="card-title">
+                                      <a style="color:#012970" 
+                                      href="index.aspx?notid=024fc5d2-a6b0-4c29-93db-979bf485d544" 
+                                      target="_self">2. COMBINED TECHNICAL SERVICES EXAMINATION (NON – INTERVIEW POSTS) -  04/2026
+
+                                      </a>
+                                  </h5>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="col">
+                            <div class="card h-100 text-center">
+                                <div class="card-body">
+                                  <h5 class="card-title">
+                                      <a style="color:#012970" 
+                                      href="index.aspx?notid=33aa5415-6205-4ae9-842e-212d62d088f1" 
+                                      target="_self">3. COMBINED CIVIL SERVICES EXAMINATION – I (GROUP I SERVICES) - 05/2026
+
+                                      </a>
+                                  </h5>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="col">
+                            <div class="card h-100 text-center">
+                                <div class="card-body">
+                                  <h5 class="card-title">
+                                      <a style="color:#012970" 
+                                      href="index.aspx?notid=ea45cb0a-2d35-4b46-a38d-f05d6ee0965b" 
+                                      target="_self">4. COMBINED TECHNICAL SERVICES EXAMINATION  (DIPLOMA / ITI LEVEL) - 06/2026
+
+                                      </a>
+                                  </h5>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="col">
+                            <div class="card h-100 text-center">
+                                <div class="card-body">
+                                  <h5 class="card-title">
+                                      <a style="color:#012970" 
+                                      href="index.aspx?notid=89113de0-6a0e-4d47-a409-c84fb04ef33e" 
+                                      target="_self">5. COMBINED CIVIL SERVICES EXAMINATION - II  (GROUP II AND IIA SERVICES) - 07/2026
+
+                                      </a>
+                                  </h5>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="col">
+                            <div class="card h-100 text-center">
+                                <div class="card-body">
+                                  <h5 class="card-title">
+                                      <a style="color:#012970" 
+                                      href="index.aspx?notid=cf52b42c-7e4d-4d72-a8bf-77adf8242159" 
+                                      target="_self">6. COMBINED TECHNICAL SERVICES EXAMINATION (INTERVIEW POSTS) - 08/2026
+
+                                      </a>
+                                  </h5>
+                                </div>
+                            </div>
+                        </div>
+                    
+                            </div>
+                        </div>
+                    	
+
+
+                
+
+            </form>
+        </div>
+    </div>
+    
+     
+
+    <!-- End #main -->
+    <!-- ======= Footer ======= -->
+    <!-- End Footer -->
+    <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i
+        class="bi bi-arrow-up-short"></i></a>
+    <!-- Vendor JS Files -->
+    <script src='/web/theme/assets/vendor/jquery/jquery-1.11.1.min.js'
+        type="text/javascript"></script>
+    <script src='/web/theme/assets/vendor/jquery/jquery-ui.min.js'
+        type="text/javascript"></script>
+    <script src='/web/theme/assets/vendor/jquery/form-validation.js'
+        type="text/javascript"></script>
+    <script type="text/javascript" src='/web/theme/assets/vendor/bootstrap/js/bootstrap.bundle.min.js'></script>
+    
+    <script type="text/javascript">
+
+        window.addEventListener("pageshow", function (event) {
+            var historyTraversal = event.persisted ||
+                (typeof window.performance != "undefined" &&
+                    window.performance.navigation.type === 2);
+            if (historyTraversal) {
+                // Handle page restore.
+                window.location.reload();
+            }
+        });
+
+        document.querySelectorAll(".toggle-btn").forEach(btn => {
+            btn.addEventListener("click", function () {
+                let detailsRow = this.closest("tr").nextElementSibling;
+                let icon = this.querySelector("i");
+                // detailsRow.style.display = detailsRow.style.display === "table-row" ? "none" : "table-row";
+
+                if (detailsRow.style.display === "table-row") {
+                    detailsRow.style.display = "none";
+                    icon.classList.remove("bi-chevron-up");
+                    icon.classList.add("bi-chevron-down");
+                } else {
+                    detailsRow.style.display = "table-row";
+                    icon.classList.remove("bi-chevron-down");
+                    icon.classList.add("bi-chevron-up");
+                }
+
+
+            });
+        });
+
+    </script>
+</body>
+</html>
