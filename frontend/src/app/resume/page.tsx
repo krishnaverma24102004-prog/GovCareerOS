@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { Badge, ErrorNote, Shell, errText, fmtDate, useSession } from "@/components/ui";
-import { api, ApiError, API_URL, getToken } from "@/lib/api";
+import { api, ApiError, API_URL, getToken, setToken } from "@/lib/api";
 import type { Profile, VacancyDetail } from "@/lib/types";
 import type { Resume, ResumeClaim, ResumeEvidence, ResumeFormat, VacancyOption } from "@/lib/types-resume";
 
@@ -70,6 +70,8 @@ async function downloadResume(id: string, format: ResumeFormat): Promise<void> {
     throw new ApiError(0, `cannot reach the API at ${API_URL}`);
   }
   if (!res.ok) {
+    // Same as api(): an expired or revoked token is dropped so the shell sends the user to log in
+    if (res.status === 401) setToken(null);
     const body = (await res.json().catch(() => null)) as { detail?: unknown } | null;
     const msg = typeof body?.detail === "string" ? body.detail : res.statusText || `HTTP ${res.status}`;
     throw new ApiError(res.status, `download failed: ${msg}`);
