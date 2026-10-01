@@ -1,0 +1,39 @@
+{
+  "source": "ESIC",
+  "url": "https://www.esic.gov.in/recruitments",
+  "captured_on": "2026-10-01",
+  "fetch_mode": "HTTP",
+  "fetched_with": "govcareeros.backend.sources.generic_notices.PageFetcher.fetch_http (robots.txt + url_guard, honest User-Agent)",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "robots_txt": "https://www.esic.gov.in/robots.txt and https://esic.gov.in/robots.txt redirect to https://esic.gov.in/404 (an HTML error page, no robots rules); PageFetcher.robots_allows returned True for the listing pages",
+  "notes": "HTML stored exactly as returned by FetchResult.html (UTF-8, LF line endings). No JavaScript needed: the recruitment table (S.No. / Name of Office / Subject / Publish Date / Last Date / Console Sl. No.) is in the served HTML, 10 rows per page, newest first. https://www.esic.gov.in/recruitments redirects to https://esic.gov.in/recruitments. Pages 2 and 3 are the table's own pagination links (/recruitments/index/page:N). The listing changes daily; the page's visitor counter also differs between fetches.",
+  "pages": [
+    {
+      "file": "recruitments.html",
+      "url": "https://www.esic.gov.in/recruitments",
+      "final_url": "https://esic.gov.in/recruitments",
+      "http_status": 200,
+      "sha256": "856a94172cde8597bc57490adce9375635c87d8a83c68926e77a2168e4a1f65a",
+      "bytes": 86766,
+      "page": "Recruitments table, page 1 (S.No. 1-10, published 2026-09-28 to 2026-10-01)"
+    },
+    {
+      "file": "recruitments_page2.html",
+      "url": "https://esic.gov.in/recruitments/index/page:2",
+      "final_url": "https://esic.gov.in/recruitments/index/page:2",
+      "http_status": 200,
+      "sha256": "90ff376cf90ebe0f08d186845a3d69bb823f029883557d3ad90efe4d47576fdb",
+      "bytes": 93995,
+      "page": "Recruitments table, page 2 (S.No. 11-20)"
+    },
+    {
+      "file": "recruitments_page3.html",
+      "url": "https://esic.gov.in/recruitments/index/page:3",
+      "final_url": "https://esic.gov.in/recruitments/index/page:3",
+      "http_status": 200,
+      "sha256": "c544a9cff4593876b1d032a0a357befd4322829c7c9c122d921764f8e4e815ad",
+      "bytes": 85926,
+      "page": "Recruitments table, page 3 (S.No. 21-30)"
+    }
+  ]
+}
