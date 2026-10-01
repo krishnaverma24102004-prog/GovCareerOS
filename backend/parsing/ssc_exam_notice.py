@@ -13,7 +13,8 @@ are not "N years for category X" (ex-servicemen after deducting service, widows 
 Central Government employees "up to 40 years") are stored as AGE_RELAXATION_RULE rows with their own
 basis names for the exam engine; they never reuse the UPSC rule names, whose meaning differs.
 Post-wise age limits (e.g. JE: "up to 30 years" for some posts, "up to 32 years" for others) are
-not mapped to posts here; the notice then gets no exam-level AGE_MAX and a warning.
+not mapped to posts here; the notice then gets no exam-level AGE_MAX and a warning. parsing/ssc_tables.py
+reads the post-wise tables and adds per-post rows on top of this parse (parse_exam_pdf).
 """
 import bisect
 import re
@@ -42,6 +43,15 @@ class ParsedExamPost:
     pay_level: Optional[str]
     pay_scale: Optional[str]
     provenance: Provenance
+    # Set when the notice states them post-wise (parsing/ssc_tables.py)
+    post_code: Optional[str] = None
+    department: Optional[str] = None
+    classification: Optional[str] = None
+    age_min: Optional[int] = None
+    age_max: Optional[int] = None
+    education_text: Optional[str] = None
+    vacancy_count: Optional[int] = None
+    requirements: List[ParsedRequirement] = field(default_factory=list)  # rows that apply to this post only
 
 @dataclass
 class ParsedExam:

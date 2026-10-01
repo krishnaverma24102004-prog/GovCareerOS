@@ -16,14 +16,22 @@ adds only what exam notices state differently:
   * Several education paragraphs for different posts are alternatives: without a post, the best one
     decides (can the candidate sit the exam at all?) and the others are reported, not counted.
 
-Post-level requirement rows replace exam-level rows of the same type.
+Post-level requirement rows replace exam-level rows of the same type. Post-wise notices (CGL, JE) also give:
+
+  * The birth-date window of the notice ("born not earlier than 02-08-1996 and not later than 01-08-2008"
+    for an 18-30 post) decides age when a post's AGE_MAX row carries it: the upper limit must not have been
+    reached on the crucial date. Older candidates go through the same relaxation rules, read that way.
+  * Relaxation rules the notice states for Group 'C' posts only apply to posts classified Group "C".
+  * Without a post, every post is evaluated and the best one decides ("can I sit this exam for some post?");
+    the result names that post and how many posts the profile is eligible for.
 """
 import hashlib
 import json
 import re
 import uuid
+from dataclasses import replace
 from datetime import date, timezone
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +43,7 @@ from govcareeros.backend.models.exam import Exam, ExamEligibilityEvidence, ExamE
 from govcareeros.backend.models.user import PersonalInfo, ProfileVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
 
-ENGINE_VERSION = f"exam_eligibility/1+{rules.ENGINE_VERSION}"
+ENGINE_VERSION = f"exam_eligibility/2+{rules.ENGINE_VERSION}"
 
 async def load_requirements(session: AsyncSession, exam_id: uuid.UUID, post_id: Optional[uuid.UUID]) -> List[rules.Requirement]:
     rows = (await session.execute(select(ExamRequirement).where(
@@ -105,8 +113,51 @@ def exam_age_relaxations(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Re
             options.append(rules.RelaxationOption(basis, years, status, "the profile does not record marital status", r.source_page))
     return options
 
+def _post_group(classification: Optional[str]) -> Optional[str]:
+    m = re.search(r"Group\s*\W?\s*([ABC])\b", classification or "")
+    return m.group(1) if m else None
+
+def scope_to_post(reqs: Sequence[rules.Requirement], post: ExamPost) -> List[rules.Requirement]:
+    """Drops relaxation rules the notice states for another group of posts ("for Group 'C' posts")."""
+    group = _post_group(post.classification)
+    return [r for r in reqs if not (r.req_type == "AGE_RELAXATION_RULE" and isinstance(r.value, dict) and r.value.get("post_group")
+                                    and r.value["post_group"] != group)]
+
 def check_exam_age(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Requirement], crucial: Optional[date],
                    closing: Optional[date], gender: Optional[str] = None) -> List[rules.RuleOutcome]:
+    category = rules.normalize_category(profile.category)
+    limit = rules.age_limit_for(reqs, category) if category else None
+    if limit is not None and limit.value.get("born_not_earlier_than") and profile.date_of_birth and crucial:
+        return _check_birth_window(profile, reqs, limit, crucial, closing, gender)
+    return _check_exam_age_years(profile, reqs, crucial, closing, gender)
+
+def _check_birth_window(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Requirement], limit: rules.Requirement, crucial: date,
+                        closing: Optional[date], gender: Optional[str]) -> List[rules.RuleOutcome]:
+    v = limit.value
+    earliest, latest = date.fromisoformat(v["born_not_earlier_than"]), date.fromisoformat(v["born_not_later_than"])
+    dob, age = profile.date_of_birth, rules.age_on(profile.date_of_birth, crucial)
+    stated = f"born {earliest.isoformat()} to {latest.isoformat()} for {v['category']} (age limit {v.get('min_age')}-{v['max_age']})"
+    evidence = f"DOB {dob.isoformat()}, category {v['category']}, age {age} on crucial date {crucial.isoformat()}"
+    if dob > latest:
+        return [rules.RuleOutcome("AGE", "NOT_MET", f"born after {latest.isoformat()}: below the minimum age on {crucial.isoformat()}",
+                                  stated, evidence, limit.id, limit.source_page)]
+    if dob >= earliest:
+        return [rules.RuleOutcome("AGE", "MET", f"born on or after {earliest.isoformat()} and not after {latest.isoformat()}",
+                                  stated, evidence, limit.id, limit.source_page)]
+    # Born before the window: the upper limit was reached. Relaxations are judged on completed years with the limit
+    # read as the notice states it (not reached = at most limit - 1 completed years)
+    def reached(r: rules.Requirement) -> rules.Requirement:
+        if r.req_type != "AGE_MAX" or not isinstance(r.value, dict) or not r.value.get("born_not_earlier_than"):
+            return r
+        value = dict(r.value, max_age=r.value["max_age"] - 1)
+        if "base_max_age" in value:
+            value["base_max_age"] -= 1
+        return rules.Requirement(r.id, r.req_type, value, r.source_page)
+    o = _check_exam_age_years(profile, [reached(r) for r in reqs], crucial, closing, gender)[0]
+    return [replace(o, requirement=stated, rule=f"born before {earliest.isoformat()} (limit {v['max_age']} reached); {o.rule}")]
+
+def _check_exam_age_years(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Requirement], crucial: Optional[date],
+                          closing: Optional[date], gender: Optional[str] = None) -> List[rules.RuleOutcome]:
     out = rules.check_age(profile, reqs, crucial)
     o = out[0]
     if o.outcome != "NOT_MET" or "no applicable relaxation" not in o.rule:
@@ -205,6 +256,34 @@ def input_fingerprint(exam: Exam, post_id, reqs: List[rules.Requirement]) -> str
              (exam.age_crucial_date, exam.education_cutoff_date, exam.application_end)), *sorted(str(r.id) for r in reqs)]
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
+_STATUS_RANK = {"ELIGIBLE": 4, "CONDITIONAL": 3, "MANUAL_REVIEW": 2, "INELIGIBLE": 1}
+
+async def _posts_with_own_rows(session: AsyncSession, exam_id: uuid.UUID) -> List[ExamPost]:
+    """Posts that carry their own age/education rows (post-wise notices), in the notice's order."""
+    ids = set((await session.execute(select(ExamRequirement.post_id).where(
+        ExamRequirement.exam_id == exam_id, ExamRequirement.post_id.is_not(None), ExamRequirement.superseded_at.is_(None),
+        ExamRequirement.req_type.in_(("AGE_MAX", "EDUCATION"))))).scalars())
+    posts = (await session.execute(select(ExamPost).where(ExamPost.id.in_(ids)))).scalars().all() if ids else []
+    return sorted(posts, key=lambda p: (p.source_page or 0, p.created_at, p.post_key))
+
+async def _best_post(posts: List[ExamPost], judge) -> Tuple[List[rules.RuleOutcome], List[rules.Requirement]]:
+    """No post chosen: every post is judged with its own rows and the best one decides; the others are counted, not shown."""
+    judged = []
+    for i, p in enumerate(posts):
+        outcomes, reqs = await judge(p)
+        status, confidence = rules.overall_status(outcomes)
+        judged.append((_STATUS_RANK[status], confidence, -i, p, outcomes, reqs, status))
+    best = max(judged, key=lambda j: j[:3])
+    counts = {}
+    for j in judged:
+        counts[j[6]] = counts.get(j[6], 0) + 1
+    p = best[3]
+    summary = rules.RuleOutcome(
+        "POST", "NOT_EVALUATED", f"the notice states age/qualification post-wise; best of {len(posts)} posts shown",
+        f"{p.post_name} ({p.department or '-'}, {p.pay_level or '-'})",
+        ", ".join(f"{k}: {v} posts" for k, v in sorted(counts.items(), key=lambda kv: -_STATUS_RANK[kv[0]])), source_page=p.source_page)
+    return best[4] + [summary], [r for j in judged for r in j[5]]
+
 async def evaluate_exam(session: AsyncSession, user_id: uuid.UUID, profile_version_id: uuid.UUID, exam_id: uuid.UUID,
                         post_id: Optional[uuid.UUID] = None) -> ExamEligibilityResult:
     version = await session.get(ProfileVersion, profile_version_id)
@@ -213,6 +292,7 @@ async def evaluate_exam(session: AsyncSession, user_id: uuid.UUID, profile_versi
     exam = await session.get(Exam, exam_id)
     if exam is None:
         raise EligibilityInputError("exam not found")
+    post = None
     if post_id is not None:
         post = await session.get(ExamPost, post_id)
         if post is None or post.exam_id != exam_id:
@@ -220,13 +300,22 @@ async def evaluate_exam(session: AsyncSession, user_id: uuid.UUID, profile_versi
 
     snapshot = await load_profile_snapshot(session, profile_version_id)
     gender = (await session.execute(select(PersonalInfo.gender).where(PersonalInfo.profile_version_id == profile_version_id))).scalar_one_or_none()
-    reqs = await load_requirements(session, exam_id, post_id)
     closing = _day(exam.application_end)
     age_day = _day(exam.age_crucial_date) or closing
     edu_day = _day(exam.education_cutoff_date) or closing
 
-    outcomes = check_exam_age(snapshot, reqs, age_day, closing, gender) + check_exam_education(snapshot, reqs, edu_day) + \
-        rules.check_citizenship(snapshot, reqs)
+    async def judge(p: Optional[ExamPost]) -> Tuple[List[rules.RuleOutcome], List[rules.Requirement]]:
+        reqs = await load_requirements(session, exam_id, p.id if p else None)
+        if p is not None:
+            reqs = scope_to_post(reqs, p)
+        return (check_exam_age(snapshot, reqs, age_day, closing, gender) + check_exam_education(snapshot, reqs, edu_day)
+                + rules.check_citizenship(snapshot, reqs)), reqs
+
+    post_wise = [] if post is not None else await _posts_with_own_rows(session, exam_id)
+    if post_wise:
+        outcomes, reqs = await _best_post(post_wise, judge)
+    else:
+        outcomes, reqs = await judge(post)
     if exam.age_crucial_date is None and closing is not None:
         outcomes.append(rules.RuleOutcome("CRUCIAL_DATE", "NOT_EVALUATED", "the notice text used does not state a crucial date for age; the closing date was used",
                                           "-", f"closing date {closing.isoformat()}"))

@@ -1,5 +1,5 @@
 {
-  "_note": "Unmodified responses from ssc.gov.in's public (no-login) endpoints, fetched with User-Agent 'GovCareerOS/0.1 (personal government-job tracker)'. robots.txt returned 404 at capture time. The endpoints were found by watching the XHR traffic of https://ssc.gov.in/ and https://ssc.gov.in/home/notice-board in headless Chromium.",
+  "_note": "Unmodified responses from ssc.gov.in's public (no-login) endpoints, fetched with User-Agent 'GovCareerOS/0.1 (personal government-job tracker)'. robots.txt returned 404 at capture time. The endpoints were found by watching the XHR traffic of https://ssc.gov.in/ and https://ssc.gov.in/home/notice-board in headless Chromium. PDFs added on 2026-10-01 were downloaded through backend/sources/ssc.py (robots.txt checked, url_guard policy, same user agent); robots.txt allowed every URL.",
   "notice_boards_page1.json": {
     "url": "https://ssc.gov.in/api/general-website/portal/notice-boards?page=1&limit=10&contentType=notice-boards&key=createdAt&order=DESC&isAttachment=true&language=english&attributes=id,headline,examId,contentType,redirectUrl,startDate,endDate,language,createdAt",
     "captured_at": "2026-09-30T08:33:03Z"
@@ -18,5 +18,54 @@
     "published_on_notice_board": "2026-09-07T15:59:02.300Z",
     "last_modified": "Tue, 08 Sep 2026 09:19:12 GMT",
     "captured_at": "2026-09-30T08:29:12Z"
+  },
+  "Notice_of_adv_cgl_2026.pdf": {
+    "url": "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Notice_of_adv_cgl_2026.pdf",
+    "title": "Notice of Combined Graduate Level Examination, 2026",
+    "published_on_notice_board": "2026-05-21T12:51:23.773000Z",
+    "last_modified": "Thu, 21 May 2026 12:51:23 GMT",
+    "captured_at": "2026-10-01T05:57:26Z"
+  },
+  "CGLE_Reopen_23062026.pdf": {
+    "url": "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/CGLE_Reopen_23062026.pdf",
+    "title": "Important Notice regarding re-opening of window for submission of online application form for Combined Graduate Level Examination, 2026",
+    "published_on_notice_board": "2026-06-23T12:52:43.374000Z",
+    "last_modified": "Tue, 23 Jun 2026 12:52:43 GMT",
+    "captured_at": "2026-10-01T05:57:26Z"
+  },
+  "Important_Notice_2026_cgle_2026_12092026.pdf": {
+    "url": "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Important%20Notice%202026_cgle_2026_12092026.pdf",
+    "title": "Important Notice - Schedule of Examination.",
+    "published_on_notice_board": "2026-09-12T12:36:48.395000Z",
+    "last_modified": "Sat, 12 Sep 2026 12:36:48 GMT",
+    "captured_at": "2026-10-01T05:59:24Z"
+  },
+  "Notice_of_adv_je_2026.pdf": {
+    "url": "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Notice_of_adv_je_2026.pdf",
+    "title": "Notice of Junior Engineer Examination, 2026",
+    "published_on_notice_board": "2026-09-02T12:38:43.600000Z",
+    "last_modified": "Wed, 02 Sep 2026 12:38:43 GMT",
+    "captured_at": "2026-10-01T05:57:27Z"
+  },
+  "Addendum_JE_10092026.pdf": {
+    "url": "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Addendum_JE_10092026.pdf",
+    "title": "Addendum- Notice of Junior Engineer Examination, 2026",
+    "published_on_notice_board": "2026-09-10T05:22:40.004000Z",
+    "last_modified": "Thu, 10 Sep 2026 05:22:40 GMT",
+    "captured_at": "2026-10-01T05:57:27Z"
+  },
+  "English_JE_17092026.pdf": {
+    "url": "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/English_JE_17092026.pdf",
+    "title": "Important Notice - Junior Engineer Examination, 2026",
+    "published_on_notice_board": "2026-09-17T10:43:53.946000Z",
+    "last_modified": "Thu, 17 Sep 2026 10:43:53 GMT",
+    "captured_at": "2026-10-01T05:57:27Z"
+  },
+  "Addendum_to_Notice_of_Phase-XIV_2026-20.04.2026-updated.pdf": {
+    "url": "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Addendum%20to%20Notice%20of%20Phase-XIV_2026-20.04.2026-updated.pdf",
+    "title": "Addendum to Notice for Phase-XIV/2026/Selection Posts.",
+    "published_on_notice_board": "2026-04-20T12:19:54.747000Z",
+    "last_modified": "Mon, 20 Apr 2026 12:19:54 GMT",
+    "captured_at": "2026-10-01T06:06:33Z"
   }
 }

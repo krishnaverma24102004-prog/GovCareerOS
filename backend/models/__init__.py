@@ -19,3 +19,4 @@ from govcareeros.backend.models.application import Application, ApplicationRequi
 from govcareeros.backend.models.resume import Resume, ResumeClaim
 from govcareeros.backend.models.audit import ReviewAuditLog
 from govcareeros.backend.models.triage import NoticeTriage, TriageDecision
+from govcareeros.backend.models.exam_version import ExamVersion

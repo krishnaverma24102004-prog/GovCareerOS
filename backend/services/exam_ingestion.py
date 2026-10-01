@@ -2,7 +2,9 @@
 Exam notice PDF -> RawDocument -> deterministic parse -> Exam (+ posts, requirements, provenance).
 
 Idempotent: an exam is keyed by source + the notice's file number, and the same document parsed by the
-same parser version is not stored twice. A re-parse with a newer parser keeps the exam id, replaces
+same parser version is not stored twice. Post-wise tables (parsing/ssc_tables.py) give each post its own
+AGE_MAX and EDUCATION rows; corrigenda already applied to the exam (services/exam_corrigenda.py) are
+re-applied after a re-parse. A re-parse with a newer parser keeps the exam id, replaces
 field provenance, updates posts in place and supersedes (never deletes) requirement rows. A notice
 whose deterministic parse lacks the core fields is left for the LLM draft path (MANUAL_REVIEW).
 """
@@ -19,7 +21,9 @@ from govcareeros.backend.documents.pdf_text import extract_pages
 from govcareeros.backend.models.exam import Exam, ExamFieldProvenance, ExamPost, ExamRequirement
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
-from govcareeros.backend.parsing.ssc_exam_notice import CONDUCTING_BODY, ParsedExam, exam_code_for, parse_exam_notice
+from govcareeros.backend.parsing.ssc_exam_notice import CONDUCTING_BODY, ParsedExam, exam_code_for
+from govcareeros.backend.parsing.ssc_tables import norm, parse_exam_pdf
+from govcareeros.backend.services.exam_corrigenda import apply_exam_versions, ingest_corrigendum_pdf, refresh_education_summary
 from govcareeros.backend.services.exam_drafts import create_exam_draft
 from govcareeros.backend.services.document_ingestion import _as_text, get_or_create_source, store_raw_document
 from govcareeros.backend.services.source_discovery import record_probe
@@ -41,7 +45,8 @@ class ExamIngestionResult:
 
 def _confidence(parsed: ParsedExam) -> float:
     have = sum(1 for f in _SCORED if parsed.value(f) is not None)
-    have += any(r.req_type == "AGE_MAX" for r in parsed.requirements) + any(r.req_type == "EDUCATION" for r in parsed.requirements)
+    reqs = parsed.requirements + [r for p in parsed.posts for r in p.requirements]
+    have += any(r.req_type == "AGE_MAX" for r in reqs) + any(r.req_type == "EDUCATION" for r in reqs)
     return round(have / (len(_SCORED) + 2), 2)
 
 async def store_parsed_exam(session: AsyncSession, source: GovernmentSource, raw, parsed: ParsedExam,
@@ -95,8 +100,19 @@ async def store_parsed_exam(session: AsyncSession, source: GovernmentSource, raw
     for pp in parsed.posts:
         row = posts.get(pp.post_key) or ExamPost(id=uuid.uuid4(), exam_id=exam.id, post_key=pp.post_key)
         row.post_name, row.pay_level, row.pay_scale = pp.post_name, pp.pay_level or None, pp.pay_scale
+        row.post_code, row.department, row.classification = pp.post_code, pp.department, pp.classification
+        row.age_min, row.age_max, row.education_text, row.vacancy_count = pp.age_min, pp.age_max, pp.education_text, pp.vacancy_count
         row.raw_document_id, row.source_page, row.source_excerpt = raw.id, pp.provenance.page, pp.provenance.excerpt
         session.add(row)
+        posts[pp.post_key] = row
+    await session.flush()
+    for pp in parsed.posts:
+        for req in pp.requirements:
+            session.add(ExamRequirement(
+                exam_id=exam.id, post_id=posts[pp.post_key].id, req_type=req.req_type, value=_as_text(req.value), is_mandatory=req.is_mandatory,
+                raw_document_id=raw.id, source_page=req.provenance.page, source_section=req.provenance.section[:255],
+                source_excerpt=req.provenance.excerpt,
+            ))
     for req in parsed.requirements:
         session.add(ExamRequirement(
             exam_id=exam.id, req_type=req.req_type, value=_as_text(req.value), is_mandatory=req.is_mandatory, raw_document_id=raw.id,
@@ -105,12 +121,15 @@ async def store_parsed_exam(session: AsyncSession, source: GovernmentSource, raw
     if notice is not None:
         notice.raw_document_id, notice.review_status = raw.id, "PARSED"
     await session.flush()
+    await refresh_education_summary(session, exam)
+    # A re-parse rewrote the notice's own values; corrigenda stored for this exam apply on top again
+    await apply_exam_versions(session, exam)
     return result
 
 async def ingest_exam_pdf(session: AsyncSession, source: GovernmentSource, url: str, body: bytes,
                           notice: Optional[RecruitmentNotice] = None) -> ExamIngestionResult:
     raw, _ = await store_raw_document(session, source, url, body, 200, "application/pdf")
-    parsed = parse_exam_notice(extract_pages(body))
+    parsed = parse_exam_pdf(body, extract_pages(body))
     raw.parser_version = parsed.parser_version
     result = await store_parsed_exam(session, source, raw, parsed, notice)
     if notice is not None and result.exam_id is None:
@@ -143,5 +162,29 @@ async def run_ssc_pipeline(session: AsyncSession, fetcher, pages: int = 1, limit
             errors.append(f"{notice.url}: {e}")
         except Exception as e:  # one bad PDF must not stop the others
             errors.append(f"{notice.url}: {type(e).__name__}: {e}")
+    corrigenda = await _apply_pending_corrigenda(session, source, fetcher, limit, errors)
     await session.flush()
-    return {"probe": summary, "exams": results, "drafts": drafts, "errors": errors}
+    return {"probe": summary, "exams": results, "drafts": drafts, "corrigenda": corrigenda, "errors": errors}
+
+async def _apply_pending_corrigenda(session: AsyncSession, source: GovernmentSource, fetcher, limit: int, errors: List[str]) -> list:
+    """Corrigenda/addenda whose title names a stored exam, and schedule notices (their titles rarely name the exam)."""
+    names = [f" {norm(e.name)} " for e in (await session.execute(select(Exam).where(Exam.source_id == source.id))).scalars()]
+    if not names:
+        return []
+    pending = (await session.execute(select(RecruitmentNotice).where(
+        RecruitmentNotice.source_id == source.id, RecruitmentNotice.notice_kind.in_(("CORRIGENDUM", "SCHEDULE")),
+        RecruitmentNotice.document_type == "PDF", RecruitmentNotice.review_status == "NEW",
+    ).order_by(RecruitmentNotice.first_seen_at))).scalars().all()
+    wanted = [n for n in pending if n.notice_kind == "SCHEDULE" or any(name in f" {norm(n.title)} " for name in names)][:limit]
+    applied = []
+    for notice in wanted:
+        try:
+            body = await ssc.download_pdf(fetcher, notice.url)
+            async with session.begin_nested():
+                applied.append(await ingest_corrigendum_pdf(session, source, notice.url, body, notice))
+        except (ssc.AccessRestricted, ssc.RobotsDisallowed, UrlRefused) as e:
+            notice.review_status = type(e).__name__.upper()[:30]
+            errors.append(f"{notice.url}: {e}")
+        except Exception as e:
+            errors.append(f"{notice.url}: {type(e).__name__}: {e}")
+    return applied

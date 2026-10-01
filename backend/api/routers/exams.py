@@ -25,6 +25,7 @@ class ExamPostOut(BaseModel):
     post_name: str
     post_code: Optional[str]
     department: Optional[str]
+    classification: Optional[str] = None
     pay_level: Optional[str]
     pay_scale: Optional[str]
     age_min: Optional[int]
