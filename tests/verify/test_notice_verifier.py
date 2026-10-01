@@ -95,7 +95,8 @@ def test_lookalike_names_the_domain_it_imitates():
     assert check_domain(ITEMS["bsnltowerindia"]["value"]).host == "bsnltowerindia.com"
 
 @pytest.mark.parametrize("value, official", [
-    ("https://pmvbry.epfindia.gov.in", "epfindia.gov.in"),
+    # EPFO's registry entry now points at epfo.gov.in, so epfindia.gov.in is official through the gov.in suffix
+    ("https://pmvbry.epfindia.gov.in", "gov.in"),
     ("https://www.jointerritorialarmy.gov.in/", "gov.in"),
     ("indiapost.gov.in", "indiapost.gov.in"),
 ])
