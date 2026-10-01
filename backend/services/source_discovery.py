@@ -55,6 +55,11 @@ async def sync_registry(session: AsyncSession, specs: Iterable[SourceSpec] = SOU
             )
             session.add(source)
         else:
+            if source.recruitment_url != spec.recruitment_url:
+                # A page resolved from the old URL would otherwise keep overriding the corrected one
+                config = _config(source)
+                if config.pop("resolved_url", None) is not None:
+                    source.configuration = json.dumps(config)
             source.recruitment_url = spec.recruitment_url
             # The fetch policy is derived from the domain, so it must follow the registry
             source.official_domain = spec.official_domain

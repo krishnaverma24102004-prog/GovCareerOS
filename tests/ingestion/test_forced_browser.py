@@ -80,3 +80,17 @@ async def test_sync_stores_the_flag_and_the_sweep_passes_it(db_session):
     sources["AGRIWELFARE"].configuration = json.dumps({"force_browser": True, "resolved_url": URL})
     again = await sync_registry(db_session, [replace(SPECS["AGRIWELFARE"], force_browser=False)])
     assert json.loads(again["AGRIWELFARE"].configuration) == {"resolved_url": URL}
+
+@pytest.mark.asyncio
+async def test_registry_url_change_drops_the_page_resolved_from_the_old_url(db_session):
+    # The AGRIWELFARE registry URL before the 2026-10-01 fix (git history of backend/sources/registry.py)
+    old = "https://agriwelfare.gov.in/en/Recruitment"
+    sources = await sync_registry(db_session, [replace(SPECS["AGRIWELFARE"], recruitment_url=old, force_browser=False)])
+    sources["AGRIWELFARE"].configuration = json.dumps({"resolved_url": old, "last_probe_status": "OK"})
+    again = await sync_registry(db_session, [SPECS["AGRIWELFARE"]])
+    assert again["AGRIWELFARE"].recruitment_url == URL
+    assert json.loads(again["AGRIWELFARE"].configuration) == {"last_probe_status": "OK", "force_browser": True}
+
+    recorder = _Recorder()
+    await probe_sources(recorder, [again["AGRIWELFARE"]])
+    assert recorder.calls == [(URL, True)]
