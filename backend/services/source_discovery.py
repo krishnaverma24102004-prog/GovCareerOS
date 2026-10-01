@@ -59,6 +59,14 @@ async def sync_registry(session: AsyncSession, specs: Iterable[SourceSpec] = SOU
             # The fetch policy is derived from the domain, so it must follow the registry
             source.official_domain = spec.official_domain
             source.adapter_name = spec.parser or source.adapter_name
+        # Fetch mode follows the registry too (the probe reads it from the stored configuration)
+        config = _config(source)
+        if bool(config.get("force_browser")) != spec.force_browser:
+            if spec.force_browser:
+                config["force_browser"] = True
+            else:
+                del config["force_browser"]
+            source.configuration = json.dumps(config)
         by_name[spec.name] = source
     await session.flush()
     return by_name
@@ -96,7 +104,8 @@ async def probe_sources(fetcher: PageFetcher, sources: List[GovernmentSource], c
             try:
                 if source.adapter_name == "ssc":
                     return await ssc.probe(fetcher, allow_browser=getattr(fetcher, "allow_browser", False))
-                return await fetcher.discover(_probe_url(source), source_policy(source))
+                return await fetcher.discover(_probe_url(source), source_policy(source),
+                                             browser=bool(_config(source).get("force_browser")))
             except Exception as e:  # one broken site must not stop the sweep
                 return ProbeResult("UNREACHABLE", detail=f"{type(e).__name__}: {str(e)[:200]}")
 

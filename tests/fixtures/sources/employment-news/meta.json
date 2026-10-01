@@ -1,0 +1,14 @@
+{
+  "source": "EMPLOYMENT-NEWS",
+  "captured": "2026-10-01",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "files": {
+    "alljobs.html": {
+      "url": "https://employmentnews.gov.in/NewEmp/AllJobs.aspx?k=All",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "how": "govcareeros PageFetcher.fetch_http (url_guard + robots.txt, honest User-Agent); FetchResult.html written as UTF-8 text (policy OFFICIAL_AGGREGATOR)"
+    }
+  },
+  "notes": "robots.txt on employmentnews.gov.in returned 404 (nothing disallowed). The 'All JOBS' repeater table has 12 rows (issued date, organisation, post, method of appointment, last date) and no per-row links: full adverts are in the subscription e-version, which is not fetched. Captured by the live re-verification run of 2026-10-01 (scratchpad fix/EMPLOYMENT-NEWS)."
+}

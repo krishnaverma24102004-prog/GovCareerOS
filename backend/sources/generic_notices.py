@@ -289,9 +289,15 @@ class PageFetcher:
         finally:
             await context.close()
 
-    async def probe(self, url: str, policy: Optional[UrlPolicy] = None) -> ProbeResult:
+    async def probe(self, url: str, policy: Optional[UrlPolicy] = None, browser: bool = False) -> ProbeResult:
+        """`browser`: the source is known to fill its listing with JavaScript, so render it straight away."""
         policy = policy or UrlPolicy.from_url(url)
+        if browser and self.allow_browser:
+            return analyze(await self.fetch_browser(url, policy), "BROWSER", policy)
         result = analyze(await self.fetch_http(url, policy), "HTTP", policy)
+        if browser and result.status == "NO_NOTICES":
+            # Browser disabled for this run: say what is missing rather than report an empty page
+            result.status, result.detail = "NEEDS_BROWSER", "source is configured for browser fetch"
         if result.status == "NEEDS_BROWSER" and self.allow_browser:
             result = analyze(await self.fetch_browser(url, policy), "BROWSER", policy)
         return result
@@ -319,12 +325,12 @@ class PageFetcher:
             found += [u for u in sitemap_recruitment_urls(fetched.html, policy) if u not in found]
         return found[:limit]
 
-    async def discover(self, url: str, policy: Optional[UrlPolicy] = None) -> ProbeResult:
+    async def discover(self, url: str, policy: Optional[UrlPolicy] = None, browser: bool = False) -> ProbeResult:
         """Probe the configured page; if it's wrong/missing, look for the site's own Vacancies/Recruitment page:
         homepage menu, the English homepage's menu (bilingual portals open in Hindi), the sitemap, then the
         JavaScript-rendered homepage menu."""
         policy = policy or UrlPolicy.from_url(url)
-        result = await self.probe(url, policy)
+        result = await self.probe(url, policy, browser)
         if result.status not in ("HTTP_ERROR", "NO_NOTICES"):
             return result
 
