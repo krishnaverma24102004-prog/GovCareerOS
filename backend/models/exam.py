@@ -64,6 +64,7 @@ class ExamPost(Base, TimestampMixin):
     post_name: Mapped[str] = mapped_column(String(500))
     post_code: Mapped[Optional[str]] = mapped_column(String(50))
     department: Mapped[Optional[str]] = mapped_column(String(500))
+    classification: Mapped[Optional[str]] = mapped_column(String(200))  # e.g. Group "C"; scopes relaxations stated for Group 'C' posts
     pay_level: Mapped[Optional[str]] = mapped_column(String(200))
     pay_scale: Mapped[Optional[str]] = mapped_column(Text)
     age_min: Mapped[Optional[int]] = mapped_column(Integer)
