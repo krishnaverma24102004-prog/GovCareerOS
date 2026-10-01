@@ -1,0 +1,28 @@
+{
+  "source": "STEEL",
+  "captured_on": "2026-10-01",
+  "fetch_mode": "HTTP",
+  "fetched_with": "govcareeros.backend.sources.generic_notices.PageFetcher.fetch_http (robots.txt + url_guard, honest User-Agent)",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "pages": [
+    {
+      "url": "https://steel.gov.in/vacancy",
+      "final_url": "https://steel.gov.in/vacancy",
+      "http_status": 200,
+      "file": "vacancy.html",
+      "sha256": "12e190a5a82dc3fe16833de6d1226367cb02c97997e841fda8c141514003de2f",
+      "bytes": 249174,
+      "sha256_lf": "12e190a5a82dc3fe16833de6d1226367cb02c97997e841fda8c141514003de2f"
+    },
+    {
+      "url": "https://steel.gov.in/vacancy?page=1",
+      "final_url": "https://steel.gov.in/vacancy?page=1",
+      "http_status": 200,
+      "file": "vacancy_page_1.html",
+      "sha256": "0d19953502726082a275d73f7161ec25af1c43c3733efa88525d8c9f1f30865a",
+      "bytes": 215609,
+      "sha256_lf": "c5f7d6b609545000c56d8ec1367dbe22d7f639895457e8eae5f0c98a2999cc13"
+    }
+  ],
+  "notes": "HTML stored exactly as returned by FetchResult.html (httpx text), UTF-8 encoded. The page is static Drupal HTML (no JavaScript needed). It holds four 'recruitment_vacancy' view blocks (Recruitment Rules/Notification, CPSE Vacancies, MoS Vacancies, Young Professional/ Consultant/Trainee etc.), each a table S. No. | Title | Documents | Validity Date. The CPSE and MoS blocks share one pager (?page=1 is their second page). The registry URL https://steel.gov.in/vacancies returned HTTP 404 on the capture date. 'sha256' is the exact captured bytes; 'sha256_lf' is the same content with CRLF read as LF (vacancy_page_1.html had four CRLFs inside Drupal BigPipe scripts), which survives git line-ending conversion."
+}
