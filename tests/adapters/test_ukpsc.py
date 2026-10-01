@@ -65,22 +65,24 @@ def test_recruitment_rows():
         "kind_hint": "Advertisement",
     }
 
-    # Third document of the same examination: its own dates, not the row's first ones
+    # Third document of the same examination: its own Publish Date, not the row's first one. Its End Date
+    # (16-10-2026) closes the correction window, not applications, so it is not a last date
     correction = by_url["https://psc.uk.gov.in/public/uploads/recruitment/52805175.pdf"]
     assert correction.title == ("Uttarakhand Combined State Civil/Upper Subordinate Services Examination-2026: "
                                 "Edit/Correction of Online Application Form")
-    assert (correction.published_on, correction.last_date) == (date(2026, 10, 7), date(2026, 10, 16))
+    assert (correction.published_on, correction.last_date) == (date(2026, 10, 7), None)
+    assert "last_date" not in correction.evidence
     assert correction.kind_hint is None and "kind_hint" not in correction.evidence
 
     judicial = by_url["https://psc.uk.gov.in/public/uploads/recruitment/1304545086.pdf"]
     assert judicial.title == ("Uttarakhand Judicial Service Civil Judge (Junior Division) Exam-2023: "
                               "Notification (Required Document List)")
-    assert (judicial.published_on, judicial.last_date) == (date(2026, 9, 29), date(2026, 10, 6))
+    assert (judicial.published_on, judicial.last_date) == (date(2026, 9, 29), None)
 
     lecturer = by_url["https://psc.uk.gov.in/public/uploads/recruitment/1433940324.pdf"]
     assert lecturer.title == ("Uttarakhand Special Subordinate Education (Lecturer-Group 'C') Services "
                               "General/Women Branch Exam-2025: Notification")
-    assert (lecturer.published_on, lecturer.last_date) == (date(2026, 9, 24), date(2026, 10, 24))
+    assert (lecturer.published_on, lecturer.last_date) == (date(2026, 9, 24), None)
 
     vet = by_url["https://psc.uk.gov.in/public/uploads/recruitment/1339347899.pdf"]
     assert vet.title == "Veterinary Officers Exam - 2026: Advertisement"
@@ -89,6 +91,7 @@ def test_recruitment_rows():
     rejection = by_url["https://psc.uk.gov.in/public/uploads/recruitment/1904885097.pdf"]
     assert rejection.title == "Chief Fire Officer Exam-2026: Final Rejection List"
     assert rejection.kind_hint is None
+    assert rejection.last_date is None  # its End Date (10-10-2026) is not an application deadline
 
 def test_admit_card_rows_take_the_kind_from_their_label_or_the_page_heading():
     by_url = _by_url(_rows("admitcards_en.html"))
@@ -129,7 +132,9 @@ def test_answer_key_rows_and_a_blank_end_date():
     history = by_url["https://psc.uk.gov.in/public/uploads/answerkey/1570008564.pdf"]
     assert history.title == ("Uttarakhand Special Subordinate Education (Lecturer-Group 'C') Services General/Women "
                              "Branch Exam-2025: Provisional Answer Key (History-I)")
-    assert (history.published_on, history.last_date) == (date(2026, 9, 15), date(2026, 9, 24))
+    # End Date 24-09-2026 closes online objections to the key, not applications
+    assert (history.published_on, history.last_date) == (date(2026, 9, 15), None)
+    assert "last_date" not in history.evidence
     assert history.kind_hint == "ANSWER_KEY"
 
     # The page leaves this row's End Date cells blank: no last date, no evidence for one
@@ -182,6 +187,8 @@ def test_no_invented_dates(name):
             if value is None:
                 assert field not in r.evidence
                 continue
+            if field == "last_date":
+                assert r.kind_hint == "VACANCY"  # only an advertisement's End Date closes applications
             text = r.evidence[field]
             assert re.fullmatch(r"\d{2}-\d{2}-\d{4}", text)
             assert text in raw

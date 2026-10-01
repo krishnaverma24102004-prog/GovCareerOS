@@ -14,7 +14,10 @@ order. Each document becomes a ListingRow:
                   evidence "<Advertisement Name> | <Title entry>", both exactly as the cells show them
   url             the entry's own PDF link in the View column, absolute, on psc.uk.gov.in only
   published_on    the entry's "Publish Date" (dd-mm-yyyy)
-  last_date       the entry's "End Date" (dd-mm-yyyy), on the pages that have that column
+  last_date       the entry's "End Date" (dd-mm-yyyy), only for an entry labelled "Advertisement": that
+                  column is the end of whatever window the document opens (application correction,
+                  document submission, answer-key objections, ...), and only for the advertisement is it
+                  the closing date for applications
   kind_hint       from the entry's own label (Corrigendum/Addendum, Admit Card, Answer Key,
                   Result / Cut Off Marks / Marks of Candidates, Advertisement); otherwise from the page's
                   own heading (Admit Card -> ADMIT_CARD, Results -> RESULT, Answer Key -> ANSWER_KEY).
@@ -250,11 +253,11 @@ def parse_listing(html: str, base_url: str) -> List[ListingRow]:
             pub = _entry_at(pubs, i, len(titles))
             if pub and _parse_date(pub[0]):
                 row.published_on, row.evidence["published_on"] = _parse_date(pub[0]), pub[0]
+            kind = _kind(doc, _KIND_RULES) if doc else None
             end = _entry_at(ends, i, len(titles))
-            if end and _parse_date(end[0]):
+            if kind and kind[0] == "VACANCY" and end and _parse_date(end[0]):
                 row.last_date, row.evidence["last_date"] = _parse_date(end[0]), end[0]
 
-            kind = _kind(doc, _KIND_RULES) if doc else None
             if kind is None and page_kind:
                 kind = (page_kind[0], page_title)
             if kind:
