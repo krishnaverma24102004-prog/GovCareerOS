@@ -351,7 +351,8 @@ def _change_item(vc: change_log.VersionChanges, omitted: List[str], subject: str
         if new is None:
             omitted.append(f"{subject}: {c.label} change not shown (no citation)")
             continue
-        old = _cite(c.old_evidence.url, c.old_evidence.page, c.old_evidence.quote, f"{c.old_evidence.document} (earlier value)")             if c.old_evidence else None
+        old = _cite(c.old_evidence.url, c.old_evidence.page, c.old_evidence.quote, f"{c.old_evidence.document} (earlier value)") \
+            if c.old_evidence else None
         what = f"{c.label} ({c.subject})" if c.subject else c.label
         now = change_log.fmt_value(c.field, c.new)
         if old:

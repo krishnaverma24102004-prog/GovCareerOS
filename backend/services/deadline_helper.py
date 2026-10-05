@@ -81,6 +81,12 @@ def _number(word: str) -> int:
     return _TENS.get(parts[0], _UNITS.get(parts[0], 0)) + (_UNITS[parts[1]] if len(parts) > 1 else 0)
 
 def _parse_day(text: str) -> Optional[date]:
+    try:
+        return _day(text)
+    except ValueError:  # not a calendar day ("31.02.2026"): not a stated publication day
+        return None
+
+def _day(text: str) -> Optional[date]:
     m = re.fullmatch(r"(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})", text.strip())
     if m:
         y = int(m.group(3))

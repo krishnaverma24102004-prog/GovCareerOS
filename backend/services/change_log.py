@@ -86,13 +86,16 @@ def fmt_value(f: str, value: Optional[str]) -> str:
     value = re.sub(r"\s+", " ", value).strip()
     return value if len(value) <= 160 else value[:159].rstrip() + "…"
 
+def _page(ev: Evidence) -> str:
+    return f" (p.{ev.page})" if ev.page else ""  # a listing entry's own words have no page
+
 def change_lines(vc: VersionChanges) -> List[str]:
     """One line per change for people: 'Last date ...: 22 Jun 2026 23:00 IST (p.1) -> 25 Jun 2026 23:00 IST (p.1)'."""
     out = []
     for c in vc.changes:
         what = f"{c.label} ({c.subject})" if c.subject else c.label
-        was = f"{fmt_value(c.field, c.old)} (p.{c.old_evidence.page})" if c.old_evidence else fmt_value(c.field, c.old)
-        line = f"{what}: {was} -> {fmt_value(c.field, c.new)} (p.{c.new_evidence.page})"
+        was = fmt_value(c.field, c.old) + (_page(c.old_evidence) if c.old_evidence else "")
+        line = f"{what}: {was} -> {fmt_value(c.field, c.new)}{_page(c.new_evidence)}"
         out.append(line + ("; stated, not applied" if not c.applied else ""))
     return out
 
