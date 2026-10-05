@@ -2,7 +2,8 @@
 /**
  * Small shared pieces: the signed-in guard, the nav bar, status badges and date formatting.
  * useSession() is the only place that decides "signed in or not": a missing token or a 401 from
- * /auth/me sends the user to /login.
+ * /auth/me sends the user to /login. Public pages (the notice check) use useOptionalSession(),
+ * which never redirects.
  */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,6 +29,21 @@ export function useSession(): User | null {
   return user;
 }
 
+/** The signed-in user if there is one; anonymous visitors stay on the page. */
+export function useOptionalSession(): { user: User | null; checked: boolean } {
+  const [state, setState] = useState<{ user: User | null; checked: boolean }>({ user: null, checked: false });
+  useEffect(() => {
+    if (!getToken()) {
+      setState({ user: null, checked: true });
+      return;
+    }
+    api<User>("/auth/me")
+      .then((user) => setState({ user, checked: true }))
+      .catch(() => setState({ user: null, checked: true }));
+  }, []);
+  return state;
+}
+
 const LINKS = [
   ["/matches", "Matches"],
   ["/exams", "Exams"],
@@ -38,7 +54,11 @@ const LINKS = [
   ["/profile", "Profile"],
   ["/alerts", "Alerts"],
   ["/review", "Review"],
+  ["/verify", "Check a notice"],
 ] as const;
+
+// Pages that work without logging in; the only links an anonymous visitor sees
+const PUBLIC_LINKS = new Set<string>(["/verify"]);
 
 // Reviewer console pages; the backend refuses them to everyone else anyway
 const REVIEWER_LINKS = [
@@ -46,9 +66,20 @@ const REVIEWER_LINKS = [
   ["/admin/users", "Users"],
 ] as const;
 
-export function Shell({ user, children, wide = false }: { user: User | null; children: ReactNode; wide?: boolean }) {
+export function Shell({
+  user,
+  children,
+  wide = false,
+  publicPage = false,
+}: {
+  user: User | null;
+  children: ReactNode;
+  wide?: boolean;
+  /** render without a signed-in user (the page itself must not need one) */
+  publicPage?: boolean;
+}) {
   const path = usePathname();
-  const links = user?.is_reviewer ? [...LINKS, ...REVIEWER_LINKS] : LINKS;
+  const links = user?.is_reviewer ? [...LINKS, ...REVIEWER_LINKS] : user ? LINKS : LINKS.filter(([href]) => PUBLIC_LINKS.has(href));
   // The most specific link wins, so /review/facts does not also light up /review
   const active = links.map(([href]) => href).filter((href) => path === href || path?.startsWith(href + "/")).sort((a, b) => b.length - a.length)[0];
   const router = useRouter();
@@ -72,12 +103,18 @@ export function Shell({ user, children, wide = false }: { user: User | null; chi
             </Link>
           ))}
           <span className="ml-auto text-sm text-slate-500">{user?.email}</span>
-          <button onClick={logout} className="text-sm text-slate-600 hover:text-slate-900">
-            Log out
-          </button>
+          {user || !publicPage ? (
+            <button onClick={logout} className="text-sm text-slate-600 hover:text-slate-900">
+              Log out
+            </button>
+          ) : (
+            <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900">
+              Log in
+            </Link>
+          )}
         </nav>
       </header>
-      <main className={`mx-auto ${wide ? "max-w-screen-2xl" : "max-w-5xl"} px-4 py-6`}>{user ? children : <p className="text-slate-500">Loading…</p>}</main>
+      <main className={`mx-auto ${wide ? "max-w-screen-2xl" : "max-w-5xl"} px-4 py-6`}>{user || publicPage ? children : <p className="text-slate-500">Loading…</p>}</main>
     </div>
   );
 }
@@ -103,6 +140,17 @@ const STATUS_STYLE: Record<string, string> = {
   NOT_REQUIRED: "bg-slate-200 text-slate-700",
   NOT_STATED: "bg-slate-100 text-slate-500",
   REVIEWER: "bg-green-100 text-green-800",
+  // Notice check (POST /verify): verdicts, link checks, a matched vacancy's status
+  FOUND_ON_OFFICIAL_SOURCE: "bg-green-100 text-green-800",
+  OFFICIAL: "bg-green-100 text-green-800",
+  ACTIVE: "bg-green-100 text-green-800",
+  LOOKALIKE_DOMAIN: "bg-red-100 text-red-800",
+  LOOKALIKE: "bg-red-100 text-red-800",
+  CANCELLED: "bg-red-100 text-red-800",
+  UNOFFICIAL_DOMAIN: "bg-amber-100 text-amber-800",
+  UNOFFICIAL: "bg-amber-100 text-amber-800",
+  NOT_FOUND_ON_OFFICIAL_SOURCES: "bg-slate-200 text-slate-700",
+  INVALID: "bg-slate-200 text-slate-700",
 };
 
 export function Badge({ value }: { value: string }) {

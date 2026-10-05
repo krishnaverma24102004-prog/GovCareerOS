@@ -1,9 +1,10 @@
 import uuid
 from datetime import date, datetime
 from typing import Optional
-from sqlalchemy import Date, String, Text, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Date, Integer, String, Text, ForeignKey, UniqueConstraint, delete, event, inspect
+from sqlalchemy.orm import Mapped, Session, mapped_column
 from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
+from govcareeros.backend.parsing.title_tokens import normalise, token_counts
 
 class RecruitmentNotice(Base, TimestampMixin):
     """A recruitment-related link seen on an official source page (notice level, not yet a Vacancy)."""
@@ -40,3 +41,35 @@ class RecruitmentNotice(Base, TimestampMixin):
     # Rows without a document of their own (url is the listing page, e.g. EMPLOYMENT-NEWS): what tells them
     # apart, hashed into url_hash together with the url
     listing_row_key: Mapped[Optional[str]] = mapped_column(Text)
+
+class RecruitmentNoticeTitleToken(Base):
+    """One distinct word of a notice title (backend/parsing/title_tokens.py), so the public notice check looks up the
+    notices whose titles a pasted text covers instead of loading every notice. Titles under MIN_TITLE_TOKENS words have
+    no rows (the check never matches them by wording). Written by the before_flush hook below on every ORM insert or
+    title change; the migration that created the table filled it for existing notices."""
+    __tablename__ = "recruitment_notice_title_tokens"
+
+    notice_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("recruitment_notices.id", ondelete="CASCADE"), primary_key=True)
+    token: Mapped[str] = mapped_column(Text, primary_key=True, index=True)
+    occurrences: Mapped[int] = mapped_column(Integer)
+    # The same on every row of a notice: its number of title words (with repeats) and normalised title length
+    title_tokens: Mapped[int] = mapped_column(Integer)
+    title_chars: Mapped[int] = mapped_column(Integer, index=True)
+
+def title_token_rows(notice_id: uuid.UUID, title: str) -> list:
+    counts = token_counts(title or "")
+    total, chars = sum(counts.values()), len(normalise(title or ""))
+    return [RecruitmentNoticeTitleToken(notice_id=notice_id, token=t, occurrences=n, title_tokens=total, title_chars=chars)
+            for t, n in counts.items()]
+
+@event.listens_for(Session, "before_flush")
+def _index_notice_titles(session: Session, flush_context, instances) -> None:
+    for obj in list(session.new):
+        if isinstance(obj, RecruitmentNotice):
+            if obj.id is None:
+                obj.id = uuid.uuid4()
+            session.add_all(title_token_rows(obj.id, obj.title))
+    for obj in list(session.dirty):
+        if isinstance(obj, RecruitmentNotice) and inspect(obj).attrs.title.history.has_changes():
+            session.execute(delete(RecruitmentNoticeTitleToken).where(RecruitmentNoticeTitleToken.notice_id == obj.id))
+            session.add_all(title_token_rows(obj.id, obj.title))

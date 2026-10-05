@@ -41,17 +41,21 @@ function detail(body: unknown, fallback: string): string {
   return fallback;
 }
 
-export async function api<T>(path: string, init: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
+export async function api<T>(
+  path: string,
+  init: { method?: string; body?: unknown; form?: FormData; auth?: boolean } = {},
+): Promise<T> {
   const headers: Record<string, string> = {};
+  // A FormData body (file uploads) sets its own multipart Content-Type with the boundary
   if (init.body !== undefined) headers["Content-Type"] = "application/json";
   const token = getToken();
   if (init.auth !== false && token) headers["Authorization"] = `Bearer ${token}`;
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
-      method: init.method || "GET",
+      method: init.method || (init.form ? "POST" : "GET"),
       headers,
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      body: init.form ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
     });
   } catch {
     throw new ApiError(0, `cannot reach the API at ${API_URL}`);

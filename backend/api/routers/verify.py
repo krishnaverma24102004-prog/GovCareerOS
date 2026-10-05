@@ -1,7 +1,8 @@
 """
 POST /verify: the free public notice check (no login). Takes pasted text, a link, or a PDF (up to 10 MB).
 
-The link is analysed as a string only; nothing the user sends is ever fetched.
+The link is analysed as a string only; nothing the user sends is ever fetched. The body size is limited before it is
+parsed (backend/api/body_limit.py); the PDF is read off the event loop within page, time and OCR limits.
 """
 from dataclasses import asdict
 from datetime import date
@@ -54,12 +55,17 @@ class VerifyOut(BaseModel):
     red_flags: List[RedFlagOut]
     advertisement_numbers: List[str]
     text_chars: int
+    pdf_pages: Optional[int]
+    pdf_pages_read: Optional[int]
+    ocr_pages: List[int]
+    notes: List[str]
 
 @router.post("", response_model=VerifyOut)
 async def verify_notice(
     text: Optional[str] = Form(None, max_length=notice_verifier.MAX_TEXT_CHARS),
     url: Optional[str] = Form(None, max_length=2000),
     file: Optional[UploadFile] = File(None, description="the notice as a PDF, up to 10 MB"),
+    ocr: bool = Form(True, description="read up to a few scanned pages of the PDF by OCR (slower)"),
     session: AsyncSession = Depends(get_session),
 ):
     pdf = None  # status codes as numbers: their Starlette constant names changed across versions
@@ -72,7 +78,12 @@ async def verify_notice(
     if not (text and text.strip()) and not (url and url.strip()) and not pdf:
         raise HTTPException(422, "paste the notice text, a link, or upload a PDF")
     try:
-        result = await notice_verifier.verify(session, text=text, url=url, pdf=pdf)
+        result = await notice_verifier.verify(session, text=text, url=url, pdf=pdf, ocr=ocr)
     except RuntimeError as e:  # PyMuPDF raises on a damaged file
         raise HTTPException(422, f"could not read this PDF: {e}") from e
+    except notice_verifier.PdfTimeout as e:
+        raise HTTPException(422, f"this PDF took longer than {notice_verifier.PDF_TIMEOUT_SECONDS} seconds to read") from e
+    except notice_verifier.PdfBusy as e:
+        raise HTTPException(503, "too many PDFs are being checked right now; try again in a minute",
+                            headers={"Retry-After": "30"}) from e
     return VerifyOut.model_validate(asdict(result))
