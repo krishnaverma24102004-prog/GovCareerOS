@@ -26,11 +26,10 @@ Post-level requirement rows replace exam-level rows of the same type. Post-wise 
     the result names that post and how many posts the profile is eligible for.
 """
 import hashlib
-import json
 import re
 import uuid
 from dataclasses import replace
-from datetime import date, timezone
+from datetime import date, datetime, timezone
 from typing import List, Optional, Sequence, Tuple
 
 from sqlalchemy import select
@@ -38,7 +37,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from govcareeros.backend.eligibility import rules
-from govcareeros.backend.eligibility.engine import JSON_REQUIREMENTS, EligibilityInputError, load_profile_snapshot
+from govcareeros.backend.eligibility import certificate_check
+from govcareeros.backend.eligibility.engine import EligibilityInputError, load_profile_snapshot, requirement_value
 from govcareeros.backend.models.exam import Exam, ExamEligibilityEvidence, ExamEligibilityResult, ExamPost, ExamRequirement
 from govcareeros.backend.models.user import PersonalInfo, ProfileVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
@@ -55,11 +55,7 @@ async def load_requirements(session: AsyncSession, exam_id: uuid.UUID, post_id: 
     for r in rows:
         if r.post_id is None and r.req_type in post_types:
             continue
-        try:
-            value = json.loads(r.value) if r.req_type in JSON_REQUIREMENTS else r.value
-        except (json.JSONDecodeError, TypeError):
-            value = r.value
-        out.append(rules.Requirement(r.id, r.req_type, value, r.source_page))
+        out.append(rules.Requirement(r.id, r.req_type, requirement_value(r), r.source_page))
     return out
 
 # ---------- age ----------
@@ -320,6 +316,9 @@ async def evaluate_exam(session: AsyncSession, user_id: uuid.UUID, profile_versi
         outcomes.append(rules.RuleOutcome("CRUCIAL_DATE", "NOT_EVALUATED", "the notice text used does not state a crucial date for age; the closing date was used",
                                           "-", f"closing date {closing.isoformat()}"))
     status, confidence = rules.overall_status(outcomes)
+    # Separate section, after the verdict so it cannot change status/confidence (see certificate_check)
+    outcomes += certificate_check.check_certificates(snapshot, reqs, await certificate_check.load_held(session, profile_version_id),
+                                                     closing, datetime.now(IST).date())
     result = ExamEligibilityResult(
         id=uuid.uuid4(), user_id=user_id, exam_id=exam_id, post_id=post_id, profile_version_id=profile_version_id,
         engine_version=ENGINE_VERSION, crucial_date=exam.age_crucial_date or exam.application_end, status=status,

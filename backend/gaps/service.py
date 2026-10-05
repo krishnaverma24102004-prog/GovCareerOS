@@ -29,7 +29,8 @@ from govcareeros.backend.parsing.upsc_advertisement import IST
 from govcareeros.backend.relevance import scoring, service as relevance_service
 
 def _signature(rows) -> List[Tuple[str, str, str]]:
-    return sorted((r[0], r[1], str(r[2]) if r[2] else "") for r in rows if r[0] != "CRUCIAL_DATE")
+    # Certificate rows are a separate section (eligibility.certificate_check) that gaps do not explain
+    return sorted((r[0], r[1], str(r[2]) if r[2] else "") for r in rows if r[0] not in ("CRUCIAL_DATE", "CERTIFICATE"))
 
 async def _current_result(session: AsyncSession, user_id, profile_version_id, vacancy: Vacancy,
                           reqs: List[rules.Requirement]) -> Optional[EligibilityResult]:

@@ -1,7 +1,9 @@
 # certificate_cases.json
 
-Research data for the planned certificate-validity rules (OBC non-creamy layer, EWS income & assets,
-SC/ST, PwBD, ex-servicemen, domicile). It is reference material only: no engine code reads it yet.
+Research data for the certificate-validity rules (OBC non-creamy layer, EWS income & assets,
+SC/ST, PwBD, ex-servicemen, domicile). The engine never reads this file at run time:
+backend/eligibility/certificates.py copies the few `rules` it applies (checked word for word by
+tests/eligibility/test_certificate_rules.py), and that test drives the rules with every case's facts.
 Every entry is a real court decision or official document. The quotes were checked word for word
 against the text of the cited source, as downloaded on 2026-10-01. The check ignores whitespace,
 letter case and curly versus straight quote/dash characters, because PDF line breaks and typography

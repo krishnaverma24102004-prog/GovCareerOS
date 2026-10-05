@@ -2,26 +2,28 @@
 Runs hard eligibility for (profile_version_id, vacancy_id) and stores the decision with evidence.
 
 Reads only rows that belong to the given ProfileVersion, which are never modified after
-creation, so re-running for an old version reproduces the old decision.
+creation, so re-running for an old version reproduces the old decision. (The certificate section also reads
+reviewer decisions on the version's certificate Facts and today's date; see certificate_check.)
 """
 import hashlib
 import json
 import uuid
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from govcareeros.backend.eligibility import rules
+from govcareeros.backend.eligibility import certificate_check, rules
 from govcareeros.backend.models.eligibility import EligibilityEvidence, EligibilityResult
 from govcareeros.backend.models.user import Certification, Education, Experience, PersonalInfo, ProfileVersion
 from govcareeros.backend.models.vacancy import Vacancy, VacancyRequirement
 from govcareeros.backend.parsing.upsc_advertisement import IST
 
 # Requirement types whose value column holds JSON
-JSON_REQUIREMENTS = {"AGE_MAX", "AGE_RELAXATION", "RESERVATION", "AGE_RELAXATION_RULE", "CITIZENSHIP", "PWBD_SUITABILITY", "GOVT_SERVICE"}
+JSON_REQUIREMENTS = {"AGE_MAX", "AGE_RELAXATION", "RESERVATION", "AGE_RELAXATION_RULE", "CITIZENSHIP", "PWBD_SUITABILITY", "GOVT_SERVICE",
+                     "CERTIFICATE"}
 
 class EligibilityInputError(ValueError):
     pass
@@ -58,17 +60,20 @@ async def load_profile_snapshot(session: AsyncSession, profile_version_id: uuid.
         certifications=[c.name for c in await rows(Certification)],
     )
 
+def requirement_value(r) -> object:
+    """A requirement row's value: parsed JSON for structured types; a certificate requirement also carries its quote."""
+    try:
+        value = json.loads(r.value) if r.req_type in JSON_REQUIREMENTS else r.value
+    except (json.JSONDecodeError, TypeError):
+        return r.value
+    if r.req_type == certificate_check.REQ_TYPE and isinstance(value, dict) and r.source_excerpt:
+        value.setdefault("source_quote", r.source_excerpt)
+    return value
+
 async def load_requirements(session: AsyncSession, vacancy_id: uuid.UUID) -> List[rules.Requirement]:
     res = await session.execute(select(VacancyRequirement).where(
         VacancyRequirement.vacancy_id == vacancy_id, VacancyRequirement.superseded_at.is_(None)))
-    out = []
-    for r in res.scalars():
-        try:
-            value = json.loads(r.value) if r.req_type in JSON_REQUIREMENTS else r.value
-        except (json.JSONDecodeError, TypeError):
-            value = r.value
-        out.append(rules.Requirement(r.id, r.req_type, value, r.source_page))
-    return out
+    return [rules.Requirement(r.id, r.req_type, requirement_value(r), r.source_page) for r in res.scalars()]
 
 def input_fingerprint(vacancy: Vacancy, reqs: List[rules.Requirement]) -> str:
     """Identifies the vacancy-side inputs of a decision; requirement rows are never edited in place, only superseded."""
@@ -97,6 +102,10 @@ async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id
                                           "the notice text used does not state a crucial date; the closing date was used for age and experience",
                                           "-", f"closing date {crucial.isoformat()}"))
     status, confidence = rules.overall_status(outcomes)
+    # Separate section, after the verdict so it cannot change status/confidence (see certificate_check)
+    closing = vacancy.application_deadline.astimezone(IST).date() if vacancy.application_deadline else None
+    outcomes += certificate_check.check_certificates(snapshot, reqs, await certificate_check.load_held(session, profile_version_id),
+                                                     closing, datetime.now(IST).date())
 
     result = EligibilityResult(
         id=uuid.uuid4(), user_id=user_id, vacancy_id=vacancy_id, profile_version_id=profile_version_id,
