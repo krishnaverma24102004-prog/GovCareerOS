@@ -15,23 +15,31 @@ Deterministic only, never an LLM. Three checks, each returning its evidence:
 
 The user's URL is only ever parsed as a string: it is never fetched (no SSRF). The verdict never says
 "fake": the strongest negative is "not found on official sources we track".
+
+The endpoint is public, so every input is bounded: the request body (backend/api/body_limit.py), the pasted text,
+the PDF's pages, characters, reading time and OCR pages, and concurrent PDF reads. Stored notices and vacancies are
+narrowed in SQL (link, advertisement number, organisation, title words) before the checks below run on them.
 """
+import asyncio
 import re
+import threading
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date
 from difflib import SequenceMatcher
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 from urllib.parse import urlparse
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from govcareeros.backend.documents.pdf_text import extract_pages
+from govcareeros.backend.documents.pdf_text import extract_pages_limited, tessdata_dir
 from govcareeros.backend.models.artifact import RawDocument
-from govcareeros.backend.models.notice import RecruitmentNotice
+from govcareeros.backend.models.notice import RecruitmentNotice, RecruitmentNoticeTitleToken
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance
+from govcareeros.backend.parsing.title_tokens import normalise as _norm, tokens as _tokens
 from govcareeros.backend.parsing.upsc_advertisement import IST
 from govcareeros.backend.sources.registry import SOURCES
 from govcareeros.backend.sources.url_guard import GOVERNMENT_SUFFIXES, site
@@ -53,7 +61,22 @@ MESSAGES = {
 }
 
 MAX_PDF_BYTES = 10 * 1024 * 1024
-MAX_TEXT_CHARS = 100_000
+MAX_TEXT_CHARS = 100_000  # pasted text
+# Request body: the PDF plus the form fields (pasted text up to 4 bytes a character) and multipart framing
+MAX_REQUEST_BYTES = MAX_PDF_BYTES + 1024 * 1024
+# A PDF: SSC's full notices run to 132 pages and 220,000 characters, read in under a second from the text layer
+MAX_PDF_PAGES = 150
+MAX_CHECK_CHARS = 300_000  # pasted text and PDF text together
+PDF_READ_SECONDS = 20  # reading stops at the next page after this
+PDF_TIMEOUT_SECONDS = 45  # the request stops waiting after this (one page cannot be interrupted)
+# Scanned pages: Tesseract takes about a second a page (300 dpi); a few pages, started within a budget
+MAX_OCR_PAGES = 3
+OCR_SECONDS = 15
+# PDFs read at once across all requests; more get 503 instead of queueing for worker threads
+MAX_CONCURRENT_PDFS = 2
+_PDF_SLOTS = threading.BoundedSemaphore(MAX_CONCURRENT_PDFS)
+_PDF_POOL = ThreadPoolExecutor(MAX_CONCURRENT_PDFS, thread_name_prefix="verify-pdf")
+MAX_LINKS = 100  # distinct links in the text that are checked
 
 # ------------------------------------------------------------------ domains
 
@@ -193,14 +216,46 @@ def check_domain(value: str, official: Optional[Set[str]] = None) -> DomainCheck
     return DomainCheck(value, host, "UNOFFICIAL", None,
                        reasons + [f"{host} is not an official domain in our registry, nor under .gov.in / .nic.in / .bank.in"])
 
-# The '(dot)' form starts only where a run of domain characters starts: with \b it also started after every '-'
-# and '.', so a pasted 'a-a-a-...' was rescanned from each position (quadratic, minutes for 100k characters)
+# Top-level domains a bare domain ('indiapostgds.online', no scheme or www) is recognised by: the generic ones fake
+# recruitment sites use and country codes, leaving out those that are English words or abbreviations in notices
+# ('S.No', 'i.e. to', 'Sl.No.', 'M.Sc', 'B.Ed'); 'B.Tech' / 'M.Com' are kept out by _is_bare_domain
+_TLDS = sorted({
+    "com", "org", "net", "info", "biz", "online", "site", "website", "xyz", "top", "live", "store", "shop", "club",
+    "icu", "vip", "life", "world", "today", "tech", "space", "pro", "link", "click", "cloud", "fun", "buzz", "asia",
+    "app", "dev", "page", "blog", "news", "services", "support", "work", "jobs", "careers", "career", "digital",
+    "email", "network", "center", "co", "in", "uk", "au", "ca", "cn", "ru", "pk", "bd", "np", "lk", "ae", "sg", "cc",
+    "ws", "tk", "ml", "ga", "cf", "gq", "io", "ai", "gov", "edu", "int", "mil", "bank",
+}, key=len, reverse=True)
+_TLD_RE = "|".join(_TLDS)
+_LINK_CHAR = r"[^\s<>\"'()\[\]“”‘’«»]"
+# Every alternative that starts at a domain starts only where a run of domain characters starts: with \b the '(dot)'
+# form also started after every '-' and '.', so a pasted 'a-a-a-...' was rescanned from each position (quadratic,
+# minutes for 100k characters). Labels cannot contain '.', so a run splits into labels one way only.
 # Curly quotes end a link too: the UPSC advertisements print "https://upsconline.nic.in.”"
-_URL_RE = re.compile(r"(?:https?://|www\.)[^\s<>\"'()\[\]“”‘’«»]+|(?<![a-z0-9.\-])[a-z0-9\-]{1,63}(?:\.[a-z0-9\-]{1,63}){0,10}"
-                     r"\s*[\(\[]dot[\)\]]\s*[a-z]{2,}\b", re.I)
+_URL_RE = re.compile(
+    rf"(?:https?://|www\.){_LINK_CHAR}+"
+    # 'example(dot)com' on one line and ending in a known TLD: the SSC JE notice breaks "Telecommunication (DoT) JE"
+    # over lines
+    rf"|(?<![a-z0-9.\-])[a-z0-9\-]{{1,63}}(?:\.[a-z0-9\-]{{1,63}}){{0,10}}[ \t]*[\(\[]dot[\)\]][ \t]*(?:{_TLD_RE})\b"
+    # a bare domain: not inside a word, an e-mail address or a path, and not followed by more domain labels
+    rf"|(?<![\w.@/:\-])(?P<bare>(?:[a-z0-9](?:[a-z0-9\-]{{0,61}}[a-z0-9])?\.){{1,10}}(?P<tld>{_TLD_RE}))"
+    rf"(?![\w\-]|\.[a-z0-9])(?:/{_LINK_CHAR}*)?", re.I)
+
+def _is_bare_domain(m: re.Match) -> bool:
+    bare, tld = m.group("bare"), m.group("tld")
+    # Sentences run together in PDF text ('... by UPSC.Online applications'): a capitalised TLD starts a sentence
+    # unless the whole domain is in capitals
+    if not (tld.islower() or bare.isupper()):
+        return False
+    host = bare.lower()
+    names, _ = _suffix_split(host)
+    # 'gov.in' / 'nic.in' on their own name a registry (the UPSC IES/ISS notice prints both), not a site; a
+    # one-letter name is a degree ('B.Tech' in the SSC notices, 'M.Com')
+    return bool(names) and host not in _TWO_LEVEL and host not in _RESTRICTED_SUFFIXES and len(names[-1]) >= 2
 
 def urls_in(text: str) -> List[str]:
-    return list(dict.fromkeys(m.group(0).rstrip(".,;:!?") for m in _URL_RE.finditer(text)))
+    found = (m.group(0).rstrip(".,;:!?") for m in _URL_RE.finditer(text) if m.group("bare") is None or _is_bare_domain(m))
+    return list(dict.fromkeys(found))
 
 # ------------------------------------------------------------------ red flags
 
@@ -275,19 +330,10 @@ def red_flags(text: str) -> List[RedFlag]:
 
 # ------------------------------------------------------------------ matching stored official notices
 
-_STOPWORDS = {"the", "and", "for", "of", "in", "to", "on", "by", "vide", "with", "from", "at", "a", "an", "no", "is",
-              "are", "be", "or", "as", "under", "its", "this", "that", "regarding", "notice", "pdf", "download"}
 _ADVT_RE = re.compile(
     r"\b(?:advt|advertisement|adv|cen|employment\s+notice|notification)\.?\s*(?:no|number)?\.?\s*[:.\-]?\s*"
     r"((?:[A-Z]{1,6}[\s/\-]*)?\d{1,4}\s*[/\-.]\s*(?:\d{4}|\d{2}))\b", re.I)
 _DATE_RE = re.compile(r"\b(\d{1,2})[./\-](\d{1,2})[./\-](\d{4})\b")
-
-def _norm(text: str) -> str:
-    text = unicodedata.normalize("NFKC", text).lower().replace("’", "'")
-    return re.sub(r"[^a-z0-9/]+", " ", text).strip()
-
-def _tokens(text: str) -> List[str]:
-    return [t for t in _norm(text).replace("/", " ").split() if len(t) >= 3 and t not in _STOPWORDS]
 
 def canonical_advt(raw: str) -> str:
     """'12/2026', '12-2026', 'Advt. No. 13-25' -> '12/2026' / '13/2025' (two-digit years are 20xx)."""
@@ -346,19 +392,83 @@ def _source_names(sources: Iterable[GovernmentSource]) -> Dict[str, Set[str]]:
 def _names_org(text_norm: str, names: Set[str]) -> bool:
     return any(n and re.search(rf"(?<![a-z0-9]){re.escape(n)}(?![a-z0-9])", text_norm) for n in names)
 
+_IN_BATCH = 500  # values per IN (...) / conditions per OR: well under SQLite's and asyncpg's parameter limits
+
+def _batches(values: Iterable, size: int = _IN_BATCH) -> Iterable[list]:
+    values = list(values)
+    for i in range(0, len(values), size):
+        yield values[i:i + size]
+
+def _advt_like(advt: str) -> Optional[str]:
+    """A LIKE pattern that every stored spelling of a canonical number matches: '12/2026' <- '012-26', 'Advt 12/2026'."""
+    m = re.search(r"(\d+)/(\d{4})$", advt)
+    return f"%{m.group(1)}%{m.group(2)[2:]}%" if m else None
+
+async def _ids(session: AsyncSession, id_column, conditions: Sequence) -> Set:
+    out: Set = set()
+    for batch in _batches(conditions):
+        out |= set((await session.execute(select(id_column).where(or_(*batch)))).scalars())
+    return out
+
+async def _rows(session: AsyncSession, model, ids: Iterable) -> list:
+    out = []
+    for batch in _batches(ids):
+        out += (await session.execute(select(model).where(model.id.in_(batch)))).scalars().all()
+    return sorted(out, key=lambda r: str(r.id))
+
+async def _candidate_vacancies(session: AsyncSession, variants: Set[str], advt_patterns: Set[str],
+                               named_sources: Set, text_norm: str) -> list:
+    """Every vacancy the checks below could match strongly: a strong match needs the official link, the
+    advertisement number or the organisation, so the rest are never loaded."""
+    conditions = [col.in_(batch) for col in (Vacancy.notification_url, Vacancy.source_url, Vacancy.application_url)
+                  for batch in _batches(variants)]
+    conditions += [Vacancy.advertisement_number.like(p) for p in sorted(advt_patterns)]
+    conditions += [Vacancy.source_id.in_(batch) for batch in _batches(named_sources)]
+    organisations = (await session.execute(select(Vacancy.organization).distinct())).scalars().all()
+    named_orgs = [o for o in organisations if o and _names_org(text_norm, {_norm(o)})]
+    conditions += [Vacancy.organization.in_(batch) for batch in _batches(named_orgs)]
+    return await _rows(session, Vacancy, await _ids(session, Vacancy.id, conditions))
+
+async def _candidate_notices(session: AsyncSession, variants: Set[str], advt_patterns: Set[str],
+                             named_sources: Set, text_tokens: Set[str], text_norm: str) -> list:
+    """Every notice the checks below could match: its link, an advertisement number in its title with its
+    organisation named, or its title words (recruitment_notice_title_tokens)."""
+    ids = await _ids(session, RecruitmentNotice.id, [RecruitmentNotice.url.in_(b) for b in _batches(variants)])
+    if advt_patterns and named_sources:
+        title_like = [RecruitmentNotice.title.like(p) for p in sorted(advt_patterns)]
+        for batch in _batches(title_like):
+            ids |= set((await session.execute(select(RecruitmentNotice.id).where(
+                RecruitmentNotice.source_id.in_(list(named_sources)), or_(*batch)))).scalars())
+    t = RecruitmentNoticeTitleToken
+    # Title words covered (with repeats): "title" needs 90% of them in the text, or half of them and similar wording,
+    # where a ratio of 0.85 needs 2 * min(len) >= 0.85 * (sum of len), so the lengths are within 85:115. 89% and 49%
+    # leave room for float rounding.
+    hits: Dict = {}
+    for batch in _batches(sorted(text_tokens)):
+        rows = await session.execute(select(t.notice_id, func.sum(t.occurrences), func.max(t.title_tokens),
+                                            func.max(t.title_chars)).where(t.token.in_(batch)).group_by(t.notice_id))
+        for notice_id, n, total, chars in rows:
+            hits[notice_id] = (hits.get(notice_id, (0,))[0] + n, total, chars)
+    length = len(text_norm)
+    ids |= {notice_id for notice_id, (n, total, chars) in hits.items()
+            if n * 100 >= 89 * total or (n * 100 >= 49 * total and chars * 115 >= length * 85 and chars * 85 <= length * 115)}
+    return await _rows(session, RecruitmentNotice, ids)
+
 async def match_official(session: AsyncSession, text: str, urls: Sequence[str] = ()) -> List[NoticeMatch]:
     text_norm = _norm(text)
     text_tokens = set(_tokens(text))
     advts = set(advertisement_numbers(text))
     stated_dates = dates_in(text)
     variants = {v for u in urls for v in _url_variants(u)}
+    advt_patterns = {p for p in map(_advt_like, advts) if p}
 
     sources = {s.id: s for s in (await session.execute(select(GovernmentSource))).scalars()}
     names = _source_names(sources.values())
+    named_sources = {sid for sid, s in sources.items() if _names_org(text_norm, names.get(s.name, set()))}
     matches: List[NoticeMatch] = []
 
     # Vacancies parsed from official documents
-    vacancies = (await session.execute(select(Vacancy))).scalars().all()
+    vacancies = await _candidate_vacancies(session, variants, advt_patterns, named_sources, text_norm)
     for v in vacancies:
         src = sources.get(v.source_id)
         on = []
@@ -398,7 +508,7 @@ async def match_official(session: AsyncSession, text: str, urls: Sequence[str] =
             m.official_url = m.official_url or doc_url
 
     # Notice links seen on official source pages
-    notices = (await session.execute(select(RecruitmentNotice))).scalars().all()
+    notices = await _candidate_notices(session, variants, advt_patterns, named_sources, text_tokens, text_norm)
     for n in notices:
         src = sources.get(n.source_id)
         on = []
@@ -409,7 +519,8 @@ async def match_official(session: AsyncSession, text: str, urls: Sequence[str] =
             covered = sum(t in text_tokens for t in title_tokens) / len(title_tokens)
             if covered >= 0.9:
                 on.append("title")
-            elif len(text_norm) <= 3 * len(_norm(n.title)) and \
+            # Similar wording needs half the title's words verbatim, so the title index can find it
+            elif covered >= 0.5 and len(text_norm) <= 3 * len(_norm(n.title)) and \
                     SequenceMatcher(None, _norm(n.title), text_norm).ratio() >= 0.85:
                 on.append("title")
         title_advts = set(advertisement_numbers(n.title))
@@ -436,21 +547,80 @@ class VerificationResult:
     red_flags: List[RedFlag]
     advertisement_numbers: List[str]
     text_chars: int
+    pdf_pages: Optional[int] = None  # pages in the uploaded PDF
+    pdf_pages_read: Optional[int] = None
+    ocr_pages: List[int] = field(default_factory=list)  # pages read by OCR
+    notes: List[str] = field(default_factory=list)  # what was not read or checked, and why
+
+class PdfBusy(Exception):
+    """Every PDF slot is taken."""
+
+class PdfTimeout(Exception):
+    """The PDF was not read within PDF_TIMEOUT_SECONDS."""
+
+@dataclass
+class PdfRead:
+    text: str
+    pages: int
+    pages_read: int
+    ocr_pages: List[int]
+    notes: List[str]
+
+def _page_list(pages: Sequence[int]) -> str:
+    return ", ".join(map(str, pages[:10])) + (f" and {len(pages) - 10} more" if len(pages) > 10 else "")
+
+def read_pdf(body: bytes, ocr: bool = False, max_chars: Optional[int] = None) -> PdfRead:
+    """The PDF's text within the page, character, time and OCR limits, with a note for whatever was left out."""
+    ex = extract_pages_limited(body, MAX_PDF_PAGES, MAX_CHECK_CHARS if max_chars is None else max_chars,
+                               PDF_READ_SECONDS, MAX_OCR_PAGES if ocr else 0, OCR_SECONDS)
+    notes = []
+    if ex.stopped:
+        limit = {"pages": f"the limit of {MAX_PDF_PAGES} pages", "chars": f"the limit of {MAX_CHECK_CHARS:,} characters",
+                 "time": "the reading time limit"}[ex.stopped]
+        notes.append(f"Only the first {len(ex.pages)} of {ex.page_count} pages were read ({limit}).")
+    ocr_pages = [p.page_number for p in ex.pages if p.ocr]
+    if ocr_pages:
+        notes.append(f"Page(s) {_page_list(ocr_pages)} are scanned and were read by OCR, which can misread words.")
+    if ex.scanned_unread:
+        why = ("OCR was not requested" if not ocr else "OCR is not installed on this server" if tessdata_dir() is None
+               else f"OCR is limited to {MAX_OCR_PAGES} pages and {OCR_SECONDS} seconds")
+        notes.append(f"Page(s) {_page_list(ex.scanned_unread)} have no text layer (scanned or blank) and were not "
+                     f"read: {why}.")
+    return PdfRead("\n".join(p.text for p in ex.pages), ex.page_count, len(ex.pages), ocr_pages, notes)
 
 def pdf_text(body: bytes) -> str:
-    # Text layer only: OCR of an anonymous upload would let one request hold a worker for minutes
-    return "\n".join(p.text for p in extract_pages(body, ocr=False))
+    """Text layer only, within the limits."""
+    return read_pdf(body).text
+
+async def read_pdf_async(body: bytes, ocr: bool = False, max_chars: Optional[int] = None) -> PdfRead:
+    """read_pdf off the event loop, at most MAX_CONCURRENT_PDFS at once. A timed-out read keeps its slot until its
+    thread finishes the page it is on (PyMuPDF cannot be interrupted), so slow PDFs cannot pile up threads."""
+    if not _PDF_SLOTS.acquire(blocking=False):
+        raise PdfBusy()
+    job = _PDF_POOL.submit(read_pdf, body, ocr, max_chars)
+    # Released when the job ends, also when it is cancelled before it starts
+    job.add_done_callback(lambda _: _PDF_SLOTS.release())
+    try:
+        return await asyncio.wait_for(asyncio.wrap_future(job), PDF_TIMEOUT_SECONDS)
+    except asyncio.TimeoutError as e:
+        raise PdfTimeout() from e
 
 async def verify(session: AsyncSession, text: Optional[str] = None, url: Optional[str] = None,
-                 pdf: Optional[bytes] = None) -> VerificationResult:
+                 pdf: Optional[bytes] = None, ocr: bool = False) -> VerificationResult:
     text = (text or "")[:MAX_TEXT_CHARS]
+    read, notes = None, []
     if pdf:
-        text = (text + "\n" + pdf_text(pdf)).strip()
+        read = await read_pdf_async(pdf, ocr, MAX_CHECK_CHARS - len(text))
+        text, notes = (text + "\n" + read.text).strip(), list(read.notes)
+    text = text[:MAX_CHECK_CHARS]
     sources = (await session.execute(select(GovernmentSource.official_domain))).scalars().all()
     official = official_domains(sources)
 
     url_check = check_domain(url, official) if url and url.strip() else None
-    links = [check_domain(u, official) for u in urls_in(text)]
+    found = urls_in(text)
+    if len(found) > MAX_LINKS:
+        notes.append(f"Only the first {MAX_LINKS} of {len(found)} links in the text were checked.")
+    links = [check_domain(u, official) for u in found[:MAX_LINKS]]
     # Exact links are looked up whatever their domain: a stored notice link was seen on an official source page
     matches = await match_official(session, text, [c.input for c in [url_check, *links] if c])
     flags = red_flags(text)
@@ -476,4 +646,7 @@ async def verify(session: AsyncSession, text: Optional[str] = None, url: Optiona
         message = (f"The link is on the official domain {url_check.official_domain}; we have not indexed this "
                    "notice yet, so open it there to confirm.")
     return VerificationResult(verdict, message, VERIFIER_VERSION, url_check, links, matches, flags,
-                              advertisement_numbers(text), len(text))
+                              advertisement_numbers(text), len(text), pdf_pages=read.pages if read else None,
+                              pdf_pages_read=read.pages_read if read else None,
+                              ocr_pages=read.ocr_pages if read else [],
+                              notes=notes)

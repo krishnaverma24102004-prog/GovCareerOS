@@ -8,7 +8,7 @@ from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.vacancy import Vacancy, VacancyRequirement, VacancyVersion, VacancyFieldProvenance
 from govcareeros.backend.models.eligibility import EligibilityResult, EligibilityEvidence, MatchScore, SkillGap
 from govcareeros.backend.models.auth import BrowserSessionState
-from govcareeros.backend.models.notice import RecruitmentNotice
+from govcareeros.backend.models.notice import RecruitmentNotice, RecruitmentNoticeTitleToken
 from govcareeros.backend.models.auth_token import AuthToken
 from govcareeros.backend.models.alert import UserAlert
 from govcareeros.backend.models.extraction import ExtractionDraft

@@ -8,6 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from govcareeros.backend.config.settings import settings
+from govcareeros.backend.api.body_limit import BodyLimitMiddleware
+from govcareeros.backend.services import notice_verifier
 from govcareeros.backend.api.routers import (
     admin, admin_console, alerts, applications, auth, digest, eligibility, exam_versions, exams, gaps, prep, profile,
     relevance, resume, review, review_console, vacancies, verify,
@@ -15,6 +17,9 @@ from govcareeros.backend.api.routers import (
 
 def create_app() -> FastAPI:
     app = FastAPI(title="GovCareerOS", version="0.1.0")
+    # The public notice check takes anonymous uploads: refuse oversized bodies before they are parsed or spooled.
+    # Added before CORS so CORS stays outermost and the browser can read the 413.
+    app.add_middleware(BodyLimitMiddleware, limits={"/verify": lambda: notice_verifier.MAX_REQUEST_BYTES})
     # Bearer tokens, no cookies: one explicit origin, never "*"
     app.add_middleware(CORSMiddleware, allow_origins=[settings.FRONTEND_ORIGIN], allow_credentials=False,
                        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type"])
