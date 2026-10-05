@@ -13,7 +13,7 @@ import re
 import ssl
 from dataclasses import dataclass, field
 from html import unescape
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from urllib.parse import urldefrag, urljoin, urlparse
 
 import httpx
@@ -22,6 +22,9 @@ import truststore
 from govcareeros.backend.sources.url_guard import (
     POLICY, GuardedTransport, Robots, UrlPolicy, UrlRefused, install, literal_non_public, site,
 )
+
+if TYPE_CHECKING:
+    from govcareeros.backend.sources.adapters.base import ListingRequest
 
 USER_AGENT = "GovCareerOS/0.1 (personal government-job tracker)"
 
@@ -92,6 +95,10 @@ def _anchors(html: str, base_url: str) -> List[Tuple[str, str]]:
         if urlparse(url).scheme in ("http", "https"):
             out.append((_text(inner), url))
     return out
+
+def mentions_recruitment(text: str) -> bool:
+    """The recruitment wording extract_notices looks for, for adapters that read titles out of a mixed notice board."""
+    return bool(_RECRUITMENT_RE.search(text)) and not _EXCLUDE_RE.search(text)
 
 def extract_notices(html: str, base_url: str, policy: Optional[UrlPolicy] = None) -> List[NoticeLink]:
     seen, notices = set(), []
@@ -241,12 +248,23 @@ class PageFetcher:
         return FetchResult(url, error=ProbeResult("ROBOTS_DISALLOWED", detail="robots.txt disallows this page"))
 
     async def fetch_http(self, url: str, policy: Optional[UrlPolicy] = None) -> FetchResult:
-        policy = policy or UrlPolicy.from_url(url)
+        return await self._fetch("GET", url, policy or UrlPolicy.from_url(url))
+
+    async def fetch_listing(self, request: "ListingRequest", policy: Optional[UrlPolicy] = None) -> FetchResult:
+        """An adapter's declared JSON listing endpoint (adapters/base.py): GET, or POST with its fixed form body.
+        Same checks as a page: the source policy, robots.txt, and the guarded client on every redirect hop."""
+        if request.method not in ("GET", "POST"):
+            return FetchResult(request.url, error=ProbeResult("URL_REFUSED", detail=f"method {request.method!r} not allowed"))
+        # multipart/form-data fields, as the source's own page sends them
+        files = {k: (None, v) for k, v in request.form.items()} if request.method == "POST" else None
+        return await self._fetch(request.method, request.url, policy or UrlPolicy.from_url(request.url), files=files)
+
+    async def _fetch(self, method: str, url: str, policy: UrlPolicy, **kwargs) -> FetchResult:
         refused = await self._precheck(url, policy)
         if refused:
             return refused
         try:
-            resp = await self.get(url, policy)
+            resp = await self.client.request(method, url, extensions={POLICY: policy}, **kwargs)
         except UrlRefused as e:
             return FetchResult(url, error=ProbeResult("URL_REFUSED", detail=_first_line(e)))
         except (ssl.SSLError, httpx.ConnectError) as e:

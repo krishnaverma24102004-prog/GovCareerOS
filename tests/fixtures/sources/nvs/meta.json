@@ -1,0 +1,16 @@
+{
+  "source": "NVS",
+  "captured": "2026-10-01",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "files": {
+    "api_jobs.json": {
+      "url": "https://navodaya.gov.in/api/public/media?organization_id=100&media_type_id=7&page=1&limit=100",
+      "method": "GET",
+      "http_status": 200,
+      "fetch_mode": "HTTP",
+      "how": "govcareeros PageFetcher.fetch_http (url_guard policy navodaya.gov.in + robots.txt, honest User-Agent); FetchResult.html written as UTF-8 text",
+      "note": "Official public JSON feed behind the homepage 'Recruitment' (भर्ती) box; media_type_id 7 = Recruitment. meta.totalItems 21, one page."
+    }
+  },
+  "notes": "https://navodaya.gov.in/nvs/en/Recruitment/ is a single-page app that routes to the homepage; its rendered Recruitment box links every item as href=\"#\" with a click handler and shows start_date as 'प्रकाशित तिथि' (published date). Captured by the live re-verification run of 2026-10-01 (scratchpad fix/NVS)."
+}

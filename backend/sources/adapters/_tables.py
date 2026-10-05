@@ -15,6 +15,7 @@ from govcareeros.backend.sources.url_guard import UrlPolicy
 
 _WS_RE = re.compile(r"\s+")
 _DMY_RE = re.compile(r"^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$")
+_ISO_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 
 @dataclass
 class Link:
@@ -122,5 +123,15 @@ def day_month_year(text: str) -> Optional[date]:
     day, month, year = (int(g) for g in m.groups())
     try:
         return date(year, month, day)
+    except ValueError:
+        return None
+
+def iso_date(text: str) -> Optional[date]:
+    """yyyy-mm-dd, as JSON listing endpoints send dates."""
+    m = _ISO_RE.match(text.strip())
+    if not m:
+        return None
+    try:
+        return date(*(int(g) for g in m.groups()))
     except ValueError:
         return None

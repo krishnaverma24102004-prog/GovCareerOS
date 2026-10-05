@@ -10,6 +10,13 @@ An adapter is a module in this package that defines:
     def parse_listing(html: str, base_url: str) -> List[ListingRow]
 and optionally
     LISTING_URLS: List[str]                      # extra official listing pages to read (same domain)
+    LISTING_REQUEST: ListingRequest              # official JSON endpoint the listing is read from instead
+
+LISTING_REQUEST is for single-page apps whose listing HTML carries no rows: the source's own page loads
+them from a public JSON endpoint on the official domain (GET, or POST with a fixed form body). The fetcher
+sends exactly that request under the source's UrlPolicy and robots.txt (PageFetcher.fetch_listing), and
+parse_listing receives the response body (JSON text) with the endpoint URL as base_url. Every URL an
+adapter builds from it is still checked against the policy.
 
 Modules are discovered automatically (see adapters/__init__.py); no shared file needs editing.
 Fetching stays in the generic fetcher (robots.txt + url_guard); adapters never fetch.
@@ -17,6 +24,12 @@ Fetching stays in the generic fetcher (robots.txt + url_guard); adapters never f
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Dict, List, Optional
+
+@dataclass(frozen=True)
+class ListingRequest:
+    url: str                                  # https URL on the source's official domain
+    method: str = "GET"                       # "GET" or "POST"
+    form: Dict[str, str] = field(default_factory=dict)  # POST body, sent as multipart/form-data fields
 
 @dataclass
 class ListingRow:
