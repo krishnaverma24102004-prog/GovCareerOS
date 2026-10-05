@@ -46,6 +46,9 @@ def test_general_instructions_of_advt_12():
 def test_advt_11_has_the_same_instructions_on_its_own_pages():
     info = parse_application_info(extract_pages((UPSC / "AdvtNo-11-2026-Engl-100926.pdf").read_bytes(), ocr=False))
     assert info.warnings == []
+    # "1800 Hrs on 02-10-2026 (for posts other than those under the Administration of UT of Ladakh) and 09-10-2026 (...)":
+    # no single closing date for the document, so the OBC certificate's crucial date is left to each vacancy
+    assert info.get("KEY_DATE") is None and info.get("CERTIFICATE", "OBC_NCL").value["crucial_date"] is None
     assert info.get("FEE_EXEMPTION").provenance.page == 31
     assert info.get("DOCUMENT", "CASTE_CERTIFICATE").provenance.page == 28
 
@@ -87,6 +90,10 @@ async def test_prep_checklist_is_personalised_and_cited(api, login, db_session):
     assert docs["EXPERIENCE_CERTIFICATE"]["status"] == "REQUIRED"  # Law Officer's EQ includes experience
     assert docs["AGE_RELAXATION_CERTIFICATE"]["status"] == "IF_APPLICABLE"
     assert all(d["citation"]["excerpt"] and d["citation"]["page"] for d in prep["documents"])
+    certs = {c["kind"]: c for c in prep["certificates"]}
+    assert (certs["OBC_NCL"]["status"], certs["OBC_NCL"]["crucial_date"], certs["OBC_NCL"]["format_note"]) == ("REQUIRED", "2026-10-16", "prescribed format")
+    assert certs["OBC_NCL"]["citation"]["page"] == 19 and (certs["SC"]["status"], certs["PWBD"]["status"]) == ("NOT_REQUIRED", "NOT_REQUIRED")
+    assert [(d["code"], d["at"], d["citation"]["page"]) for d in prep["key_dates"]] == [("APPLICATION_END", "2026-10-16T18:00:00+05:30", 13)]
 
     # Woman, SC, PwBD: exempt from the fee; disability certificate needed, OBC declaration not
     priya = await login("priya@example.com")

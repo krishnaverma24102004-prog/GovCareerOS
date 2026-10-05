@@ -7,6 +7,7 @@ Uses LLM_PROVIDER and LLM_MODEL (Ollama) or NVIDIA_MODELS (NVIDIA) from .env; ov
     python govcareeros/scripts/draft_notices.py --limit 5
     python govcareeros/scripts/draft_notices.py --sources CRPF DOE --provider nvidia
     python govcareeros/scripts/draft_notices.py --provider nvidia --model nvidia/nemotron-3.5-lightning-30b-a3b
+    python govcareeros/scripts/draft_notices.py --limit 5 --requirements   # also draft what each notice asks of applicants
 """
 import argparse
 import asyncio
@@ -14,6 +15,7 @@ import asyncio
 from govcareeros.backend.database.session import AsyncSessionLocal, engine
 from govcareeros.backend.llm.provider import get_provider
 from govcareeros.backend.services.extraction_drafts import draft_pending_notices
+from govcareeros.backend.services.requirement_drafts import draft_requirements_for
 from govcareeros.backend.sources.generic_notices import PageFetcher
 
 async def main(args) -> int:
@@ -21,6 +23,8 @@ async def main(args) -> int:
     async with AsyncSessionLocal() as session:
         async with PageFetcher(allow_browser=False) as fetcher:
             drafts = await draft_pending_notices(session, fetcher, provider, args.limit, args.sources, commit_each=True)
+        if args.requirements:
+            drafts += await draft_requirements_for(session, drafts, provider, commit_each=True)
         await session.commit()
         print(f"{len(drafts)} draft(s) with {provider.name}:{provider.model}")
         for d in drafts:
@@ -35,4 +39,5 @@ if __name__ == "__main__":
     p.add_argument("--sources", nargs="*")
     p.add_argument("--provider")
     p.add_argument("--model", help="model; for NVIDIA a comma-separated fallback chain")
+    p.add_argument("--requirements", action="store_true", help="also draft certificates, fee, uploads, documents and dates")
     raise SystemExit(asyncio.run(main(p.parse_args())))

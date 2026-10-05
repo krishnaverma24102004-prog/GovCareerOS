@@ -10,9 +10,10 @@ from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
 APPLICATION_STATUSES = ("PLANNED", "APPLIED", "FEE_PAID", "ADMIT_CARD", "EXAM", "RESULT", "SELECTED", "REJECTED", "WITHDRAWN")
 
 class ApplicationRequirement(Base, TimestampMixin):
-    """What an advertisement asks of an applicant (documents, fee, exemptions, payment, photo ID, portal).
+    """What a notice asks of an applicant (documents, certificates, uploads, fee, exemptions, payment, photo ID, portal, dates).
 
-    Stored per advertisement document; a vacancy gets the rows of the document it was parsed from.
+    Stored per notice document; a vacancy or exam gets the rows of the document it was parsed from.
+    CERTIFICATE rows hold eligibility/certificate_types.CertificateRequirement as JSON (parsing/application_rules.py).
     """
     __tablename__ = "application_requirements"
     __table_args__ = (UniqueConstraint("raw_document_id", "req_type", "code", name="uq_application_requirements_doc_type_code"),)
@@ -21,10 +22,11 @@ class ApplicationRequirement(Base, TimestampMixin):
     source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("government_sources.id", name="fk_application_requirements_source_id"), index=True)
     raw_document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("raw_documents.id", name="fk_application_requirements_raw_document_id"), index=True)
     advertisement_number: Mapped[Optional[str]] = mapped_column(String(100), index=True)
-    # DOCUMENT, UPLOAD_RULE, FEE, FEE_EXEMPTION, PAYMENT_MODE, FEE_RULE, PHOTO_ID, APPLICATION_PORTAL
+    # DOCUMENT, UPLOAD_RULE, FEE, FEE_EXEMPTION, PAYMENT_MODE, FEE_RULE, PHOTO_ID, APPLICATION_PORTAL, CERTIFICATE, KEY_DATE
     req_type: Mapped[str] = mapped_column(String(40))
     code: Mapped[str] = mapped_column(String(60))
-    # ALWAYS, IF_CLAIMED, CATEGORY_SC_ST_OBC, CATEGORY_OBC, PWBD, AGE_RELAXATION, GOVT_SERVICE, NAME_CHANGE
+    # ALWAYS, IF_CLAIMED, CATEGORY_SC_ST_OBC, CATEGORY_OBC, CATEGORY_SC, CATEGORY_ST, CATEGORY_EWS, CATEGORY_RESERVED, PWBD, ESM,
+    # AGE_RELAXATION, GOVT_SERVICE, CENTRAL_GOVT_EMPLOYEE, NAME_CHANGE
     applies_when: Mapped[str] = mapped_column(String(40))
     value: Mapped[str] = mapped_column(Text)  # JSON
     source_page: Mapped[Optional[int]] = mapped_column(Integer)

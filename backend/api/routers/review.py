@@ -15,7 +15,7 @@ from govcareeros.backend.models.extraction import ExtractionDraft
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.user import User
-from govcareeros.backend.services import exam_drafts, extraction_drafts, review_audit
+from govcareeros.backend.services import exam_drafts, extraction_drafts, requirement_drafts, review_audit
 
 router = APIRouter(prefix="/review", tags=["review"])
 
@@ -42,6 +42,8 @@ class DraftDetail(DraftSummary):
 
 class ApproveIn(BaseModel):
     vacancy_indexes: Optional[List[int]] = None
+    # Requirements drafts: the items to approve, each named; there is no approve-all
+    requirement_indexes: Optional[List[int]] = None
     note: Optional[str] = None
 
 class RejectIn(BaseModel):
@@ -88,16 +90,18 @@ async def approve(draft_id: uuid.UUID, body: ApproveIn, user: User = Depends(cur
     try:
         if exam_drafts.is_exam_draft(draft):
             await exam_drafts.approve_exam_draft(session, draft, user, body.note)
+        elif requirement_drafts.is_requirements_draft(draft):
+            await requirement_drafts.approve_requirements_draft(session, draft, user, body.requirement_indexes, body.note)
         else:
             await extraction_drafts.approve(session, draft, user, body.vacancy_indexes, body.note)
     except PermissionError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     except extraction_drafts.DraftError as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-    except IntegrityError:  # a concurrent approval already created this vacancy
-        raise HTTPException(status.HTTP_409_CONFLICT, "vacancy already approved")
+    except IntegrityError:  # a concurrent approval already created this vacancy / requirement
+        raise HTTPException(status.HTTP_409_CONFLICT, "already approved")
     review_audit.record(session, user, "DRAFT_APPROVE", "DRAFT", draft.id, body.note,
-                        {"vacancy_indexes": body.vacancy_indexes, "to": draft.status,
+                        {"vacancy_indexes": body.vacancy_indexes, "requirement_indexes": body.requirement_indexes, "to": draft.status,
                          "created_vacancy_ids": json.loads(draft.created_vacancy_ids or "[]")})
     return _detail(draft, source, title, url)
 
@@ -105,7 +109,10 @@ async def approve(draft_id: uuid.UUID, body: ApproveIn, user: User = Depends(cur
 async def reject(draft_id: uuid.UUID, body: RejectIn, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
     draft, source, title, url = await _load(session, draft_id)
     try:
-        await extraction_drafts.reject(session, draft, user, body.note)
+        if requirement_drafts.is_requirements_draft(draft):
+            await requirement_drafts.reject_requirements_draft(session, draft, user, body.note)
+        else:
+            await extraction_drafts.reject(session, draft, user, body.note)
     except PermissionError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     except extraction_drafts.DraftError as e:

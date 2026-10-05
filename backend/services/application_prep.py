@@ -1,6 +1,7 @@
 """
-Application preparation: stores what an advertisement asks of applicants (ApplicationRequirement rows,
-from backend/parsing/upsc_application.py) and turns it into a checklist for one profile version.
+Application preparation: stores what a notice asks of applicants (ApplicationRequirement rows, from
+backend/parsing/upsc_application.py, parsing/ssc_application.py, or reviewer-approved LLM drafts in
+services/requirement_drafts.py) and turns it into a checklist for one profile version, for a vacancy or an exam.
 
 Rules:
   - Every checklist item is an advertisement row with its page/section/excerpt; nothing is added that the
@@ -10,10 +11,14 @@ Rules:
     UNKNOWN, never a guess.
   - Fee: EXEMPT when the profile matches a group in the advertisement's exemption clause, PAY when every field
     that clause depends on is known and none matches, otherwise UNKNOWN.
+  - Certificates: each CERTIFICATE row (eligibility/certificate_types.CertificateRequirement as JSON) is listed with
+    the same REQUIRED / NOT_REQUIRED / UNKNOWN decision for the profile and the conditions the notice states
+    (crucial date, issue window, financial year, format). Whether a certificate the candidate holds meets them
+    is the certificate rules' decision, not this checklist's.
 """
 import json
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,9 +27,11 @@ from govcareeros.backend.documents.pdf_text import PageText
 from govcareeros.backend.eligibility import rules
 from govcareeros.backend.models.application import ApplicationRequirement
 from govcareeros.backend.models.artifact import RawDocument
+from govcareeros.backend.models.exam import Exam
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.user import Education, Experience, PersonalInfo, ProfileVersion
 from govcareeros.backend.models.vacancy import Vacancy, VacancyRequirement
+from govcareeros.backend.parsing import application_rules as ar
 from govcareeros.backend.parsing import upsc_application as ua
 from govcareeros.backend.parsing.upsc_advertisement import IST
 
@@ -35,9 +42,11 @@ REQUIRED, NOT_REQUIRED, IF_APPLICABLE, UNKNOWN = "REQUIRED", "NOT_REQUIRED", "IF
 
 async def store_application_requirements(
     session: AsyncSession, source: GovernmentSource, raw: RawDocument, pages: List[PageText], advertisement_number: Optional[str],
+    parse: Callable[[List[PageText]], ua.ParsedApplicationInfo] = ua.parse_application_info,
 ) -> ua.ParsedApplicationInfo:
-    """Idempotent per (document, parser version); a newer parser replaces the document's rows."""
-    info = ua.parse_application_info(pages)
+    """Idempotent per (document, parser version); a newer parser replaces the document's rows. `parse` is the
+    notice's deterministic parser (UPSC advertisement by default; ssc_application / upsc exam notice otherwise)."""
+    info = parse(pages)
     current = (await session.execute(select(ApplicationRequirement.parser_version).where(
         ApplicationRequirement.raw_document_id == raw.id).limit(1))).scalar_one_or_none()
     if current == info.parser_version or not info.items:
@@ -69,6 +78,13 @@ async def requirements_for_vacancy(session: AsyncSession, vacancy: Vacancy) -> L
                 ApplicationRequirement.raw_document_id == latest))).scalars().all()
     return list(rows)
 
+async def requirements_for_exam(session: AsyncSession, exam: Exam) -> List[ApplicationRequirement]:
+    """Rows of the notice the exam was parsed from."""
+    if not exam.raw_document_id:
+        return []
+    return list((await session.execute(select(ApplicationRequirement).where(
+        ApplicationRequirement.raw_document_id == exam.raw_document_id))).scalars().all())
+
 def _gender(value: Optional[str]) -> Optional[str]:
     v = (value or "").strip().lower()
     if v in ("female", "f", "woman", "women"):
@@ -83,6 +99,22 @@ def _decide(when: str, code: str, info: Optional[PersonalInfo], has_experience: 
     flag = lambda name: getattr(info, name) if info else None
     if when == ua.ALWAYS:
         return REQUIRED, "required of every applicant"
+    single = {ar.SC: "SC", ar.ST: "ST", ar.EWS: "EWS"}
+    if when in single or when == ar.RESERVED:
+        if category is None:
+            return UNKNOWN, "category not stated in profile"
+        claims = (single[when],) if when in single else ("SC", "ST", "OBC", "EWS")
+        return (REQUIRED, f"you claim {category}") if category in claims else (NOT_REQUIRED, f"category {category}")
+    if when == ar.ESM:
+        esm = flag("is_ex_serviceman")
+        if esm is None:
+            return UNKNOWN, "ex-serviceman status not stated in profile"
+        return (REQUIRED, "you are an ex-serviceman") if esm else (NOT_REQUIRED, "not an ex-serviceman")
+    if when == ar.CENTRAL_GOVT_EMPLOYEE:
+        cgs = flag("is_central_govt_employee")
+        if cgs is None:
+            return UNKNOWN, "Central Government service not stated in profile"
+        return (REQUIRED, "you are a Central Government employee") if cgs else (NOT_REQUIRED, "not a Central Government employee")
     if when == ua.SC_ST_OBC:
         if category is None:
             return UNKNOWN, "category not stated in profile"
@@ -123,45 +155,92 @@ def _decide(when: str, code: str, info: Optional[PersonalInfo], has_experience: 
     return IF_APPLICABLE, "only for claims you make"
 
 def _fee(rows: List[ApplicationRequirement], info: Optional[PersonalInfo], cite) -> Optional[Dict[str, Any]]:
-    fee = next((r for r in rows if r.req_type == "FEE"), None)
+    fees = [r for r in rows if r.req_type == "FEE"]
     exemption = next((r for r in rows if r.req_type == "FEE_EXEMPTION"), None)
-    if fee is None and exemption is None:
+    if not fees and exemption is None:
         return None
+    category = rules.normalize_category(info.category) if info else None
+    # A notice may state the fee per category (FEE rows with a "category"); the profile's own one wins, else the general fee
+    by_cat = {json.loads(r.value).get("category"): r for r in fees}
+    fee = next((by_cat[c] for c in (category, _gender(info.gender) if info else None) if c and c in by_cat), None) or by_cat.get(None)
     amount = json.loads(fee.value) if fee else None
     groups = json.loads(exemption.value)["exempt"] if exemption else []
-    category = rules.normalize_category(info.category) if info else None
-    known = {"SC": category, "ST": category, "PWBD": info.is_pwbd if info else None, "FEMALE": _gender(info.gender) if info else None}
-    matched = [g for g in groups if (g in ("SC", "ST") and category == g) or (g == "PWBD" and known["PWBD"]) or (g == "FEMALE" and known["FEMALE"] == "FEMALE")]
-    missing = sorted({{"SC": "category", "ST": "category", "PWBD": "PwBD status", "FEMALE": "gender"}[g] for g in groups if known[g] is None})
+    known = {"SC": category, "ST": category, "PWBD": info.is_pwbd if info else None, "FEMALE": _gender(info.gender) if info else None,
+             "ESM": info.is_ex_serviceman if info else None}
+    matched = [g for g in groups if (g in ("SC", "ST") and category == g) or (g in ("PWBD", "ESM") and known[g])
+               or (g == "FEMALE" and known["FEMALE"] == "FEMALE")]
+    missing = sorted({{"SC": "category", "ST": "category", "PWBD": "PwBD status", "FEMALE": "gender", "ESM": "ex-serviceman status"}[g]
+                      for g in groups if known[g] is None})
     if matched:
         status, reason = "EXEMPT", "exempt as " + "/".join(matched)
     elif missing:
         status, reason = UNKNOWN, "profile does not state " + ", ".join(missing)
     else:
         status, reason = "PAY", "not in an exempted group"
+    if status == "PAY" and fee is None and fees:
+        # Only per-category fees are stated (no FEE rows at all keeps the exemption decision, as before)
+        status, reason = UNKNOWN, ("the notice states no fee for your category" if category
+                                   else "the fee depends on a category the profile does not state")
     return {"status": status, "reason": reason, "amount": amount["amount"] if amount else None,
             "currency": amount["currency"] if amount else None, "exempt_groups": groups,
+            "by_category": [{"category": c, "amount": json.loads(r.value)["amount"], "citation": cite(r)} for c, r in by_cat.items() if c],
             "citations": [cite(r) for r in (fee, exemption) if r is not None]}
 
-async def build_checklist(session: AsyncSession, user_id: uuid.UUID, vacancy_id: uuid.UUID, profile_version_id: uuid.UUID) -> Dict[str, Any]:
+async def _profile_version(session: AsyncSession, user_id: uuid.UUID, profile_version_id: uuid.UUID) -> ProfileVersion:
     version = (await session.execute(select(ProfileVersion).where(
         ProfileVersion.id == profile_version_id, ProfileVersion.user_id == user_id))).scalar_one_or_none()
     if version is None:
         raise PrepInputError("profile version not found")
+    return version
+
+def _ist(at) -> Optional[str]:
+    return at.astimezone(IST).strftime("%d %b %Y %H:%M IST") if at else None
+
+async def build_checklist(session: AsyncSession, user_id: uuid.UUID, vacancy_id: uuid.UUID, profile_version_id: uuid.UUID) -> Dict[str, Any]:
+    version = await _profile_version(session, user_id, profile_version_id)
     vacancy = await session.get(Vacancy, vacancy_id)
     if vacancy is None:
         raise PrepInputError("vacancy not found")
+    post_needs_experience = bool((await session.execute(select(VacancyRequirement.id).where(
+        VacancyRequirement.vacancy_id == vacancy.id, VacancyRequirement.req_type == "EXPERIENCE",
+        VacancyRequirement.superseded_at.is_(None)).limit(1))).first())
+    rows = await requirements_for_vacancy(session, vacancy)
+    out = await _checklist(session, version, rows, post_needs_experience, _ist(vacancy.eligibility_crucial_date))
+    return {
+        "vacancy_id": str(vacancy.id), "profile_version_id": str(version.id), "advertisement_number": vacancy.advertisement_number,
+        "application_deadline": vacancy.application_deadline.isoformat() if vacancy.application_deadline else None,
+        **out, "warnings": [] if rows else ["no application requirements extracted for this vacancy's advertisement"],
+    }
 
+async def build_exam_checklist(session: AsyncSession, user_id: uuid.UUID, exam_id: uuid.UUID, profile_version_id: uuid.UUID) -> Dict[str, Any]:
+    """Same checklist for an examination notice (e.g. SSC CGL 2026); the crucial date for category claims is the
+    closing date when the notice states that, which its OBC certificate row then carries."""
+    version = await _profile_version(session, user_id, profile_version_id)
+    exam = await session.get(Exam, exam_id)
+    if exam is None:
+        raise PrepInputError("exam not found")
+    rows = await requirements_for_exam(session, exam)
+    obc = next((json.loads(r.value) for r in rows if r.req_type == "CERTIFICATE" and r.code == "OBC_NCL"), None)
+    crucial = obc["crucial_date"] if obc and obc.get("crucial_date") else None
+    out = await _checklist(session, version, rows, False, crucial)
+    return {
+        "exam_id": str(exam.id), "profile_version_id": str(version.id), "exam_name": exam.name, "file_number": exam.external_ref,
+        "application_deadline": exam.application_end.isoformat() if exam.application_end else None,
+        **out, "warnings": [] if rows else ["no application requirements extracted for this exam's notice"],
+    }
+
+def _certificate_item(r: ApplicationRequirement, status: str, reason: str, cite) -> Dict[str, Any]:
+    value = json.loads(r.value)
+    return {"kind": r.code, "applies_when": r.applies_when, "status": status, "reason": reason,
+            **{k: value.get(k) for k in ("crucial_date", "issued_on_or_after", "issued_on_or_before", "financial_year", "format_note")},
+            "clauses": value.get("clauses") or [], "citation": cite(r)}
+
+async def _checklist(session: AsyncSession, version: ProfileVersion, rows: List[ApplicationRequirement], post_needs_experience: bool,
+                     crucial: Optional[str]) -> Dict[str, Any]:
     info = (await session.execute(select(PersonalInfo).where(PersonalInfo.profile_version_id == version.id))).scalar_one_or_none()
     has_experience = bool((await session.execute(select(Experience.id).where(Experience.profile_version_id == version.id).limit(1))).first())
     has_equivalence = bool((await session.execute(select(Education.id).where(
         Education.profile_version_id == version.id, Education.equivalence.is_not(None), Education.equivalence != "").limit(1))).first())
-    post_needs_experience = bool((await session.execute(select(VacancyRequirement.id).where(
-        VacancyRequirement.vacancy_id == vacancy.id, VacancyRequirement.req_type == "EXPERIENCE",
-        VacancyRequirement.superseded_at.is_(None)).limit(1))).first())
-    crucial = vacancy.eligibility_crucial_date.astimezone(IST).strftime("%d %b %Y %H:%M IST") if vacancy.eligibility_crucial_date else None
-
-    rows = await requirements_for_vacancy(session, vacancy)
     urls = {}
     for doc_id in {r.raw_document_id for r in rows}:
         urls[doc_id] = (await session.get(RawDocument, doc_id)).url
@@ -174,19 +253,25 @@ async def build_checklist(session: AsyncSession, user_id: uuid.UUID, vacancy_id:
         r = next((r for r in rows if r.req_type == req_type), None)
         return {**json.loads(r.value), "citation": cite(r)} if r else None
 
+    def order(r: ApplicationRequirement):
+        item = json.loads(r.value).get("item") or "~"
+        # SSC numbers its list items ("1".."10"), UPSC letters them; numbers sort as numbers
+        return (int(item), "") if item.isdigit() else (10 ** 6, item), r.code
+
+    decide = lambda r: _decide(r.applies_when, r.code, info, has_experience, has_equivalence, post_needs_experience, crucial)
     items = []
-    for r in sorted((r for r in rows if r.req_type == "DOCUMENT"), key=lambda r: (json.loads(r.value).get("item") or "~", r.code)):
-        status, reason = _decide(r.applies_when, r.code, info, has_experience, has_equivalence, post_needs_experience, crucial)
+    for r in sorted((r for r in rows if r.req_type == "DOCUMENT"), key=order):
+        status, reason = decide(r)
         items.append({"code": r.code, "applies_when": r.applies_when, "status": status, "reason": reason,
                       "text": json.loads(r.value).get("text"), "citation": cite(r)})
 
     return {
-        "vacancy_id": str(vacancy.id), "profile_version_id": str(version.id), "advertisement_number": vacancy.advertisement_number,
-        "application_deadline": vacancy.application_deadline.isoformat() if vacancy.application_deadline else None,
         "portal": single("APPLICATION_PORTAL"), "photo_id": single("PHOTO_ID"), "payment": single("PAYMENT_MODE"),
         "fee": _fee(rows, info, cite),
         "fee_rules": [{"code": r.code, **json.loads(r.value), "citation": cite(r)} for r in rows if r.req_type == "FEE_RULE"],
         "upload_rules": [{"code": r.code, **json.loads(r.value), "citation": cite(r)} for r in rows if r.req_type == "UPLOAD_RULE"],
+        "certificates": [_certificate_item(r, *decide(r), cite) for r in sorted((r for r in rows if r.req_type == "CERTIFICATE"), key=lambda r: r.code)],
+        "key_dates": [{"code": r.code, **json.loads(r.value), "citation": cite(r)}
+                      for r in sorted((r for r in rows if r.req_type == "KEY_DATE"), key=lambda r: json.loads(r.value)["at"])],
         "documents": items,
-        "warnings": [] if rows else ["no application requirements extracted for this vacancy's advertisement"],
     }
