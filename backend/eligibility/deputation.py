@@ -92,8 +92,12 @@ def _clause_outcome(profile: ProfileSnapshot, clause: ServiceClause, closing: Op
         missing = "closing date" if closing is None else "current pay level / regular service start in profile"
         return {**out, "outcome": "UNKNOWN", "rule": f"{missing} not known"}
     if level not in clause.levels:
-        # Service in a listed level held before the current one is not in the profile
-        return {**out, "outcome": "NOT_MET", "rule": f"current level {level} is not " + "/".join(f"Level-{l}" for l in clause.levels)}
+        listed = "/".join(f"Level-{l}" for l in clause.levels)
+        if level > max(clause.levels):
+            # Service in a listed level held before promotion to the current one is not in the profile
+            return {**out, "outcome": NEEDS_HUMAN_REVIEW,
+                    "rule": f"current level {level} is above {listed}; earlier service there is not in the profile"}
+        return {**out, "outcome": "NOT_MET", "rule": f"current level {level} is not {listed}"}
     due = add_years(since, clause.years)
     if closing >= due:
         return {**out, "outcome": "MET", "rule": f"{clause.years} years in Level-{level} completed on {due.isoformat()}"}

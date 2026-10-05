@@ -170,10 +170,15 @@ def test_level_and_years_route():
     met = dep.check_service(_officer(current_pay_level=11, current_level_regular_since=date(2020, 1, 1)), iafa, closing)
     assert met.outcome == "MET" and met.source_page == 5
     assert met.data["clauses"][0]["quote"] == iafa.service[0].quote
-    # Level 11 for under 5 years and not Level 9/10: no clause is met, but the analogous route stays with a reviewer
+    # Level 11 for under 5 years: the Level-11 clause is not met; 9 years in Level 9/10 before promotion may be,
+    # but that service is not in the profile, so a reviewer decides (never NOT_MET)
     short = dep.check_service(_officer(current_pay_level=11, current_level_regular_since=date(2022, 6, 1)), iafa, closing)
     assert short.outcome == dep.NEEDS_HUMAN_REVIEW
-    assert [cl["outcome"] for cl in short.data["clauses"]] == ["NOT_MET", "NOT_MET"]
+    assert [cl["outcome"] for cl in short.data["clauses"]] == ["NOT_MET", dep.NEEDS_HUMAN_REVIEW]
+    assert "Level-9/Level-10" in short.data["clauses"][1]["rule"]
+    # A level below every listed level stays NOT_MET for that clause
+    low = dep.check_service(_officer(current_pay_level=8, current_level_regular_since=date(2010, 1, 1)), iafa, closing)
+    assert [cl["outcome"] for cl in low.data["clauses"]] == ["NOT_MET", "NOT_MET"]
     unknown = dep.check_service(_officer(), iafa, closing)
     assert unknown.outcome == "UNKNOWN"
 
