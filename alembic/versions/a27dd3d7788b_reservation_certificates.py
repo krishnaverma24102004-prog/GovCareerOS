@@ -1,7 +1,7 @@
 """reservation certificates held by the candidate (profile section)
 
 Revision ID: a27dd3d7788b
-Revises: a7c3e91f2d64
+Revises: f72903584591
 Create Date: 2026-10-05 12:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'a27dd3d7788b'
-down_revision: Union[str, Sequence[str], None] = 'a7c3e91f2d64'
+down_revision: Union[str, Sequence[str], None] = 'f72903584591'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

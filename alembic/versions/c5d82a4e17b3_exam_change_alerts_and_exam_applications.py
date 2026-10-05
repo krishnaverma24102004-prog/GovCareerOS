@@ -1,7 +1,7 @@
 """exam change alerts and exam applications
 
 Revision ID: c5d82a4e17b3
-Revises: a7c3e91f2d64
+Revises: d3e8b1a6c072
 Create Date: 2026-10-05 12:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'c5d82a4e17b3'
-down_revision: Union[str, Sequence[str], None] = 'a7c3e91f2d64'
+down_revision: Union[str, Sequence[str], None] = 'd3e8b1a6c072'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

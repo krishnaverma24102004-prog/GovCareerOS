@@ -1,7 +1,7 @@
 """recruitment notice title tokens
 
 Revision ID: f72903584591
-Revises: a7c3e91f2d64
+Revises: f8420cc4390d
 Create Date: 2026-10-05 12:00:00.000000
 
 """
@@ -15,7 +15,7 @@ from govcareeros.backend.parsing.title_tokens import normalise, token_counts
 
 # revision identifiers, used by Alembic.
 revision: str = 'f72903584591'
-down_revision: Union[str, Sequence[str], None] = 'a7c3e91f2d64'
+down_revision: Union[str, Sequence[str], None] = 'f8420cc4390d'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
