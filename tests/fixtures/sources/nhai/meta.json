@@ -1,0 +1,33 @@
+{
+  "source": "NHAI",
+  "captured": "2026-10-01",
+  "user_agent": "GovCareerOS/0.1 (personal government-job tracker)",
+  "files": {
+    "vacancies-current-en.json": {
+      "url": "https://nhai.gov.in/nhai/api/vacancies-current",
+      "method": "POST multipart/form-data",
+      "form": {
+        "totalrecord": "200",
+        "publish_from_dt": "",
+        "publish_to_dt": "",
+        "last_from_dt": "",
+        "last_to_dt": "",
+        "status": "",
+        "position": "",
+        "captcha_page": "0",
+        "verification": "",
+        "language": "en",
+        "index": "0",
+        "archive": "0"
+      },
+      "how": "govcareeros PageFetcher client (url_guard policy nhai.gov.in, robots.txt checked); response JSON re-serialized with json.dumps(indent=1, ensure_ascii=False), values unchanged",
+      "note": "XHR issued by the SPA page https://nhai.gov.in/#/vacancies/current; total_count 116, all 116 rows returned"
+    },
+    "vacancies-current-rendered-hi.html": {
+      "url": "https://nhai.gov.in/#/vacancies/current",
+      "method": "PageFetcher.fetch_browser (headless Chromium)",
+      "note": "SPA defaults to Hindi; list rows have no <a href>, only click handlers. Shows date_val first in each row and archive_date_val under the label 'समाप्ति तिथि'"
+    }
+  },
+  "notes": "Captured by the live re-verification run of 2026-10-01 (scratchpad fix/NHAI)."
+}

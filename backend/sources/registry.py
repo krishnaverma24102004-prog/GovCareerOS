@@ -87,6 +87,8 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("IBPS", "Institute of Banking Personnel Selection", COMMISSION, "https://www.ibps.in/"),
     # rrbcdg.gov.in redirects here; the board's pages now live on the Indian Railways domain
     SourceSpec("RRB-CDG", "Railway Recruitment Board Chandigarh", COMMISSION, "https://rrb.indianrailways.gov.in/chandigarh"),
+    # No recruitment page; the homepage "Latest @ NTA" board titles its notices in <content> elements next to a
+    # "Read More" PDF link (backend/sources/adapters/nta.py pairs them)
     SourceSpec("NTA", "National Testing Agency", COMMISSION, "https://nta.ac.in/"),
 
     # Official aggregators covering all ministries
@@ -185,9 +187,13 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("EPFO", "Employees' Provident Fund Organisation", BODY, "https://www.epfo.gov.in/archive-recruitments/"),
     SourceSpec("FCI", "Food Corporation of India", BODY, "https://fci.gov.in/recruitments.php"),
     SourceSpec("KVS", "Kendriya Vidyalaya Sangathan", BODY, "https://kvsangathan.nic.in/"),
+    # JavaScript app (routes to the homepage); its Recruitment box is read from the site's public media feed
+    # (adapters/nvs.py LISTING_REQUEST)
     SourceSpec("NVS", "Navodaya Vidyalaya Samiti", BODY, "https://navodaya.gov.in/nvs/en/Recruitment/"),
     SourceSpec("CSIR", "Council of Scientific & Industrial Research", BODY, "https://www.csir.res.in/en/career-opportunities"),
     SourceSpec("ICAR", "Indian Council of Agricultural Research", BODY, "https://icar.org.in/vacancies"),
+    # JavaScript app whose rows carry no links; the list comes from a POST to /nhai/api/vacancies-current on the
+    # same domain (adapters/nhai.py LISTING_REQUEST)
     SourceSpec("NHAI", "National Highways Authority of India", BODY, "https://nhai.gov.in/#/vacancies/current"),
 
     # State public service commissions: each URL returned recruitment links on its own domain (live probe
