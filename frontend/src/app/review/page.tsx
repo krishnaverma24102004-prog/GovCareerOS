@@ -245,6 +245,7 @@ function Console() {
               <th className="px-2 py-1">Source</th>
               <th className="px-2 py-1">Kind</th>
               <th className="px-2 py-1">Status</th>
+              <th className="px-2 py-1">Last date</th>
               <th className="px-2 py-1">First seen</th>
             </tr>
           </thead>
@@ -269,12 +270,15 @@ function Console() {
                 <td className="px-2 py-1">
                   <Badge value={i.status} />
                 </td>
+                <td className="whitespace-nowrap px-2 py-1 text-xs" title={i.listing_evidence.last_date ?? ""}>
+                  {i.last_date ?? ""}
+                </td>
                 <td className="whitespace-nowrap px-2 py-1 text-xs text-slate-500">{fmtDate(i.first_seen_at ?? i.created_at)}</td>
               </tr>
             ))}
             {page && items.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-2 py-4 text-center text-slate-500">
+                <td colSpan={9} className="px-2 py-4 text-center text-slate-500">
                   Nothing waiting.
                 </td>
               </tr>
@@ -343,6 +347,46 @@ function Console() {
   );
 }
 
+/** What the source's listing row states about the notice, each value with the listing text it was read from. */
+function ListingFacts({ item }: { item: QueueItem }) {
+  const ev = item.listing_evidence;
+  const facts: [string, string | null, string | undefined][] = [
+    ["Published", item.published_on, ev.published_on],
+    ["Last date", item.last_date, ev.last_date],
+    ["Advt. no.", item.advertisement_number, ev.advertisement_number],
+    ["Posts", item.post_names.length ? item.post_names.join("; ") : null, ev.post_names],
+    ["Listing label", item.kind_hint, ev.kind_hint],
+  ];
+  const stated = facts.filter(([, value]) => value);
+  if (!stated.length) return null;
+  return (
+    <div className="rounded bg-slate-50 p-2 text-xs">
+      <div className="mb-1 text-slate-500">
+        From the official listing
+        {item.found_on_url && (
+          <>
+            {" "}
+            <a className="break-all text-blue-700 underline" href={item.found_on_url} target="_blank" rel="noreferrer">
+              {item.found_on_url}
+            </a>
+          </>
+        )}
+      </div>
+      <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5">
+        {stated.map(([label, value, quote]) => (
+          <div key={label} className="contents">
+            <dt className="text-slate-500">{label}</dt>
+            <dd>
+              {value}
+              {quote && quote !== value && <span className="ml-2 text-slate-400">“{quote}”</span>}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function NoticePanel({ item, onAction }: { item: QueueItem; onAction: (a: NoticeAction) => void }) {
   return (
     <div className="space-y-2 rounded border border-slate-200 bg-white p-3 text-sm">
@@ -358,6 +402,7 @@ function NoticePanel({ item, onAction }: { item: QueueItem; onAction: (a: Notice
           {item.url}
         </a>
       )}
+      <ListingFacts item={item} />
       {item.review_note && (
         <p className="text-slate-600">
           Last note: {item.review_note} ({fmtDate(item.reviewed_at, true)})

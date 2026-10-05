@@ -61,7 +61,7 @@ class _Recorder:
     def __init__(self):
         self.calls = []
 
-    async def discover(self, url, policy=None, browser=False):
+    async def discover(self, url, policy=None, browser=False, listing_parser=None):
         self.calls.append((url, browser))
         return ProbeResult("NO_NOTICES")
 

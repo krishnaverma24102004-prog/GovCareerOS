@@ -6,7 +6,7 @@ There is deliberately no bulk approve: a draft becomes vacancies only through PO
 one draft at a time. Every decision here is appended to the review audit log.
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -51,6 +51,15 @@ class QueueItem(BaseModel):
     model: Optional[str]
     review_note: Optional[str]
     reviewed_at: Optional[datetime]
+    # From the source's listing row (listing adapter); None / empty where the listing states nothing.
+    # listing_evidence: field -> the exact listing text it was read from, on the page found_on_url
+    published_on: Optional[date] = None
+    last_date: Optional[date] = None
+    advertisement_number: Optional[str] = None
+    post_names: List[str] = []
+    kind_hint: Optional[str] = None
+    listing_evidence: Dict[str, str] = {}
+    found_on_url: Optional[str] = None
 
 class QueuePage(BaseModel):
     total: int
