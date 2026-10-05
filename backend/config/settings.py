@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     LLM_NUM_CTX: int = 8192
     NVIDIA_API_KEY: str = ""
     NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    # Tried in order; a model the API reports gone (404/410) is skipped for the rest of the run.
+    # nvidia/nemotron-3-super-120b-a12b was retired 03-10-2026 (HTTP 410). Ultra handles Hindi
+    # notices but is slow; 3.5-lightning is fast.
+    NVIDIA_MODELS: str = "nvidia/nemotron-3-ultra-550b-a55b,nvidia/nemotron-3.5-lightning-30b-a3b"
+    NVIDIA_REQUESTS_PER_MINUTE: float = 40  # free tier limit; request starts are spaced to stay under it
     GOOGLE_API_KEY: str = ""
 
     EMAIL_HOST: str = "smtp.gmail.com"

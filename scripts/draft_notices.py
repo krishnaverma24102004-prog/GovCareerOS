@@ -1,10 +1,12 @@
 """
 Create review drafts for VACANCY PDF notices of sources without a deterministic parser.
-Uses LLM_PROVIDER / LLM_MODEL from .env (override with --provider/--model).
+Uses LLM_PROVIDER and LLM_MODEL (Ollama) or NVIDIA_MODELS (NVIDIA) from .env; override with
+--provider/--model. For NVIDIA, --model takes a comma-separated chain tried in order.
 
     $env:PYTHONPATH="C:\\Users\\krishna"
     python govcareeros/scripts/draft_notices.py --limit 5
-    python govcareeros/scripts/draft_notices.py --sources CRPF DOE --provider nvidia --model nvidia/nemotron-3-super-120b-a12b
+    python govcareeros/scripts/draft_notices.py --sources CRPF DOE --provider nvidia
+    python govcareeros/scripts/draft_notices.py --provider nvidia --model nvidia/nemotron-3.5-lightning-30b-a3b
 """
 import argparse
 import asyncio
@@ -32,5 +34,5 @@ if __name__ == "__main__":
     p.add_argument("--limit", type=int, default=5)
     p.add_argument("--sources", nargs="*")
     p.add_argument("--provider")
-    p.add_argument("--model")
+    p.add_argument("--model", help="model; for NVIDIA a comma-separated fallback chain")
     raise SystemExit(asyncio.run(main(p.parse_args())))
