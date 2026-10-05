@@ -50,6 +50,10 @@ async def load_profile_snapshot(session: AsyncSession, profile_version_id: uuid.
         is_central_govt_employee=info.is_central_govt_employee if info else None,
         central_govt_service_start=rules.to_date(info.central_govt_service_start) if info else None,
         is_state_govt_employee=info.is_state_govt_employee if info else None,
+        current_pay_level=info.current_pay_level if info else None,
+        current_level_regular_since=rules.to_date(info.current_level_regular_since) if info else None,
+        organisation_cadre=info.organisation_cadre if info else None,
+        last_deputation_end=rules.to_date(info.last_deputation_end) if info else None,
         education=[rules.EducationEntry(e.degree, e.specialization, e.education_level, rules.to_date(e.end_date), e.equivalence)
                    for e in await rows(Education)],
         experience=[rules.ExperienceEntry(e.organization, e.designation, e.domain, e.responsibilities,

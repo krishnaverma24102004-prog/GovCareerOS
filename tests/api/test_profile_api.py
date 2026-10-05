@@ -197,3 +197,21 @@ async def test_users_cannot_see_each_others_data(api, login, db_session):
     await api.put("/profile", json={"education": [{"degree": "B.Sc.", "institution": "Uni B"}]}, headers=ravi)
     assert (await api.get("/profile", headers=asha)).json()["version"]["version_number"] == 1
     assert (await api.get(f"/profile/facts/{fact['id']}/evidence", headers=asha)).json()[0]["source"] == "self"
+
+@pytest.mark.asyncio
+async def test_serving_officer_fields_reach_the_eligibility_snapshot(api, login, db_session):
+    import uuid
+    from datetime import date
+    from govcareeros.backend.eligibility.engine import load_profile_snapshot
+    h = await login("officer@example.com")
+    personal = {"date_of_birth": "1980-04-02", "is_central_govt_employee": True, "current_pay_level": 10,
+                "current_level_regular_since": "2019-07-01", "organisation_cadre": "CSS", "last_deputation_end": "2023-03-31"}
+    r = await api.put("/profile", json={"personal_info": personal}, headers=h)
+    assert r.status_code == 201, r.text
+    assert {k: r.json()["personal_info"][k] for k in personal} == personal
+    snap = await load_profile_snapshot(db_session, uuid.UUID(r.json()["version"]["id"]))
+    assert (snap.current_pay_level, snap.current_level_regular_since, snap.organisation_cadre, snap.last_deputation_end) == \
+        (10, date(2019, 7, 1), "CSS", date(2023, 3, 31))
+    # 7th CPC pay matrix has levels 1-18
+    bad = await api.put("/profile", json={"personal_info": {"current_pay_level": 19}}, headers=h)
+    assert bad.status_code == 422

@@ -6,6 +6,7 @@ Each check returns a RuleOutcome with one of:
   NOT_MET        requirement definitely not satisfied -> INELIGIBLE
   CONDITIONAL    satisfied subject to something the data cannot confirm (named in `note`)
   UNKNOWN        the requirement or the profile is not machine-decidable -> MANUAL_REVIEW
+  NEEDS_HUMAN_REVIEW  a judgement the code must never make (e.g. "analogous post" on deputation) -> MANUAL_REVIEW
   NOT_EVALUATED  informational; the advertisement text for this criterion was not extracted
 
 Education equivalence is never assumed: BCA is not B.Tech/BE, and a degree family only
@@ -61,6 +62,11 @@ class ProfileSnapshot:
     is_central_govt_employee: Optional[bool] = None
     central_govt_service_start: Optional[date] = None
     is_state_govt_employee: Optional[bool] = None
+    # Serving officers (deputation): 7th CPC pay-matrix level held on regular basis, and since when
+    current_pay_level: Optional[int] = None
+    current_level_regular_since: Optional[date] = None
+    organisation_cadre: Optional[str] = None
+    last_deputation_end: Optional[date] = None
 
 @dataclass
 class Requirement:
@@ -544,7 +550,7 @@ def overall_status(outcomes: Sequence[RuleOutcome]) -> Tuple[str, float]:
     decisive = [o for o in outcomes if o.outcome != "NOT_EVALUATED"]
     if any(o.outcome == "NOT_MET" for o in decisive):
         status = "INELIGIBLE"
-    elif any(o.outcome == "UNKNOWN" for o in decisive):
+    elif any(o.outcome in ("UNKNOWN", "NEEDS_HUMAN_REVIEW") for o in decisive):
         status = "MANUAL_REVIEW"
     elif any(o.outcome == "CONDITIONAL" for o in decisive):
         status = "CONDITIONAL"

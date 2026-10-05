@@ -197,7 +197,8 @@ export function toPayloadRows(spec: SectionSpec, rows: FormRow[]): Record<string
 export const PERSONAL_FIELDS: (keyof PersonalInfoFull)[] = [
   "full_name", "date_of_birth", "gender", "category", "is_pwbd", "disability_percentage", "disability_types",
   "citizenship_status", "is_ex_serviceman", "armed_forces_service_months", "is_central_govt_employee",
-  "central_govt_service_start", "is_state_govt_employee", "career_interests", "nationality", "contact", "address",
+  "central_govt_service_start", "is_state_govt_employee", "current_pay_level", "current_level_regular_since",
+  "organisation_cadre", "last_deputation_end", "career_interests", "nationality", "contact", "address",
   "preferred_locations",
 ];
 
@@ -215,6 +216,10 @@ export const PERSONAL_LABELS: Record<keyof PersonalInfoFull, string> = {
   is_central_govt_employee: "Central Govt employee",
   central_govt_service_start: "Central Govt service since",
   is_state_govt_employee: "State Govt employee",
+  current_pay_level: "Current pay level (regular)",
+  current_level_regular_since: "Regular service in current level since",
+  organisation_cadre: "Organisation / cadre",
+  last_deputation_end: "Returned from last deputation on",
   career_interests: "Career interests",
   nationality: "Nationality",
   contact: "Contact",

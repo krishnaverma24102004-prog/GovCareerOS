@@ -1,0 +1,42 @@
+{
+  "Advertisement_-_Deputation_Posts25_9_2026.pdf": {
+    "url": "https://icsil.in/app/uploads/advertisement/Advertisement_-_Deputation_Posts25_9_2026.pdf",
+    "final_url": "https://icsil.in/app/uploads/advertisement/Advertisement_-_Deputation_Posts25_9_2026.pdf",
+    "fetched_at": "2026-10-05T06:06:16+00:00",
+    "sha256": "06465f098f208bb13d4a9c649a8de932f1508fc84ca079f54e29cd81f9d5965b",
+    "content_type": "application/pdf",
+    "fetcher": "PageFetcher.get (robots.txt + UrlPolicy)"
+  },
+  "Details_Advertisement_Deputation_15012026.pdf": {
+    "url": "https://www.cbse.gov.in/cbsenew/documents/Details_Advertisement_Deputation_15012026.pdf",
+    "final_url": "https://www.cbse.gov.in/cbsenew/documents/Details_Advertisement_Deputation_15012026.pdf",
+    "fetched_at": "2026-10-05T06:06:15+00:00",
+    "sha256": "d1f0b99f0c6c2e0796bc1bd88bf5761850465c663883bf75818b8ca2f7dba69e",
+    "content_type": "application/pdf",
+    "fetcher": "PageFetcher.get (robots.txt + UrlPolicy)"
+  },
+  "NATGRIDVACAN_13062025.pdf": {
+    "url": "https://www.mha.gov.in/sites/default/files/NATGRIDVACAN_13062025.pdf",
+    "final_url": "https://www.mha.gov.in/sites/default/files/NATGRIDVACAN_13062025.pdf",
+    "fetched_at": "2026-10-05T06:06:16+00:00",
+    "sha256": "44aed83a6e831c98af33c6cdcf4e318182078ba61f5918cf8838096bffb481bd",
+    "content_type": "application/pdf",
+    "fetcher": "PageFetcher.get (robots.txt + UrlPolicy)"
+  },
+  "dopt_despatch_rider_A-12026-1-2023-AD-III.pdf": {
+    "url": "https://documents.doptcirculars.nic.in/D2/D02adm/Vacancy%20CircularwwTEQ.pdf",
+    "final_url": "https://documents.doptcirculars.nic.in/D2/D02adm/Vacancy%20CircularwwTEQ.pdf",
+    "fetched_at": "2026-10-05T06:07:03+00:00",
+    "sha256": "afbe5475bb8662b3a1564c2f4f424b97a5f1fe9e6997bb72251198485b7aede2",
+    "content_type": "application/pdf",
+    "fetcher": "PageFetcher.get (robots.txt + UrlPolicy)"
+  },
+  "dopt_vacancy_circulars.html": {
+    "url": "https://doptcirculars.nic.in/Default.aspx?URL=UWnd5SMSSkgG",
+    "final_url": "https://doptcirculars.nic.in/Default.aspx?URL=UWnd5SMSSkgG",
+    "fetched_at": "2026-10-05T06:06:15+00:00",
+    "sha256": "9ac5d8abc9a129b637b1a36cc1615da6f5ddfe21f485fd081a239ac1c29e1e3d",
+    "content_type": "text/html; charset=utf-8",
+    "fetcher": "PageFetcher.get (robots.txt + UrlPolicy)"
+  }
+}

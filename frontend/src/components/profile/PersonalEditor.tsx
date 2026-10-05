@@ -122,6 +122,15 @@ export function PersonalEditor({
         {(value.is_central_govt_employee || value.central_govt_service_start || err("central_govt_service_start")) &&
           text("central_govt_service_start", "Continuous Central Govt service since", "date")}
         {question("is_state_govt_employee", "State Government employee?")}
+        {(value.is_central_govt_employee || value.is_state_govt_employee || value.current_pay_level != null ||
+          err("current_pay_level")) && (
+          <>
+            {text("current_pay_level", "Pay-matrix level held on regular basis (not ACP/MACP)", "number")}
+            {text("current_level_regular_since", "Regular service in that level since", "date")}
+            {text("organisation_cadre", "Organisation / cadre")}
+            {text("last_deputation_end", "Returned from last deputation on (if any)", "date")}
+          </>
+        )}
       </div>
 
       <div className="grid gap-3 border-t border-slate-200 pt-3 md:grid-cols-2">
