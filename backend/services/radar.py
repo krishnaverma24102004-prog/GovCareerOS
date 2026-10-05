@@ -3,10 +3,10 @@ Eligibility radar: re-checks every user's latest profile version against every a
 open vacancy and turns the results into in-app alerts.
 
 Everything an alert says comes from stored data: the deterministic eligibility result,
-the vacancy's stated deadline and age limits, and official notices (VacancyVersion).
+the vacancy's stated deadline and age limits, and official notices (VacancyVersion, and ExamVersion for
+exams the user applied for or is eligible for, with old and new evidence: services/change_log.py).
 Alerts are de-duplicated per user, so running the radar repeatedly is safe.
 """
-import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
@@ -25,6 +25,7 @@ from govcareeros.backend.models.user import ProfileVersion, User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
 from govcareeros.backend.relevance import service as relevance_service
+from govcareeros.backend.services import change_log
 from govcareeros.backend.services.application_tracker import application_update_alerts
 
 DEADLINE_WINDOW = timedelta(days=7)
@@ -123,19 +124,18 @@ async def run_for_user(session: AsyncSession, user: User, now: datetime, run: Ra
                                           f"from {out.strftime('%d %b %Y')} unless a relaxation applies.",
                                      due_at=datetime(out.year, out.month, out.day, tzinfo=IST), **base)
 
-    # Official notices about vacancies this user has been assessed for
+    # Official notices about vacancies this user has been assessed for. Those the user applied for or is eligible for
+    # are alerted by change_log.change_alerts (run_radar), with the reason; the dedupe key is the same either way.
+    _, watched = await change_log.watched_targets(session, user.id)
+    cache = change_log.LogCache(session)
     assessed = select(EligibilityResult.vacancy_id).where(EligibilityResult.user_id == user.id).distinct()
     for vv, vacancy in (await session.execute(
         select(VacancyVersion, Vacancy).join(Vacancy, Vacancy.id == VacancyVersion.vacancy_id).where(VacancyVersion.vacancy_id.in_(assessed))
     )).all():
-        details = json.loads(vv.details or "{}")
-        cancelled = vacancy.status == "CANCELLED" and "cancellation" in details
-        await _add_alert(session, run, kind="VACANCY_CANCELLED" if cancelled else "VACANCY_UPDATED",
-                         dedupe_key=f"notice:{vv.id}", user_id=user.id, vacancy_id=vacancy.id, vacancy_version_id=vv.id,
-                         title=("Cancelled: " if cancelled else "Official notice: ") + vacancy.post_name,
-                         body=f"{vv.change_type} notice" + (f" dated {vv.notice_date.astimezone(IST).strftime('%d %b %Y')}" if vv.notice_date else "")
-                              + f" for {vacancy.post_name}: {vv.change_log or ''}".rstrip(),
-                         due_at=vacancy.application_deadline)
+        vc = await cache.vacancy(vacancy, vv.id)
+        if vacancy.id in watched and vc and vc.changes:
+            continue
+        await _add_alert(session, run, **change_log.vacancy_alert(user.id, vacancy, vv, vc, None))
 
 async def run_radar(session: AsyncSession, now: Optional[datetime] = None, user_ids: Optional[List[uuid.UUID]] = None) -> RadarRun:
     now = now or datetime.now(timezone.utc)
@@ -147,6 +147,9 @@ async def run_radar(session: AsyncSession, now: Optional[datetime] = None, user_
         await run_for_user(session, user, now, run)
         # Result/corrigendum notices for advertisements the user tracks an application for
         for values in await application_update_alerts(session, user.id):
+            await _add_alert(session, run, **values)
+        # Field-level official changes to exams/vacancies the user applied for or is eligible for (old and new evidence)
+        for values in await change_log.change_alerts(session, user.id):
             await _add_alert(session, run, **values)
     await session.flush()
     return run

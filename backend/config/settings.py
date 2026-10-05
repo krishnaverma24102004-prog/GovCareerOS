@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # Folder containing eng.traineddata; defaults to the standard Windows Tesseract install
     TESSDATA_DIR: Optional[str] = None
 
+    # Days an in-service applicant's office may need to forward an application; 0 = off. Shown only as a labelled
+    # estimate beside the official last date, never as the date (backend/services/deadline_helper.py)
+    IN_SERVICE_FORWARDING_BUFFER_DAYS: int = 0
+
     @property
     def storage_dir(self) -> Path:
         path = Path(self.STORAGE_PATH)

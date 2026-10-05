@@ -33,7 +33,7 @@ class ApplicationRequirement(Base, TimestampMixin):
     parser_version: Mapped[str] = mapped_column(String(100))
 
 class Application(Base, TimestampMixin):
-    """A user's own application tracker entry, for a stored vacancy or (free text) an exam not in the database."""
+    """A user's own application tracker entry, for a stored vacancy, a stored exam, or (free text) an exam not in the database."""
     __tablename__ = "applications"
     __table_args__ = (
         UniqueConstraint("user_id", "vacancy_id", name="uq_applications_user_vacancy"),
@@ -43,7 +43,8 @@ class Application(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", name="fk_applications_user_id"), index=True)
     vacancy_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("vacancies.id", name="fk_applications_vacancy_id"), index=True)
-    exam_ref: Mapped[Optional[str]] = mapped_column(String(255))
+    exam_ref: Mapped[Optional[str]] = mapped_column(String(255))  # set to the exam's name when exam_id is given
+    exam_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("exams.id", name="fk_applications_exam_id"), index=True)
     profile_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("profile_versions.id", name="fk_applications_profile_version_id"))
     status: Mapped[str] = mapped_column(String(20), default="PLANNED", index=True)
     application_number: Mapped[Optional[str]] = mapped_column(String(100))

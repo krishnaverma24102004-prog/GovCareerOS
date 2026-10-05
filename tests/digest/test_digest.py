@@ -157,7 +157,7 @@ async def test_digest_api_is_per_user_and_never_emails(api, login, db_session, n
 
     r = await api.post("/digest/generate", headers=asha)
     assert r.status_code == 201, r.text
-    assert r.json()["sent_at"] is None and set(r.json()["item_counts"]) == {"matches", "deadlines", "age_headroom", "notices"}
+    assert r.json()["sent_at"] is None and set(r.json()["item_counts"]) == {"matches", "deadlines", "age_headroom", "notices", "changes"}
 
     page = await api.get("/digest/latest", headers=asha)
     assert page.status_code == 200 and page.headers["content-type"].startswith("text/html") and "आशा राव" in page.text

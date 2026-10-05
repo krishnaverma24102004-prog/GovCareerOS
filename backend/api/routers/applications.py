@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from govcareeros.backend.api.deps import current_user, get_session
 from govcareeros.backend.models.application import Application, ApplicationStatusHistory
+from govcareeros.backend.models.exam import Exam
 from govcareeros.backend.models.user import ProfileVersion, User
 from govcareeros.backend.models.vacancy import Vacancy
 from govcareeros.backend.services.application_prep import PrepInputError, build_checklist
@@ -35,13 +36,14 @@ class _Fields(BaseModel):
 
 class ApplicationIn(_Fields):
     vacancy_id: Optional[uuid.UUID] = None
+    exam_id: Optional[uuid.UUID] = Field(None, description="a stored exam (SSC CGL ...); official changes to it are alerted")
     exam_ref: Optional[str] = Field(None, max_length=255, description="exam not stored as a vacancy, e.g. 'UPSC CSE 2027'")
     status: Status = "PLANNED"
 
     @model_validator(mode="after")
     def _target(self):
-        if not self.vacancy_id and not (self.exam_ref or "").strip():
-            raise ValueError("vacancy_id or exam_ref is required")
+        if not self.vacancy_id and not self.exam_id and not (self.exam_ref or "").strip():
+            raise ValueError("vacancy_id, exam_id or exam_ref is required")
         return self
 
 class ApplicationPatch(_Fields):
@@ -59,6 +61,7 @@ class ApplicationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     vacancy_id: Optional[uuid.UUID]
+    exam_id: Optional[uuid.UUID] = None
     exam_ref: Optional[str]
     profile_version_id: Optional[uuid.UUID]
     status: str
@@ -100,7 +103,16 @@ async def create(body: ApplicationIn, user: User = Depends(current_user), sessio
         if (await session.execute(select(Application.id).where(
                 Application.user_id == user.id, Application.vacancy_id == body.vacancy_id))).scalar_one_or_none():
             raise HTTPException(status.HTTP_409_CONFLICT, "this vacancy is already tracked")
-    app = Application(id=uuid.uuid4(), user_id=user.id, **body.model_dump(exclude={"exam_ref"}), exam_ref=(body.exam_ref or "").strip() or None)
+    exam_ref = (body.exam_ref or "").strip() or None
+    if body.exam_id:
+        exam = await session.get(Exam, body.exam_id)
+        if exam is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "exam not found")
+        if (await session.execute(select(Application.id).where(
+                Application.user_id == user.id, Application.exam_id == body.exam_id))).scalar_one_or_none():
+            raise HTTPException(status.HTTP_409_CONFLICT, "this exam is already tracked")
+        exam_ref = exam_ref or exam.name[:255]
+    app = Application(id=uuid.uuid4(), user_id=user.id, **body.model_dump(exclude={"exam_ref"}), exam_ref=exam_ref)
     session.add(app)
     session.add(ApplicationStatusHistory(application_id=app.id, from_status=None, to_status=app.status,
                                          changed_at=datetime.now(timezone.utc), note="created"))
