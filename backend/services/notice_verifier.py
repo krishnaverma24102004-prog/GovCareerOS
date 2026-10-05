@@ -581,10 +581,13 @@ def read_pdf(body: bytes, ocr: bool = False, max_chars: Optional[int] = None) ->
     ocr_pages = [p.page_number for p in ex.pages if p.ocr]
     if ocr_pages:
         notes.append(f"Page(s) {_page_list(ocr_pages)} are scanned and were read by OCR, which can misread words.")
-    if ex.scanned_unread:
+    if ex.oversized:
+        notes.append(f"Page(s) {_page_list(ex.oversized)} have no text layer and are too large to read by OCR.")
+    unread = [p for p in ex.scanned_unread if p not in ex.oversized]
+    if unread:
         why = ("OCR was not requested" if not ocr else "OCR is not installed on this server" if tessdata_dir() is None
                else f"OCR is limited to {MAX_OCR_PAGES} pages and {OCR_SECONDS} seconds")
-        notes.append(f"Page(s) {_page_list(ex.scanned_unread)} have no text layer (scanned or blank) and were not "
+        notes.append(f"Page(s) {_page_list(unread)} have no text layer (scanned or blank) and were not "
                      f"read: {why}.")
     return PdfRead("\n".join(p.text for p in ex.pages), ex.page_count, len(ex.pages), ocr_pages, notes)
 

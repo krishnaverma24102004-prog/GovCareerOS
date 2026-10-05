@@ -460,3 +460,12 @@ def test_ocr_page_limit_on_a_four_page_scanned_circular():
     assert "Office of the Custodian of Enemy Property" in read.text
     assert any("Page(s) 4 have no text layer" in n and f"limited to {notice_verifier.MAX_OCR_PAGES} pages" in n
                for n in read.notes)
+
+@NEEDS_TESSERACT
+def test_ocr_skips_a_page_too_large_to_render(monkeypatch):
+    # The scanned UPSC notice is A4 (8.7 million pixels at 300 dpi); with the cap below that, it is not rendered
+    from govcareeros.backend.documents import pdf_text
+    monkeypatch.setattr(pdf_text, "MAX_OCR_PIXELS", 5_000_000)
+    read = notice_verifier.read_pdf(ASSTT_NOTICE.read_bytes(), ocr=True)
+    assert read.ocr_pages == [] and read.text.strip() == ""
+    assert read.notes == ["Page(s) 1 have no text layer and are too large to read by OCR."]
