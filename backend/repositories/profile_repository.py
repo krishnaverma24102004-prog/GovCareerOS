@@ -2,17 +2,18 @@ import uuid
 from typing import Any, Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func, update
-from govcareeros.backend.models.user import User, ProfileVersion, Education, Experience, Skill, Project, Certification, Language, Achievement, PersonalInfo, UserDocument
+from govcareeros.backend.models.user import User, ProfileVersion, Education, Experience, Skill, Project, Certification, Language, Achievement, PersonalInfo, UserDocument, ReservationCertificate
 from govcareeros.backend.models.fact import Fact, Evidence
 
 # Child entities that belong to a single ProfileVersion snapshot
-VERSIONED_ENTITIES = [PersonalInfo, Education, Experience, Project, Skill, Certification, Language, Achievement, UserDocument]
+VERSIONED_ENTITIES = [PersonalInfo, Education, Experience, Project, Skill, Certification, Language, Achievement, UserDocument,
+                      ReservationCertificate]
 _NON_COPIED_COLUMNS = {"id", "profile_version_id", "created_at", "updated_at"}
 # API section name -> model
 SECTION_MODELS = {
     "personal_info": PersonalInfo, "education": Education, "experience": Experience, "projects": Project,
     "skills": Skill, "certifications": Certification, "languages": Language, "achievements": Achievement,
-    "documents": UserDocument,
+    "documents": UserDocument, "reservation_certificates": ReservationCertificate,
 }
 
 class ProfileRepository:

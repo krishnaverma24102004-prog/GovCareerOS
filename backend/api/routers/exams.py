@@ -16,7 +16,7 @@ from govcareeros.backend.eligibility.engine import EligibilityInputError
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.exam import Exam, ExamEligibilityResult
 from govcareeros.backend.models.user import User
-from govcareeros.backend.schemas.api import EligibilityEvidenceOut, ProvenanceOut, RequirementOut
+from govcareeros.backend.schemas.api import EligibilitySectionsOut, ProvenanceOut, RequirementOut
 from govcareeros.backend.schemas.attribution import DISCLAIMER, AttributionOut
 from govcareeros.backend.services import attribution
 
@@ -79,8 +79,7 @@ class ExamEligibilityIn(BaseModel):
     profile_version_id: uuid.UUID
     post_id: Optional[uuid.UUID] = None
 
-class ExamEligibilityOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class ExamEligibilityOut(EligibilitySectionsOut):
     id: uuid.UUID
     exam_id: uuid.UUID
     post_id: Optional[uuid.UUID]
@@ -90,7 +89,6 @@ class ExamEligibilityOut(BaseModel):
     engine_version: str
     crucial_date: Optional[datetime]
     created_at: datetime
-    evidence: List[EligibilityEvidenceOut]
 
 @router.get("", response_model=List[ExamSummary], dependencies=[Depends(current_user)])
 async def list_exams(q: Optional[str] = Query(None, description="substring of the exam name or code"),

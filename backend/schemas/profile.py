@@ -100,6 +100,16 @@ class UserDocumentIn(_In):
     document_type: str
     file_path: str
 
+class ReservationCertificateIn(_In):
+    """A category/benefit certificate as written on it; it counts for eligibility only once a reviewer verifies its Fact."""
+    kind: Literal["OBC_NCL", "EWS", "SC", "ST", "PWBD", "ESM", "DOMICILE"]
+    issue_date: Optional[date] = None
+    financial_year: Optional[str] = Field(None, pattern=r"^\d{4}-(\d{2}|\d{4})$",
+                                          description="EWS: financial year of the income stated, e.g. 2025-26")
+    valid_until: Optional[date] = None
+    issuing_authority: Optional[str] = None
+    central_format: Optional[bool] = Field(None, description="issued in the Central Government format; null = not stated")
+
 class ProfileIn(_In):
     """Sections left as null are carried over on PATCH and cleared on PUT."""
     change_summary: Optional[str] = None
@@ -112,6 +122,7 @@ class ProfileIn(_In):
     languages: Optional[List[LanguageIn]] = None
     achievements: Optional[List[AchievementIn]] = None
     documents: Optional[List[UserDocumentIn]] = None
+    reservation_certificates: Optional[List[ReservationCertificateIn]] = None
 
 class PersonalInfoOut(PersonalInfoIn, _Out):
     model_config = ConfigDict(from_attributes=True, extra="ignore")
@@ -149,6 +160,7 @@ CertificationOut = _out(CertificationIn)
 LanguageOut = _out(LanguageIn)
 AchievementOut = _out(AchievementIn)
 UserDocumentOut = _out(UserDocumentIn)
+ReservationCertificateOut = _out(ReservationCertificateIn)
 
 class ProfileVersionSummary(_Out):
     id: uuid.UUID
@@ -167,6 +179,7 @@ class ProfileOut(BaseModel):
     languages: List[LanguageOut] = []
     achievements: List[AchievementOut] = []
     documents: List[UserDocumentOut] = []
+    reservation_certificates: List[ReservationCertificateOut] = []
 
 class FactIn(_In):
     subject: str

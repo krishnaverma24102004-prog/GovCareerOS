@@ -34,6 +34,7 @@ class ProfileVersion(Base, TimestampMixin):
     languages: Mapped[List["Language"]] = relationship(back_populates="profile_version")
     achievements: Mapped[List["Achievement"]] = relationship(back_populates="profile_version")
     documents: Mapped[List["UserDocument"]] = relationship(back_populates="profile_version")
+    reservation_certificates: Mapped[List["ReservationCertificate"]] = relationship(back_populates="profile_version")
     facts: Mapped[List["Fact"]] = relationship(back_populates="profile_version")
 
 class PersonalInfo(Base, TimestampMixin):
@@ -129,6 +130,23 @@ class Certification(Base, TimestampMixin):
     credential_id: Mapped[Optional[str]] = mapped_column(String(255))
     verification_url: Mapped[Optional[str]] = mapped_column(String(1000))
     profile_version: Mapped["ProfileVersion"] = relationship(back_populates="certifications")
+
+class ReservationCertificate(Base, TimestampMixin):
+    """A category/benefit certificate the candidate holds (eligibility.certificate_types.HeldCertificate).
+    Counts as verified only when its Fact (subject "reservation_certificates") is VERIFIED by a reviewer."""
+    __tablename__ = "reservation_certificates"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profile_versions.id"), index=True)
+    # CertificateKind: OBC_NCL, EWS, SC, ST, PWBD, ESM, DOMICILE
+    kind: Mapped[str] = mapped_column(String(20))
+    issue_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    # EWS: the financial year whose income the certificate states, e.g. "2025-26"
+    financial_year: Mapped[Optional[str]] = mapped_column(String(9))
+    valid_until: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    issuing_authority: Mapped[Optional[str]] = mapped_column(String(255))
+    # None = not stated
+    central_format: Mapped[Optional[bool]] = mapped_column(Boolean)
+    profile_version: Mapped["ProfileVersion"] = relationship(back_populates="reservation_certificates")
 
 class Language(Base, TimestampMixin):
     __tablename__ = "languages"

@@ -1,12 +1,24 @@
 import uuid
 from datetime import date, datetime
 from typing import Dict, Any, Optional
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from govcareeros.backend.repositories.profile_repository import ProfileRepository, SECTION_MODELS
 from govcareeros.backend.repositories.fact_repository import FactRepository
+from govcareeros.backend.models.user import ReservationCertificate
 
 _VERSION_RETRIES = 10
+# A held certificate is one claim: one Fact per certificate row, verified (or rejected) by a reviewer as a whole
+CERTIFICATE_SUBJECT, CERTIFICATE_PREDICATE = "reservation_certificates", "certificate"
+
+def certificate_fact_value(row: ReservationCertificate) -> str:
+    """The claim a reviewer checks against the uploaded certificate; every recorded field, nothing else."""
+    def d(v):
+        return v.date().isoformat() if isinstance(v, datetime) else (v.isoformat() if v else "not stated")
+    fmt = {True: "yes", False: "no", None: "not stated"}[row.central_format]
+    return (f"{row.kind} certificate; issued {d(row.issue_date)}; income financial year {row.financial_year or 'not stated'}; "
+            f"valid until {d(row.valid_until)}; issued by {row.issuing_authority or 'not stated'}; Central Government format: {fmt}")
 
 class ProfileService:
     def __init__(self, session: AsyncSession):
@@ -65,7 +77,17 @@ class ProfileService:
             for item in ([payload] if key == "personal_info" else payload):
                 self.session.add(model(profile_version_id=version.id, **_datetimes(item)))
         await self.session.flush()
+        await self.certificate_facts(version.id)
         return version
+
+    async def certificate_facts(self, version_id: uuid.UUID) -> None:
+        """Each certificate row of the version gets an UNVERIFIED Fact with USER_ATTESTED evidence naming the row
+        (as resume claims do). Facts belong to one version: a reviewer verifies the certificate on that version."""
+        rows = (await self.session.execute(select(ReservationCertificate).where(
+            ReservationCertificate.profile_version_id == version_id))).scalars().all()
+        for row in rows:
+            fact = await self.fact_repo.create_fact(version_id, CERTIFICATE_SUBJECT, CERTIFICATE_PREDICATE, certificate_fact_value(row))
+            await self.fact_repo.add_evidence(fact.id, "USER_ATTESTED", source=f"profile row {row.__tablename__}/{row.id}")
 
 def _datetimes(item: Dict[str, Any]) -> Dict[str, Any]:
     # Profile date columns are DateTime; API accepts plain dates

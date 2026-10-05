@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from govcareeros.backend.schemas.attribution import DISCLAIMER, AttributionOut
 
@@ -98,8 +98,37 @@ class EligibilityEvidenceOut(BaseModel):
     requirement_id: Optional[uuid.UUID]
     source_page: Optional[str]
 
-class EligibilityOut(BaseModel):
+_CERTIFICATE_CHECK = "CERTIFICATE"
+_CERTIFICATE_SEVERITY = ("FAILS", "NEEDS_DOCUMENT", "CANNOT_DECIDE", "OK", "NOT_APPLICABLE")
+
+def _check_name(e) -> str:
+    return e.get("check_name") if isinstance(e, dict) else e.check_name
+
+class EligibilitySectionsOut(BaseModel):
+    """`evidence` holds the hard checks behind `status`; `certificates` is the separate certificate-validity section
+    (eligibility.certificate_check), stored as evidence rows but never counted in `status` or `confidence`."""
     model_config = ConfigDict(from_attributes=True)
+    evidence: List[EligibilityEvidenceOut]
+    certificates: List[EligibilityEvidenceOut] = Field([], validation_alias="evidence")
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def _hard_checks(cls, v):
+        return [e for e in v if _check_name(e) != _CERTIFICATE_CHECK]
+
+    @field_validator("certificates", mode="before")
+    @classmethod
+    def _certificate_checks(cls, v):
+        return [e for e in v if _check_name(e) == _CERTIFICATE_CHECK]
+
+    @computed_field
+    @property
+    def certificate_status(self) -> Optional[str]:
+        """Worst certificate outcome; null when the notice has no extracted certificate requirement."""
+        present = {c.outcome for c in self.certificates}
+        return next((s for s in _CERTIFICATE_SEVERITY if s in present), None)
+
+class EligibilityOut(EligibilitySectionsOut):
     id: uuid.UUID
     profile_version_id: uuid.UUID
     vacancy_id: uuid.UUID
@@ -108,4 +137,3 @@ class EligibilityOut(BaseModel):
     engine_version: str
     crucial_date: Optional[datetime]
     created_at: datetime
-    evidence: List[EligibilityEvidenceOut]
