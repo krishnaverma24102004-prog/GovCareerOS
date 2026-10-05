@@ -160,3 +160,31 @@ async def test_reviewer_approves_named_items_only(api, login, db_session):
     assert decisions == ["APPROVED", "REJECTED", "APPROVED", "REJECTED", "REJECTED", None, None]
     assert len((await db_session.execute(select(ApplicationRequirement))).scalars().all()) == 2
     assert (await db_session.get(ExtractionDraft, draft_id)).status == "APPROVED"
+
+@pytest.mark.asyncio
+async def test_closing_date_is_approved_with_the_certificate_that_uses_it(api, login, db_session, cgl_pages):
+    """"on the crucial date i.e. the closing date" (CGL 2026, page 11): the date itself is the draft's APPLICATION_END
+    item (page 1), so the OBC row cannot be stored without it; the EWS row states its own year and needs nothing."""
+    from govcareeros.backend.services.document_ingestion import get_or_create_source
+    from govcareeros.backend.sources import ssc
+    source = await get_or_create_source(db_session, ssc.SSC_SOURCE)
+    raw, _ = await store_raw_document(db_session, source, "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Notice_of_adv_cgl_2026.pdf",
+                                      CGL.read_bytes(), 200, "application/pdf")
+    draft = await create_requirements_draft(db_session, source, raw, cgl_pages, HandBuilt(CGL_LOCATED))
+    items = json.loads(draft.payload)["requirements"]
+    idx = {(r["req_type"], r["code"]): i for i, r in enumerate(items)}
+    end, obc, ews = idx[("KEY_DATE", "APPLICATION_END")], idx[("CERTIFICATE", "OBC_NCL")], idx[("CERTIFICATE", "EWS")]
+    draft_id = draft.id
+    await db_session.commit()
+    h = await login("reviewer@example.com")
+    (await db_session.execute(select(User).where(User.email == "reviewer@example.com"))).scalar_one().is_reviewer = True
+    await db_session.commit()
+
+    r = await api.post(f"/review/drafts/{draft_id}/approve", json={"requirement_indexes": [obc]}, headers=h)
+    assert r.status_code == 409 and "approve the APPLICATION_END key date with it" in r.json()["detail"]
+    r = await api.post(f"/review/drafts/{draft_id}/approve", json={"requirement_indexes": [ews]}, headers=h)
+    assert r.status_code == 200, r.text
+    r = await api.post(f"/review/drafts/{draft_id}/approve", json={"requirement_indexes": [end, obc]}, headers=h)
+    assert r.status_code == 200, r.text
+    rows = {x.code: json.loads(x.value) for x in (await db_session.execute(select(ApplicationRequirement))).scalars()}
+    assert rows["OBC_NCL"]["crucial_date"] == "2026-06-22" and rows["APPLICATION_END"] == {"at": "2026-06-22T23:00:00+05:30"}

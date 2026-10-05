@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.documents.pdf_text import PageText, extract_pages
+from govcareeros.backend.eligibility.certificate_types import CertificateKind
 from govcareeros.backend.extraction.requirements_extractor import RequirementsExtractionResult, extract_requirements
 from govcareeros.backend.models.application import ApplicationRequirement
 from govcareeros.backend.models.artifact import RawDocument
@@ -24,6 +25,7 @@ from govcareeros.backend.models.extraction import ExtractionDraft
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.user import User
+from govcareeros.backend.parsing import application_rules as ar
 from govcareeros.backend.services.extraction_drafts import DraftError
 
 def is_requirements_draft(draft: ExtractionDraft) -> bool:
@@ -57,6 +59,15 @@ def _open(payload: Dict[str, Any]) -> List[int]:
     """Accepted items nobody has decided on yet; rejected-by-validator items can never be approved."""
     return [i for i, r in enumerate(payload["requirements"]) if r["accepted"] and not r.get("decision")]
 
+def _needs_closing_date(r: Dict[str, Any]) -> bool:
+    """A certificate whose crucial date or issue limit is "the closing date": that date comes from the draft's
+    APPLICATION_END item, not from this item's own quote."""
+    if r["req_type"] != "CERTIFICATE":
+        return False
+    own, _ = ar.certificate_from_clauses(CertificateKind(r["code"]), [(r["page"], r["quote"])], None)
+    return bool((own.crucial_date is None and r["value"].get("crucial_date"))
+                or (own.issued_on_or_before is None and r["value"].get("issued_on_or_before")))
+
 def _close(draft: ExtractionDraft, payload: Dict[str, Any]) -> None:
     approved = any((r.get("decision") or {}).get("status") == "APPROVED" for r in payload["requirements"])
     draft.status, draft.reviewed_at = ("APPROVED" if approved else "REJECTED"), datetime.now(timezone.utc)
@@ -86,6 +97,13 @@ async def approve_requirements_draft(session: AsyncSession, draft: ExtractionDra
             raise DraftError(f"item {i} was not verified ({r['reason']}) and cannot be approved")
         if (r["req_type"], r["code"]) in existing:
             raise DraftError(f"document already has a {r['req_type']} {r['code']} requirement")
+    # A date read through "the closing date" is stored only with the closing date it came from, itself approved
+    closing_ok = ("KEY_DATE", "APPLICATION_END") in existing or any(
+        r["req_type"] == "KEY_DATE" and r["code"] == "APPLICATION_END" and (j in item_indexes or (r.get("decision") or {}).get("status") == "APPROVED")
+        for j, r in enumerate(items))
+    for i in item_indexes:
+        if not closing_ok and _needs_closing_date(items[i]):
+            raise DraftError(f"item {i} takes its date from the closing date; approve the APPLICATION_END key date with it")
     created = []
     section = "LLM-located ({}), reviewer-approved"
     for i in item_indexes:
