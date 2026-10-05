@@ -254,8 +254,17 @@ def _is_bare_domain(m: re.Match) -> bool:
     return bool(names) and host not in _TWO_LEVEL and host not in _RESTRICTED_SUFFIXES and len(names[-1]) >= 2
 
 def urls_in(text: str) -> List[str]:
-    found = (m.group(0).rstrip(".,;:!?") for m in _URL_RE.finditer(text) if m.group("bare") is None or _is_bare_domain(m))
-    return list(dict.fromkeys(found))
+    found, link_end = [], None
+    for m in _URL_RE.finditer(text):
+        if m.group("bare") is None:
+            found.append(m.group(0))
+            link_end = m.end()
+        # A link the PDF text layer split with a space ('://www.m ha.Qov.in/en/notifi' in MHA's NATGRID circular)
+        # goes on as a fragment, not a domain of its own
+        elif _is_bare_domain(m) and not (link_end is not None and 0 < m.start() - link_end <= 2
+                                         and not text[link_end:m.start()].strip(" \t")):
+            found.append(m.group(0))
+    return list(dict.fromkeys(u.rstrip(".,;:!?") for u in found))
 
 # ------------------------------------------------------------------ red flags
 
