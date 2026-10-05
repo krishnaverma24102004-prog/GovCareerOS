@@ -177,8 +177,10 @@ def _fee(rows: List[ApplicationRequirement], info: Optional[PersonalInfo], cite)
         status, reason = UNKNOWN, "profile does not state " + ", ".join(missing)
     else:
         status, reason = "PAY", "not in an exempted group"
-    if status == "PAY" and fee is None:
-        status, reason = UNKNOWN, "the fee depends on a category the profile does not state"
+    if status == "PAY" and fee is None and fees:
+        # Only per-category fees are stated (no FEE rows at all keeps the exemption decision, as before)
+        status, reason = UNKNOWN, ("the notice states no fee for your category" if category
+                                   else "the fee depends on a category the profile does not state")
     return {"status": status, "reason": reason, "amount": amount["amount"] if amount else None,
             "currency": amount["currency"] if amount else None, "exempt_groups": groups,
             "by_category": [{"category": c, "amount": json.loads(r.value)["amount"], "citation": cite(r)} for c, r in by_cat.items() if c],
