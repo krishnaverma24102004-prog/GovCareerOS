@@ -24,6 +24,8 @@ class AlertOut(BaseModel):
     profile_version_id: Optional[uuid.UUID]
     eligibility_result_id: Optional[uuid.UUID]
     vacancy_version_id: Optional[uuid.UUID]
+    exam_id: Optional[uuid.UUID] = None
+    exam_version_id: Optional[uuid.UUID] = None
     due_at: Optional[datetime]
     read_at: Optional[datetime]
     created_at: datetime

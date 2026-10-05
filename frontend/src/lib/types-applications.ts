@@ -28,6 +28,7 @@ export interface ApplicationHistory {
 export interface Application {
   id: string;
   vacancy_id: string | null;
+  exam_id?: string | null;
   exam_ref: string | null;
   profile_version_id: string | null;
   status: ApplicationStatus | string;
@@ -43,6 +44,7 @@ export interface Application {
 /** POST /applications body (extra fields are rejected by the backend). */
 export interface ApplicationCreate {
   vacancy_id?: string | null;
+  exam_id?: string | null;
   exam_ref?: string | null;
   status?: ApplicationStatus;
   profile_version_id?: string | null;

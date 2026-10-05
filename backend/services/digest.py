@@ -10,6 +10,8 @@ Sections, all built from stored deterministic data:
   age_headroom within AGE_HEADROOM_YEARS of the vacancy's own stated age limit for the candidate's category
   notices      official notices recorded in the period for vacancies this profile version was assessed
                for (and not found INELIGIBLE)
+  changes      the radar's alerts for official changes to exams/vacancies the user applied for or is eligible
+               for, field by field, citing both the earlier value and the new one (services/change_log.py)
 
 Every item carries citations: document URL + page + exact quote, taken from VacancyFieldProvenance,
 VacancyRequirement (via EligibilityEvidence) or the sentences recorded with a notice. A fact that cannot
@@ -34,13 +36,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from govcareeros.backend.config.settings import settings
 from govcareeros.backend.eligibility import engine as eligibility_engine
 from govcareeros.backend.eligibility import rules
+from govcareeros.backend.models.alert import UserAlert
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.digest import DigestRun
 from govcareeros.backend.models.eligibility import EligibilityEvidence, EligibilityResult
 from govcareeros.backend.models.user import PersonalInfo, ProfileVersion, User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance, VacancyRequirement, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
-from govcareeros.backend.services import mailer
+from govcareeros.backend.services import change_log, mailer
 from govcareeros.backend.services.radar import AGE_HEADROOM_YEARS, _current_result, age_out_date
 
 DEFAULT_PERIOD = timedelta(days=7)
@@ -52,7 +55,8 @@ _CHECK_REQ = {"AGE": "AGE_MAX", "EDUCATION": "EDUCATION", "EXPERIENCE": "EXPERIE
 _CHECK_LABEL = {"AGE": "age limit / relaxation", "EDUCATION": "qualification match", "EXPERIENCE": "experience relevance",
                 "CITIZENSHIP": "citizenship", "NOTICE": "notice condition"}
 SECTIONS = [("matches", "New and updated matches"), ("deadlines", "Closing in the next 14 days"),
-            ("age_headroom", "Age limit close"), ("notices", "Official notices on your vacancies")]
+            ("age_headroom", "Age limit close"), ("notices", "Official notices on your vacancies"),
+            ("changes", "Official changes to what you applied for or are eligible for")]
 
 @dataclass
 class Citation:
@@ -69,8 +73,8 @@ class OpenCheck:
 
 @dataclass
 class DigestItem:
-    kind: str       # MATCH, DEADLINE, AGE_HEADROOM, NOTICE
-    vacancy_id: str
+    kind: str       # MATCH, DEADLINE, AGE_HEADROOM, NOTICE, CHANGE
+    vacancy_id: Optional[str]
     post: str
     organization: str
     advertisement: Optional[str]
@@ -81,6 +85,7 @@ class DigestItem:
     change: Optional[str] = None
     due_at: Optional[datetime] = None
     open_checks: List[OpenCheck] = field(default_factory=list)
+    exam_id: Optional[str] = None
 
 @dataclass
 class Digest:
@@ -95,11 +100,12 @@ class Digest:
     deadlines: List[DigestItem] = field(default_factory=list)
     age_headroom: List[DigestItem] = field(default_factory=list)
     notices: List[DigestItem] = field(default_factory=list)
+    changes: List[DigestItem] = field(default_factory=list)
     omitted: List[str] = field(default_factory=list)
     reported_keys: List[str] = field(default_factory=list)  # results/notices considered new in this digest
 
     def items(self) -> List[DigestItem]:
-        return self.matches + self.deadlines + self.age_headroom + self.notices
+        return self.matches + self.deadlines + self.age_headroom + self.notices + self.changes
 
     def counts(self) -> Dict[str, int]:
         return {key: len(getattr(self, key)) for key, _ in SECTIONS}
@@ -330,9 +336,72 @@ async def build_digest(session: AsyncSession, user_id: uuid.UUID, now: Optional[
             headline=("Cancelled: " if cancelled else "Official notice: ") + v.post_name, details=lines, citations=cits,
             status="CANCELLED" if cancelled else None, due_at=v.application_deadline))
 
+    await _changes(session, user.id, digest, is_new)
+
     digest.deadlines.sort(key=lambda i: i.due_at)
     digest.age_headroom.sort(key=lambda i: i.due_at)
     return digest
+
+def _change_item(vc: change_log.VersionChanges, omitted: List[str], subject: str) -> Tuple[List[str], List[Citation]]:
+    """A line per change and, for each, the citation of the earlier value and of the new one. A change whose new value
+    cannot be cited is left out; an earlier value that cannot be cited is not stated."""
+    lines, cits = [], []
+    for c in vc.changes:
+        new = _cite(c.new_evidence.url, c.new_evidence.page, c.new_evidence.quote, f"{c.new_evidence.document} (new value)")
+        if new is None:
+            omitted.append(f"{subject}: {c.label} change not shown (no citation)")
+            continue
+        old = _cite(c.old_evidence.url, c.old_evidence.page, c.old_evidence.quote, f"{c.old_evidence.document} (earlier value)") \
+            if c.old_evidence else None
+        what = f"{c.label} ({c.subject})" if c.subject else c.label
+        now = change_log.fmt_value(c.field, c.new)
+        if old:
+            lines.append(f"{what}: {change_log.fmt_value(c.field, c.old)} (p.{old.page}) -> {now} (p.{new.page})")
+            cits.append(old)
+        elif c.old is None:
+            lines.append(f"{what}: {now} (p.{new.page}), not stated before")
+        else:
+            omitted.append(f"{subject}: earlier {c.label.lower()} not shown (no citation)")
+            lines.append(f"{what}: now {now} (p.{new.page})")
+        if not c.applied:
+            lines[-1] += "; stated by the notice, not applied (needs a manual check)"
+        cits.append(new)
+    return lines, cits
+
+async def _changes(session: AsyncSession, user_id: uuid.UUID, digest: Digest, is_new) -> None:
+    """The radar's change alerts recorded in the period, for targets the user still applied for or is eligible for.
+    The keys are those of the notices section, so a vacancy notice is reported once."""
+    alerts = (await session.execute(select(UserAlert).where(
+        UserAlert.user_id == user_id, UserAlert.exam_version_id.is_not(None) | UserAlert.vacancy_version_id.is_not(None))
+        .order_by(UserAlert.created_at))).scalars().all()
+    if not alerts:
+        return
+    watched = {(kind, version.id): (target, vc, why)
+               for kind, target, version, vc, why in await change_log.watched_changes(session, user_id)}
+    for alert in alerts:
+        kind, version_id = ("exam", alert.exam_version_id) if alert.exam_version_id else ("vacancy", alert.vacancy_version_id)
+        hit = watched.get((kind, version_id))
+        key = f"exam_notice:{version_id}" if kind == "exam" else f"notice:{version_id}"
+        if hit is None or key in digest.reported_keys or not is_new(key, alert.created_at):
+            continue
+        target, vc, why = hit
+        name = target.name if kind == "exam" else target.post_name
+        lines, cits = _change_item(vc, digest.omitted, name)
+        if not cits:  # each change was listed in `omitted`
+            continue
+        dated = f" dated {datetime.fromisoformat(vc.notice_date).strftime('%d %b %Y')}" if vc.notice_date else ""
+        head = f"{vc.change_type} notice{dated} ({why}): {vc.document}"
+        if kind == "exam":
+            digest.changes.append(DigestItem(
+                kind="CHANGE", vacancy_id=None, exam_id=str(target.id), post=target.name, organization=target.conducting_body,
+                advertisement=target.external_ref, headline=f"Official change: {target.name}", details=[head] + lines,
+                citations=cits, due_at=target.application_end))
+        else:
+            cancelled = any(c.field == "STATUS" and c.new == "CANCELLED" for c in vc.changes)
+            digest.changes.append(DigestItem(
+                kind="CHANGE", vacancy_id=str(target.id), post=target.post_name, organization=target.organization,
+                advertisement=target.advertisement_number, headline=("Cancelled: " if cancelled else "Official change: ") + target.post_name,
+                details=[head] + lines, citations=cits, status="CANCELLED" if cancelled else None, due_at=target.application_deadline))
 
 # ---------- rendering ----------
 

@@ -106,7 +106,9 @@ async def test_result_or_corrigendum_notice_alerts_tracked_application(api, logi
 
     run = await run_radar(db_session, now=NOW)
     await db_session.commit()
-    assert run.alerts_created == {"APPLICATION_UPDATE": 1}
+    # The title names the advertisement (APPLICATION_UPDATE); the parsed notice's conditions are a field-level change
+    # to the tracked vacancy (VACANCY_UPDATED, services/change_log.py)
+    assert run.alerts_created == {"APPLICATION_UPDATE": 1, "VACANCY_UPDATED": 1}
     alerts = [a for a in (await api.get("/alerts", headers=asha)).json() if a["kind"] == "APPLICATION_UPDATE"]
     assert len(alerts) == 1 and alerts[0]["vacancy_id"] == app_post
     assert "Advt. No. 11 - 2026" in alerts[0]["body"] and "AssttPublProseGNCTD-Notice" in alerts[0]["body"]
