@@ -58,6 +58,12 @@ class PersonalInfo(Base, TimestampMixin):
     central_govt_service_start: Mapped[Optional[datetime]] = mapped_column(DateTime)
     # Deputation posts are open only to serving government officers; None = not stated
     is_state_govt_employee: Mapped[Optional[bool]] = mapped_column(Boolean)
+    # Serving officers, for deputation: 7th CPC pay-matrix level held on regular basis (not an ACP/MACP level),
+    # the date regular service in that level began, organisation/cadre, and return date from the last deputation
+    current_pay_level: Mapped[Optional[int]] = mapped_column(Integer)
+    current_level_regular_since: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    organisation_cadre: Mapped[Optional[str]] = mapped_column(String(255))
+    last_deputation_end: Mapped[Optional[datetime]] = mapped_column(DateTime)
     # Free text the candidate writes: posts/departments/fields they want (used only for relevance, never eligibility)
     career_interests: Mapped[Optional[str]] = mapped_column(Text)
     nationality: Mapped[Optional[str]] = mapped_column(String(100))

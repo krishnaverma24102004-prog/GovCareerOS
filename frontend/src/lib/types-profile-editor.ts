@@ -20,6 +20,10 @@ export interface PersonalInfoFull {
   is_central_govt_employee?: boolean | null;
   central_govt_service_start?: string | null;
   is_state_govt_employee?: boolean | null;
+  current_pay_level?: number | null;
+  current_level_regular_since?: string | null;
+  organisation_cadre?: string | null;
+  last_deputation_end?: string | null;
   career_interests?: string | null;
   nationality?: string | null;
   contact?: string | null;
