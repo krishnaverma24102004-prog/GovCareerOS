@@ -7,6 +7,8 @@ AGE_MAX and EDUCATION rows; corrigenda already applied to the exam (services/exa
 re-applied after a re-parse. A re-parse with a newer parser keeps the exam id, replaces
 field provenance, updates posts in place and supersedes (never deletes) requirement rows. A notice
 whose deterministic parse lacks the core fields is left for the LLM draft path (MANUAL_REVIEW).
+What a stored exam's notice asks of applicants (certificates, uploads, fee, documents, key dates) is parsed by
+parsing/ssc_application.py into ApplicationRequirement rows for the same document (services/application_prep.py).
 """
 import json
 import uuid
@@ -21,8 +23,10 @@ from govcareeros.backend.documents.pdf_text import extract_pages
 from govcareeros.backend.models.exam import Exam, ExamFieldProvenance, ExamPost, ExamRequirement
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
+from govcareeros.backend.parsing.ssc_application import parse_ssc_application_info
 from govcareeros.backend.parsing.ssc_exam_notice import CONDUCTING_BODY, ParsedExam, exam_code_for
 from govcareeros.backend.parsing.ssc_tables import norm, parse_exam_pdf
+from govcareeros.backend.services.application_prep import store_application_requirements
 from govcareeros.backend.services.exam_corrigenda import apply_exam_versions, ingest_corrigendum_pdf, refresh_education_summary
 from govcareeros.backend.services.exam_drafts import create_exam_draft
 from govcareeros.backend.services.document_ingestion import _as_text, get_or_create_source, store_raw_document
@@ -42,6 +46,7 @@ class ExamIngestionResult:
     reparsed: bool = False
     skipped_reason: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
+    requirement_warnings: List[str] = field(default_factory=list)  # from the application requirements parse
 
 def _confidence(parsed: ParsedExam) -> float:
     have = sum(1 for f in _SCORED if parsed.value(f) is not None)
@@ -129,9 +134,13 @@ async def store_parsed_exam(session: AsyncSession, source: GovernmentSource, raw
 async def ingest_exam_pdf(session: AsyncSession, source: GovernmentSource, url: str, body: bytes,
                           notice: Optional[RecruitmentNotice] = None) -> ExamIngestionResult:
     raw, _ = await store_raw_document(session, source, url, body, 200, "application/pdf")
-    parsed = parse_exam_pdf(body, extract_pages(body))
+    pages = extract_pages(body)
+    parsed = parse_exam_pdf(body, pages)
     raw.parser_version = parsed.parser_version
     result = await store_parsed_exam(session, source, raw, parsed, notice)
+    if result.exam_id is not None and (await session.get(Exam, result.exam_id)).raw_document_id == raw.id:
+        info = await store_application_requirements(session, source, raw, pages, parsed.value("file_number"), parse=parse_ssc_application_info)
+        result.requirement_warnings = info.warnings
     if notice is not None and result.exam_id is None:
         # No deterministic result: a reviewer or the LLM draft path (services/exam_drafts.py) takes it from here
         notice.raw_document_id, notice.review_status = raw.id, "MANUAL_REVIEW"

@@ -5,6 +5,9 @@ A field is accepted only if its quote is found in the document (exactly after wh
 normalisation, or — for OCR text — as a near match) and the value is derivable from the quote.
 What gets stored is always the document's own words: the matched quote, and numbers/dates
 parsed from that quote by fixed rules. The LLM's paraphrase is never stored.
+
+Application requirements (verify_requirement) are stricter: the quote must be on the very page the
+model cites, since the page is what the applicant is sent to.
 """
 import re
 from dataclasses import dataclass, field
@@ -13,6 +16,8 @@ from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Tuple
 
 from govcareeros.backend.documents.pdf_text import PageText
+from govcareeros.backend.eligibility.certificate_types import CertificateKind
+from govcareeros.backend.parsing import application_rules as ar
 from govcareeros.backend.parsing.upsc_advertisement import words_to_number
 
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -274,3 +279,127 @@ def verify_field(name: str, item: Any, pages: List[PageText]) -> FieldVerdict:
 
 def verify_vacancy(raw: Dict[str, Any], pages: List[PageText]) -> VacancyVerdict:
     return VacancyVerdict({name: verify_field(name, raw.get(name), pages) for name in ALL_FIELDS})
+
+# ---------- what a notice asks of an applicant (LLM drafts for sources without a deterministic parser) ----------
+
+REQUIREMENT_TYPES = ("CERTIFICATE", "UPLOAD_RULE", "FEE", "FEE_EXEMPTION", "DOCUMENT", "KEY_DATE")
+KEY_DATE_CODES = ("APPLICATION_START", "APPLICATION_END", "FEE_PAYMENT_END", "CORRECTION_START", "CORRECTION_END",
+                  "AGE_CRUCIAL_DATE", "EDUCATION_CUTOFF_DATE")
+_EXEMPT_WORDS_RE = re.compile(r"exempt|no\s+fee|not\s+required\s+to\s+pay", re.I)
+
+@dataclass
+class RequirementVerdict:
+    req_type: str
+    code: str
+    accepted: bool
+    reason: str
+    llm_value: Any = None
+    quote: Optional[str] = None       # the document's text matched on the cited page
+    page: Optional[int] = None
+    value: Any = None                 # JSON-ready value derived from the quote by fixed rules
+    match: Optional[str] = None
+    applies_when: Optional[str] = None
+
+def find_quote_on_page(quote: str, pages: List[PageText], page: Optional[int]) -> Optional[Tuple[int, str, str]]:
+    """Like find_quote, but only on the page the quote is cited from."""
+    cited = [p for p in pages if p.page_number == page] if isinstance(page, int) else []
+    return find_quote(quote, cited, page) if cited else None
+
+def verify_requirement(item: Any, pages: List[PageText], closing: Optional[date] = None) -> RequirementVerdict:
+    """One located requirement: its quote must be on the page it cites, and its value is re-derived from that quote
+    by the same fixed rules the deterministic parsers use (parsing/application_rules.py). `closing` is the notice's
+    verified closing date, which "the closing date" in a certificate clause refers to."""
+    if not isinstance(item, dict):
+        return RequirementVerdict("", "", False, "missing")
+    req_type, code = str(item.get("req_type") or "").upper(), str(item.get("code") or "").strip().upper()
+    value, quote, page = item.get("value"), (item.get("quote") or "").strip(), item.get("page")
+    v = RequirementVerdict(req_type, code, False, "", value)
+    if req_type not in REQUIREMENT_TYPES:
+        v.reason = f"unknown requirement type {req_type!r}"
+        return v
+    if not quote:
+        v.reason = "no supporting quote"
+        return v
+    found = find_quote_on_page(quote, pages, page)
+    if not found:
+        elsewhere = find_quote(quote, pages, None)
+        v.reason = (f"quote is on page {elsewhere[0]}, not on the cited page {page}" if elsewhere
+                    else f"quote not found on the cited page {page}")
+        return v
+    v.page, v.quote, v.match = found
+    text = v.quote
+    llm_text = str(value or "")
+
+    if req_type == "KEY_DATE":
+        if code not in KEY_DATE_CODES:
+            v.reason = f"unknown key date {code!r}"
+            return v
+        d = verify_field("last_date", {"value": value, "quote": quote, "page": page}, [p for p in pages if p.page_number == page])
+        if not d.accepted:
+            v.reason = d.reason
+            return v
+        at = d.value
+        if code != "APPLICATION_END" and "time not stated" in d.reason:
+            at = at.replace(hour=0, minute=0)  # 23:59 is the default for a closing date only
+        v.accepted, v.value, v.reason, v.applies_when = True, {"at": at.isoformat()}, "date parsed from the quote", ar.ALWAYS
+    elif req_type == "CERTIFICATE":
+        try:
+            kind = CertificateKind(code)
+        except ValueError:
+            v.reason = f"{code!r} is not a certificate kind"
+            return v
+        if not ar.KIND_WORDS[kind].search(text):
+            v.reason = f"quote does not name a {kind.value} certificate"
+            return v
+        req, used = ar.certificate_from_clauses(kind, [(v.page, text)], closing)
+        stated = {d for d in (req.crucial_date, req.issued_on_or_after, req.issued_on_or_before) if d}
+        if not set(dates_in(llm_text)) <= stated:
+            v.reason = f"{value!r} has a date the quote does not state"
+        elif req.financial_year and ar.FY_RE.search(llm_text) and \
+                req.financial_year not in {ar.financial_year(a, b) for a, b in ar.FY_RE.findall(llm_text)}:
+            v.reason = f"{value!r} disagrees with the financial year in the quote ({req.financial_year})"
+        else:
+            v.accepted, v.value, v.applies_when = True, ar.certificate_value(req, used), ar.CERTIFICATE_APPLIES_WHEN[kind]
+            v.reason = "certificate conditions parsed from the quote"
+    elif req_type == "UPLOAD_RULE":
+        if code not in ("PHOTOGRAPH", "SIGNATURE"):
+            v.reason = f"upload rule {code!r} is not PHOTOGRAPH or SIGNATURE"
+            return v
+        spec = ar.upload_spec(text, code)
+        numbers = {float(n) for n in re.findall(r"\d+(?:\.\d+)?", llm_text)}
+        if ar.spec_is_empty(spec):
+            v.reason = f"no {code.lower()} format, size, dimension or background in the quote"
+        elif not numbers <= {float(n) for n in re.findall(r"\d+(?:\.\d+)?", text)}:
+            v.reason = f"{value!r} has a number the quote does not state"
+        else:
+            v.accepted, v.value, v.applies_when = True, {**spec, "text": text}, ar.ALWAYS
+            v.reason = "upload rule parsed from the quote"
+    elif req_type == "FEE":
+        category = code.replace("APPLICATION_FEE", "").strip("_") or None
+        digits = re.sub(r"\D", "", llm_text)
+        if category and (category not in ar.CATEGORY_WORDS or not ar.CATEGORY_WORDS[category].search(text)):
+            v.reason = f"category {category!r} is not named in the quote"
+        elif not digits or int(digits) not in ar.rupee_amounts(text):
+            v.reason = f"{value!r} is not a rupee amount in the quote"
+        else:
+            v.code = f"APPLICATION_FEE_{category}" if category else "APPLICATION_FEE"
+            v.accepted, v.value, v.applies_when = True, {"amount": int(digits), "currency": "INR", "category": category}, ar.ALWAYS
+            v.reason = "rupee amount printed in the quote"
+    elif req_type == "FEE_EXEMPTION":
+        groups = ar.exemption_groups(text)
+        if not _EXEMPT_WORDS_RE.search(text):
+            v.reason = "quote does not exempt anyone from the fee"
+        elif not groups:
+            v.reason = "quote names no exempted group"
+        else:
+            v.code = "FEE_EXEMPT"
+            v.accepted, v.value, v.applies_when = True, {"exempt": groups, "text": text}, ar.ALWAYS
+            v.reason = "exempted groups read from the quote"
+    else:  # DOCUMENT
+        if not ar.DOCUMENT_NOUN_RE.search(text) or len(_tokens(text)) < 2:
+            v.reason = "quote does not name a document"
+        else:
+            # The code and condition come from the document's own words, not from the model
+            v.code, v.applies_when = ar.classify_document(text) or ("DOCUMENT", ar.IF_CLAIMED)
+            v.accepted, v.value, v.reason = True, {"text": text}, "document named in the quote; stored verbatim"
+    return v

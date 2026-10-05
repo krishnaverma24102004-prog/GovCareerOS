@@ -17,7 +17,7 @@ from govcareeros.backend.api.deps import current_user, get_session
 from govcareeros.backend.models.application import Application, ApplicationStatusHistory
 from govcareeros.backend.models.user import ProfileVersion, User
 from govcareeros.backend.models.vacancy import Vacancy
-from govcareeros.backend.services.application_prep import PrepInputError, build_checklist
+from govcareeros.backend.services.application_prep import PrepInputError, build_checklist, build_exam_checklist
 from govcareeros.backend.services.application_tracker import change_status
 
 router = APIRouter(prefix="/applications", tags=["applications"])
@@ -88,6 +88,15 @@ async def prep(vacancy_id: uuid.UUID, profile_version_id: uuid.UUID,
     """Documents, fee and how-to-apply checklist for one vacancy, personalised by an explicit profile version; every item cited."""
     try:
         return await build_checklist(session, user.id, vacancy_id, profile_version_id)
+    except PrepInputError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+@router.get("/exam-prep")
+async def exam_prep(exam_id: uuid.UUID, profile_version_id: uuid.UUID,
+                    user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> Dict[str, Any]:
+    """Certificates, uploads, fee, documents and key dates an examination notice asks for, personalised; every item cited."""
+    try:
+        return await build_exam_checklist(session, user.id, exam_id, profile_version_id)
     except PrepInputError as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
