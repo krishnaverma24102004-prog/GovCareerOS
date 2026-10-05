@@ -113,6 +113,11 @@ async def test_vacancy_certificate_section_is_separate_and_follows_review(api, l
     rejected = await evaluate(v2)
     assert rejected["status"] == "ELIGIBLE" and rejected["certificate_status"] == "NEEDS_DOCUMENT"
     assert rejected["certificates"][0]["match_type"] is None and "provisionally" in rejected["certificates"][0]["rule"]
+    # Posting the rejected claim again as a fresh (UNVERIFIED) Fact does not undo the reviewer's rejection
+    again_claimed = await api.post("/profile/facts", json={"subject": other["subject"], "predicate": other["predicate"],
+                                                           "value": other["value"]}, headers=h)
+    assert again_claimed.status_code == 201, again_claimed.text
+    assert (await evaluate(v2))["certificate_status"] == "NEEDS_DOCUMENT"
 
     # No reserved-category claim: the certificate is not needed
     v3 = (await api.patch("/profile", json={"personal_info": {**PERSON, "category": "UR"}}, headers=h)).json()["version"]["id"]

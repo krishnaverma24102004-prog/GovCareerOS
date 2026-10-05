@@ -4,7 +4,7 @@ Certificate section of an eligibility result (vacancy or exam), kept apart from 
   * CERTIFICATE requirement rows (req_type "CERTIFICATE", value = CertificateRequirement fields as JSON, quote =
     the row's source_excerpt) are judged by certificates.evaluate against the certificates of the same immutable
     profile version. A certificate is "verified" only when its profile Fact is VERIFIED by a reviewer; a certificate
-    whose Facts were all REJECTED counts as not held.
+    with any REJECTED Fact counts as not held.
   * The hard verdict is untouched: rules.overall_status (status, confidence) is computed from the hard checks first,
     and certificate rows are stored after it as evidence rows with check_name CERTIFICATE and outcome
     OK / FAILS / NEEDS_DOCUMENT / CANNOT_DECIDE / NOT_APPLICABLE. The API shows them as `certificates` with their own
@@ -73,8 +73,10 @@ async def load_held(session: AsyncSession, profile_version_id: uuid.UUID) -> Dic
     for row in rows:
         value = certificate_fact_value(row)
         seen = statuses.get(value, set())
-        if seen and seen == {"REJECTED"}:
-            continue  # a reviewer rejected this certificate claim: it does not count as held
+        if "REJECTED" in seen:
+            # A reviewer rejected this certificate claim: it does not count as held, even if the candidate later
+            # posts the same claim again as a new Fact (rejection is final; review never moves REJECTED back)
+            continue
         held = HeldCertificate(kind=CertificateKind(row.kind), issue_date=_day(row.issue_date), financial_year=row.financial_year,
                                valid_until=_day(row.valid_until), issuing_authority=row.issuing_authority,
                                central_format=row.central_format)
