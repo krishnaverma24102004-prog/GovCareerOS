@@ -66,6 +66,17 @@ TRIAGED_OUT = ("STALE", "NOT_REQUIRED")
 def _status_clause(column, status: str):
     return column.like(f"{FETCH_FAILED}\\_%", escape="\\") if status == FETCH_FAILED else column == status
 
+# What the source's listing adapter read from the notice's listing row (source_discovery), shown next to the
+# notice with the listing text each value was read from and the listing page it is on
+_LISTING_COLUMNS = (RecruitmentNotice.published_on, RecruitmentNotice.last_date, RecruitmentNotice.advertisement_number,
+                    RecruitmentNotice.post_names, RecruitmentNotice.kind_hint, RecruitmentNotice.listing_evidence,
+                    RecruitmentNotice.found_on_url)
+
+def _listing(published_on, last_date, advertisement_number, post_names, kind_hint, evidence, found_on_url) -> Dict[str, Any]:
+    return dict(published_on=published_on, last_date=last_date, advertisement_number=advertisement_number,
+                post_names=json.loads(post_names) if post_names else [], kind_hint=kind_hint,
+                listing_evidence=json.loads(evidence) if evidence else {}, found_on_url=found_on_url)
+
 def _title_clause(q: str):
     return func.lower(RecruitmentNotice.title).contains(q.strip().lower(), autoescape=True)
 
@@ -79,7 +90,7 @@ async def review_queue(session: AsyncSession, *, source: Optional[str] = None, k
         stmt = (select(ExtractionDraft.id, ExtractionDraft.created_at, ExtractionDraft.payload, ExtractionDraft.fields_offered,
                        ExtractionDraft.fields_accepted, ExtractionDraft.model, ExtractionDraft.status, GovernmentSource.name,
                        RecruitmentNotice.id, RecruitmentNotice.title, RecruitmentNotice.url, kind_expr,
-                       RecruitmentNotice.document_type, RecruitmentNotice.first_seen_at, priority)
+                       RecruitmentNotice.document_type, RecruitmentNotice.first_seen_at, priority, *_LISTING_COLUMNS)
                 .join(GovernmentSource, GovernmentSource.id == ExtractionDraft.source_id)
                 .outerjoin(RecruitmentNotice, RecruitmentNotice.id == ExtractionDraft.notice_id)
                 .outerjoin(NoticeTriage, NoticeTriage.notice_id == RecruitmentNotice.id)
@@ -91,16 +102,17 @@ async def review_queue(session: AsyncSession, *, source: Optional[str] = None, k
         if q:
             stmt = stmt.where(_title_clause(q))
         for (did, created, payload, offered, accepted, model, st, src, nid, title, url, nkind, doc_type, seen,
-             prio) in (await session.execute(stmt)).all():
+             prio, *listing) in (await session.execute(stmt)).all():
             items.append(dict(type="DRAFT", id=did, draft_id=did, notice_id=nid, source=src, title=title, url=url,
                               notice_kind=nkind, document_type=doc_type, status=st, priority=prio, first_seen_at=seen,
                               created_at=created, vacancies=len(json.loads(payload).get("vacancies", [])),
                               fields_offered=offered, fields_accepted=accepted, model=model,
-                              review_note=None, reviewed_at=None))
+                              review_note=None, reviewed_at=None, **_listing(*listing)))
     if item_type in (None, "NOTICE") and status != "PENDING_REVIEW":
         stmt = (select(RecruitmentNotice.id, RecruitmentNotice.title, RecruitmentNotice.url, RecruitmentNotice.notice_kind,
                        RecruitmentNotice.document_type, RecruitmentNotice.review_status, RecruitmentNotice.first_seen_at,
-                       RecruitmentNotice.review_note, RecruitmentNotice.reviewed_at, GovernmentSource.name, priority)
+                       RecruitmentNotice.review_note, RecruitmentNotice.reviewed_at, GovernmentSource.name, priority,
+                       *_LISTING_COLUMNS)
                 .join(GovernmentSource, GovernmentSource.id == RecruitmentNotice.source_id)
                 .outerjoin(NoticeTriage, NoticeTriage.notice_id == RecruitmentNotice.id))
         if status:
@@ -115,11 +127,11 @@ async def review_queue(session: AsyncSession, *, source: Optional[str] = None, k
             stmt = stmt.where(RecruitmentNotice.notice_kind == kind)
         if q:
             stmt = stmt.where(_title_clause(q))
-        for nid, title, url, nkind, doc_type, st, seen, note, reviewed, src, prio in (await session.execute(stmt)).all():
+        for nid, title, url, nkind, doc_type, st, seen, note, reviewed, src, prio, *listing in (await session.execute(stmt)).all():
             items.append(dict(type="NOTICE", id=nid, draft_id=None, notice_id=nid, source=src, title=title, url=url,
                               notice_kind=nkind, document_type=doc_type, status=st, priority=prio, first_seen_at=seen,
                               created_at=None, vacancies=None, fields_offered=None, fields_accepted=None, model=None,
-                              review_note=note, reviewed_at=reviewed))
+                              review_note=note, reviewed_at=reviewed, **_listing(*listing)))
     items.sort(key=_sort_key)
     return len(items), items[offset:offset + limit]
 

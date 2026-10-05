@@ -2,20 +2,32 @@
 Registry sync + notice-level discovery across every registered official source.
 
 Network probes run concurrently; database writes happen sequentially on one session.
+
+A source with a listing adapter (backend/sources/adapters, looked up by registry name) has its fetched listing
+page(s) read by the adapter as well: the configured / located page, then the adapter's LISTING_URLS, each fetched
+through the same PageFetcher (url_guard policy + robots.txt). The generic link extraction stays the fallback: its
+links are kept, and where an adapter row has the same URL the row wins on every field it states (title,
+published_on, last_date, advertisement_number, post_names, kind_hint), with the listing text in listing_evidence.
+A row without a document of its own (its url is the listing page, e.g. EMPLOYMENT-NEWS) is told apart by its
+own text (listing_row_key), hashed into url_hash with the url; no document URL is made up for it.
 """
 import asyncio
 import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from types import ModuleType
 from typing import Dict, Iterable, List, Optional, Tuple
+from urllib.parse import urldefrag
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
-from govcareeros.backend.sources.generic_notices import PageFetcher, ProbeResult
+from govcareeros.backend.sources.adapters import all_adapters
+from govcareeros.backend.sources.adapters.base import ListingRow
+from govcareeros.backend.sources.generic_notices import PageFetcher, ProbeResult, _doc_type
 from govcareeros.backend.sources import ssc
 from govcareeros.backend.sources.notice_classifier import classify_notice
 from govcareeros.backend.sources.registry import SOURCES, SourceSpec
@@ -32,8 +44,9 @@ class SourceDiscoverySummary:
     new_vacancy_notices: int
     detail: Optional[str]
 
-def url_hash(url: str) -> str:
-    return hashlib.sha256(url.encode("utf-8")).hexdigest()
+def url_hash(url: str, row_key: Optional[str] = None) -> str:
+    """Identity of a notice within its source: its URL, plus the row key for a row that has no URL of its own."""
+    return hashlib.sha256((url if row_key is None else f"{url}\n{row_key}").encode("utf-8")).hexdigest()
 
 def _config(source: GovernmentSource) -> Dict:
     try:
@@ -85,8 +98,28 @@ def _probe_url(source: GovernmentSource) -> str:
     resolved = _config(source).get("resolved_url")
     return resolved if resolved and source_policy(source).allows(resolved) else source.recruitment_url
 
-def _classify(source: GovernmentSource, title: str, url: str) -> str:
+# A listing's own label (ListingRow.kind_hint) in the classifier's vocabulary: admit cards and answer keys are
+# RESULT there as well (notice_classifier). A label outside this map leaves the notice to the classifier.
+KIND_HINT_KINDS = {
+    "VACANCY": "VACANCY", "CORRIGENDUM": "CORRIGENDUM", "RESULT": "RESULT", "RULES": "RULES",
+    "ADMIT_CARD": "RESULT", "ANSWER_KEY": "RESULT", "SCHEDULE": "EXAM_SCHEDULE",
+}
+
+def _evidence(notice: RecruitmentNotice) -> Dict[str, str]:
+    try:
+        return json.loads(notice.listing_evidence) if notice.listing_evidence else {}
+    except json.JSONDecodeError:
+        return {}
+
+def _classify(source: GovernmentSource, title: str, url: str, kind_hint: Optional[str] = None,
+              kind_hint_text: Optional[str] = None) -> str:
+    # The listing's label decides only where the page states it (the adapter quotes the text); else the classifier
+    if kind_hint_text and kind_hint in KIND_HINT_KINDS:
+        return KIND_HINT_KINDS[kind_hint]
     return ssc.classify(title, url) if source.adapter_name == "ssc" else classify_notice(title, url)
+
+def _notice_kind(source: GovernmentSource, notice: RecruitmentNotice, title: str) -> str:
+    return _classify(source, title, notice.url, notice.kind_hint, _evidence(notice).get("kind_hint"))
 
 async def reclassify_notices(session: AsyncSession) -> Dict[Tuple[str, str], int]:
     """Re-apply the (deterministic) classifier to every stored notice, so classifier fixes also reach notices
@@ -95,27 +128,102 @@ async def reclassify_notices(session: AsyncSession) -> Dict[Tuple[str, str], int
     rows = (await session.execute(select(RecruitmentNotice, GovernmentSource)
                                   .join(GovernmentSource, GovernmentSource.id == RecruitmentNotice.source_id))).all()
     for notice, source in rows:
-        kind = _classify(source, notice.title, notice.url)
+        kind = _notice_kind(source, notice, notice.title)
         if kind != notice.notice_kind:
             changed[(notice.notice_kind, kind)] = changed.get((notice.notice_kind, kind), 0) + 1
             notice.notice_kind = kind
     await session.flush()
     return changed
 
+def _page(url: str) -> str:
+    return urldefrag(url)[0].rstrip("/")
+
+async def _listing_pages(fetcher: PageFetcher, adapter: ModuleType, source: GovernmentSource, browser: bool,
+                         main: ProbeResult) -> List[ProbeResult]:
+    """The adapter's further listing pages (LISTING_URLS), each probed like the main page (policy + robots)."""
+    done = {_page(u) for u in (_probe_url(source), main.final_url) if u}
+    pages: List[ProbeResult] = []
+    for url in getattr(adapter, "LISTING_URLS", []):
+        if _page(url) in done:
+            continue
+        done.add(_page(url))
+        try:
+            page = await fetcher.probe(url, source_policy(source), browser, listing_parser=adapter.parse_listing)
+        except Exception as e:  # one broken page must not lose the others
+            page = ProbeResult("UNREACHABLE", detail=f"{type(e).__name__}: {str(e)[:200]}")
+        # Error results carry no final URL; keep which page it was
+        page.final_url = page.final_url or url
+        pages.append(page)
+    return pages
+
 async def probe_sources(fetcher: PageFetcher, sources: List[GovernmentSource], concurrency: int = 6) -> List[ProbeResult]:
     sem = asyncio.Semaphore(concurrency)
+    adapters = all_adapters()
 
     async def one(source: GovernmentSource) -> ProbeResult:
         async with sem:
             try:
                 if source.adapter_name == "ssc":
                     return await ssc.probe(fetcher, allow_browser=getattr(fetcher, "allow_browser", False))
-                return await fetcher.discover(_probe_url(source), source_policy(source),
-                                             browser=bool(_config(source).get("force_browser")))
+                browser = bool(_config(source).get("force_browser"))
+                adapter = adapters.get(source.name)
+                if adapter is None:
+                    return await fetcher.discover(_probe_url(source), source_policy(source), browser=browser)
+                result = await fetcher.discover(_probe_url(source), source_policy(source), browser=browser,
+                                                listing_parser=adapter.parse_listing)
+                result.listing_pages = await _listing_pages(fetcher, adapter, source, browser, result)
+                return result
             except Exception as e:  # one broken site must not stop the sweep
                 return ProbeResult("UNREACHABLE", detail=f"{type(e).__name__}: {str(e)[:200]}")
 
     return await asyncio.gather(*(one(s) for s in sources))
+
+@dataclass
+class _Seen:
+    """One notice as this probe saw it: a generic link, an adapter row, or both (same URL)."""
+    title: str
+    url: str
+    document_type: str
+    found_on_url: Optional[str]
+    row: Optional[ListingRow] = None
+    row_key: Optional[str] = None
+
+def row_key(row: ListingRow) -> str:
+    """What tells apart rows that share the listing page as their url: the row's own stated text (a row index
+    would shift as the listing changes)."""
+    return " | ".join([row.title, row.advertisement_number or "",
+                       row.evidence.get("published_on", ""), row.evidence.get("last_date", "")])
+
+def _seen_notices(source: GovernmentSource, result: ProbeResult) -> Dict[str, _Seen]:
+    policy = source_policy(source)
+    seen: Dict[str, _Seen] = {}
+    for page in [result, *result.listing_pages]:
+        for row in page.listing_rows:
+            # Stored notices are fetched later as official evidence: only from the source's own domain
+            if not policy.allows(row.url):
+                continue
+            key = row_key(row) if page.final_url and _page(row.url) == _page(page.final_url) else None
+            h = url_hash(row.url, key)
+            if h not in seen:  # a row repeated on a later page adds nothing
+                seen[h] = _Seen(row.title, row.url, _doc_type(row.url), page.final_url, row, key)
+    for link in result.notices:
+        seen.setdefault(url_hash(link.url), _Seen(link.title, link.url, link.document_type, result.final_url))
+    return seen
+
+_ROW_FIELDS = ("published_on", "last_date", "advertisement_number", "kind_hint")
+
+def _apply_row(notice: RecruitmentNotice, row: ListingRow) -> None:
+    """The adapter wins on every field its row states; fields it leaves unstated keep their stored value."""
+    evidence = _evidence(notice)
+    evidence.update(row.evidence)
+    notice.title = row.title
+    for name in _ROW_FIELDS:
+        value = getattr(row, name)
+        if value is not None:
+            setattr(notice, name, value)
+    if row.post_names:
+        notice.post_names = json.dumps(row.post_names, ensure_ascii=False)
+    notice.listing_evidence = json.dumps(evidence, ensure_ascii=False, sort_keys=True) if evidence else None
 
 async def record_probe(session: AsyncSession, source: GovernmentSource, result: ProbeResult, now: datetime) -> SourceDiscoverySummary:
     source.health_status = "HEALTHY" if result.status == "OK" else result.status
@@ -133,36 +241,45 @@ async def record_probe(session: AsyncSession, source: GovernmentSource, result: 
         config["resolved_url"] = result.final_url
     elif config.get("resolved_url") and not source_policy(source).allows(config["resolved_url"]):
         del config["resolved_url"]
+    if result.listing_pages:
+        config["listing_pages"] = {p.final_url: p.status for p in result.listing_pages}
     source.configuration = json.dumps(config)
 
     new = new_vacancy = 0
-    if result.notices:
-        hashes = [url_hash(n.url) for n in result.notices]
+    seen = _seen_notices(source, result)
+    if seen:
         known = {
             n.url_hash: n for n in (await session.execute(
-                select(RecruitmentNotice).where(RecruitmentNotice.source_id == source.id, RecruitmentNotice.url_hash.in_(hashes))
+                select(RecruitmentNotice).where(RecruitmentNotice.source_id == source.id,
+                                                RecruitmentNotice.url_hash.in_(list(seen)))
             )).scalars()
         }
-        for link, h in zip(result.notices, hashes):
-            if h in known:
-                known[h].last_seen_at = now
+        for h, item in seen.items():
+            notice = known.get(h)
+            if notice is not None:
+                notice.last_seen_at = now
+                if item.row:
+                    _apply_row(notice, item.row)
                 # Classification is deterministic; re-apply so classifier fixes reach stored notices
-                known[h].notice_kind = _classify(source, link.title, link.url)
+                notice.notice_kind = _notice_kind(source, notice, item.title)
                 continue
-            kind = _classify(source, link.title, link.url)
-            session.add(RecruitmentNotice(
-                source_id=source.id, url=link.url, url_hash=h, title=link.title,
-                document_type=link.document_type, notice_kind=kind, found_on_url=result.final_url,
+            notice = RecruitmentNotice(
+                source_id=source.id, url=item.url, url_hash=h, title=item.title, listing_row_key=item.row_key,
+                document_type=item.document_type, found_on_url=item.found_on_url,
                 first_seen_at=now, last_seen_at=now,
                 # Only sources with a vacancy parser get automatic extraction; the rest need a human
                 review_status="NEW" if source.adapter_name else "MANUAL_REVIEW",
-            ))
+            )
+            if item.row:
+                _apply_row(notice, item.row)
+            notice.notice_kind = _notice_kind(source, notice, item.title)
+            session.add(notice)
             new += 1
-            new_vacancy += kind in ("VACANCY", "CORRIGENDUM")
+            new_vacancy += notice.notice_kind in ("VACANCY", "CORRIGENDUM")
     await session.flush()
     return SourceDiscoverySummary(
         source.name, result.status, result.fetch_mode, result.final_url,
-        len(result.notices), new, new_vacancy, result.detail,
+        len(seen), new, new_vacancy, result.detail,
     )
 
 async def discover_all(

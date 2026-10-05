@@ -250,6 +250,15 @@ export interface QueueItem {
   model: string | null;
   review_note: string | null;
   reviewed_at: string | null;
+  /** From the source's listing row (listing adapter); null / empty where the listing states nothing. */
+  published_on: string | null;
+  last_date: string | null;
+  advertisement_number: string | null;
+  post_names: string[];
+  kind_hint: string | null;
+  /** field -> the exact listing text it was read from, on the page found_on_url */
+  listing_evidence: Record<string, string>;
+  found_on_url: string | null;
 }
 
 export interface Paged<T> {

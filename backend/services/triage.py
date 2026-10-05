@@ -1,9 +1,11 @@
 """
 Backlog triage: which discovered notices need human/LLM attention, and in what order. Fixed rules only.
 
-1. Stated date (notice_date): the publication date as the notice's own title or link states it, read by
-   the rules below in this order; the first rule that yields exactly one date wins. Nothing is inferred:
-   upload timestamps, serial numbers and bare years are ignored, and None means "not stated".
+1. Stated date (notice_date): the publication date as the source's listing row or the notice's own title or
+   link states it, read by the rules below in this order; the first rule that yields exactly one date wins.
+   Nothing is inferred: upload timestamps, serial numbers and bare years are ignored, and None means "not stated".
+     listing_published_on  the listing adapter read it from the row's own date cell (recruitment_notices.published_on,
+                        quoted in listing_evidence); it beats every title / link heuristic below
      title_dated        title says "dated 30/09/2026", "Dated:29.07.2026", "dated June 23, 2026"
      title_released_on  title says "(Vacancies released on 06/02/2026)"
      url_dated          file name says "...-dated-29.12.2025_c.pdf"
@@ -14,9 +16,13 @@ Backlog triage: which discovered notices need human/LLM attention, and in what o
      url_year_month     the upload folder "/2026-09/Vacancy.pdf" (month precision)
 2. Decision (rule):
      NOT_REQUIRED  not_a_vacancy         kind RESULT / RULES / OTHER (backend/sources/notice_classifier.py)
-     STALE         stale_stated_date     VACANCY / CORRIGENDUM whose stated date is older than the window
-                   stale_first_seen      ... no stated date and first seen longer ago than the window
-     QUEUED        fresh_stated_date / fresh_first_seen
+     STALE         closed_last_date      VACANCY / CORRIGENDUM whose listing states a closing date (last_date)
+                                         that has passed
+                   stale_stated_date     ... no closing date stated, stated date older than the window
+                   stale_first_seen      ... no closing date or stated date, first seen longer ago than the window
+     QUEUED        open_last_date        the listing's closing date is today or later (applications still open,
+                                         however old the notice)
+                   fresh_stated_date / fresh_first_seen
    The window defaults to 120 days. A month-precision date counts from the month's last day, so a notice
    is never called stale before it could be.
 3. Priority (an integer, higher first; the reason column spells out every term):
@@ -32,6 +38,7 @@ Triage writes notice_triage (current decision) and appends triage_decisions when
 It never deletes or edits a RecruitmentNotice and never touches review_status.
 """
 import calendar
+import json
 import re
 import uuid
 from collections import Counter
@@ -47,7 +54,7 @@ from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.triage import NoticeTriage, TriageDecision
 
-RULES_VERSION = "triage-v1"
+RULES_VERSION = "triage-v2"
 DEFAULT_STALE_DAYS = 120
 
 QUEUED, STALE, NOT_REQUIRED = "QUEUED", "STALE", "NOT_REQUIRED"
@@ -191,6 +198,18 @@ class NoticeFacts:
     first_seen_at: datetime
     source_category: str
     has_parser: bool
+    # What the source's listing adapter read from the row (None: not stated), with the listing text it quoted
+    published_on: Optional[date] = None
+    published_on_text: Optional[str] = None
+    last_date: Optional[date] = None
+    last_date_text: Optional[str] = None
+
+def stated_date(facts: NoticeFacts) -> Optional[NoticeDate]:
+    """The listing row's own publication date when the adapter read one, else the title / link rules."""
+    if facts.published_on and _plausible(facts.published_on):
+        return NoticeDate(facts.published_on, "listing_published_on",
+                          (facts.published_on_text or facts.published_on.isoformat())[:200])
+    return notice_date(facts.title, facts.url)
 
 @dataclass
 class Decision:
@@ -224,13 +243,19 @@ def priority_terms(facts: NoticeFacts, stated: Optional[NoticeDate], today: date
 
 def decide(facts: NoticeFacts, now: datetime, stale_days: int = DEFAULT_STALE_DAYS) -> Decision:
     today = now.astimezone(timezone.utc).date()
-    stated = notice_date(facts.title, facts.url)
+    stated = stated_date(facts)
     terms = priority_terms(facts, stated, today, stale_days)
     priority = sum(terms.values())
     breakdown = "priority " + " + ".join(f"{k} {v}" for k, v in terms.items()) + f" = {priority}"
     if facts.notice_kind not in VACANCY_KINDS:
         status, rule = NOT_REQUIRED, "not_a_vacancy"
         why = f"kind {facts.notice_kind} is not a vacancy or corrigendum (notice_classifier)"
+    elif facts.last_date:
+        closed = facts.last_date < today
+        status, rule = (STALE, "closed_last_date") if closed else (QUEUED, "open_last_date")
+        quoted = f" [listing: {facts.last_date_text!r}]" if facts.last_date_text else ""
+        why = f"listing states last date {facts.last_date.isoformat()}{quoted}: " + \
+            ("applications have closed" if closed else "applications still open")
     else:
         age, basis = _age_days(stated, facts.first_seen_at, today)
         stale = age > stale_days
@@ -282,6 +307,12 @@ class TriageRun:
         return {"notices": len(self.rows), "applied": self.applied, "stale_after_days": self.stale_days,
                 "by_status": self.counts(), "by_rule": self.rule_counts(), "changed": self.changed()}
 
+def _listing_evidence(notice: RecruitmentNotice) -> Dict[str, str]:
+    try:
+        return json.loads(notice.listing_evidence) if notice.listing_evidence else {}
+    except json.JSONDecodeError:
+        return {}
+
 def _same(current: NoticeTriage, d: Decision) -> bool:
     nd = d.notice_date
     return (current.triage_status, current.priority, current.rule, current.notice_date, current.notice_date_rule) == \
@@ -300,8 +331,10 @@ async def triage_notices(session: AsyncSession, now: Optional[datetime] = None, 
         .order_by(RecruitmentNotice.first_seen_at, RecruitmentNotice.url_hash))
     rows: List[TriageRow] = []
     for notice, source, current in result.all():
+        evidence = _listing_evidence(notice)
         facts = NoticeFacts(notice.title, notice.url, notice.notice_kind, notice.document_type, notice.first_seen_at,
-                            source.category, bool(source.adapter_name))
+                            source.category, bool(source.adapter_name),
+                            notice.published_on, evidence.get("published_on"), notice.last_date, evidence.get("last_date"))
         d = decide(facts, now, stale_days)
         changed = current is None or not _same(current, d)
         rows.append(TriageRow(notice.id, source.name, notice.title, notice.url, notice.notice_kind, notice.review_status,

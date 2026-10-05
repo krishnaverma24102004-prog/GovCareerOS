@@ -13,7 +13,7 @@ import re
 import ssl
 from dataclasses import dataclass, field
 from html import unescape
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urldefrag, urljoin, urlparse
 
 import httpx
@@ -56,6 +56,13 @@ class ProbeResult:
     detail: Optional[str] = None
     fetch_mode: str = "HTTP"
     notices: List[NoticeLink] = field(default_factory=list)
+    # Rows the source's listing adapter read from this page (backend/sources/adapters), and the adapter's
+    # further listing pages (LISTING_URLS), each probed under the same policy
+    listing_rows: List[Any] = field(default_factory=list)
+    listing_pages: List["ProbeResult"] = field(default_factory=list)
+
+# A listing adapter's parse_listing(html, base_url) -> List[ListingRow]
+ListingParser = Callable[[str, str], List[Any]]
 
 @dataclass
 class FetchResult:
@@ -172,7 +179,8 @@ def sitemap_recruitment_urls(xml: str, policy: UrlPolicy, limit: int = 12) -> Li
         ranked[url] = min((rank, path.count("/"), len(path)), ranked.get(url, (99, 0, 0)))
     return sorted(ranked, key=ranked.get)[:limit]
 
-def analyze(fetch: FetchResult, fetch_mode: str, policy: Optional[UrlPolicy] = None) -> ProbeResult:
+def analyze(fetch: FetchResult, fetch_mode: str, policy: Optional[UrlPolicy] = None,
+            listing_parser: Optional[ListingParser] = None) -> ProbeResult:
     if fetch.error:
         fetch.error.fetch_mode = fetch_mode
         return fetch.error
@@ -188,12 +196,18 @@ def analyze(fetch: FetchResult, fetch_mode: str, policy: Optional[UrlPolicy] = N
         return ProbeResult("HTTP_ERROR", fetch.status, final, "redirected to an error page", fetch_mode)
 
     notices = extract_notices(fetch.html, final, policy)
-    if notices:
-        return ProbeResult("OK", fetch.status, final, None, fetch_mode, notices)
+    rows, adapter_error = [], None
+    if listing_parser:
+        try:
+            rows = listing_parser(fetch.html, final)
+        except Exception as e:  # a broken adapter must not lose the generic links
+            adapter_error = f"listing adapter failed: {type(e).__name__}: {_first_line(e)}"
+    if notices or rows:
+        return ProbeResult("OK", fetch.status, final, adapter_error, fetch_mode, notices, rows)
     visible = _text(re.sub(r"<script.*?</script>|<style.*?</style>", " ", fetch.html, flags=re.S | re.I))
     if fetch_mode == "HTTP" and (_SPA_MARKERS.search(fetch.html) or len(visible) < 500):
         return ProbeResult("NEEDS_BROWSER", fetch.status, final, "page content is rendered by JavaScript", fetch_mode)
-    return ProbeResult("NO_NOTICES", fetch.status, final, "page loaded but no recruitment links found", fetch_mode)
+    return ProbeResult("NO_NOTICES", fetch.status, final, adapter_error or "page loaded but no recruitment links found", fetch_mode)
 
 class PageFetcher:
     """HTTP first; a real (headless, unmodified) Chromium only for JavaScript-rendered pages.
@@ -289,17 +303,19 @@ class PageFetcher:
         finally:
             await context.close()
 
-    async def probe(self, url: str, policy: Optional[UrlPolicy] = None, browser: bool = False) -> ProbeResult:
-        """`browser`: the source is known to fill its listing with JavaScript, so render it straight away."""
+    async def probe(self, url: str, policy: Optional[UrlPolicy] = None, browser: bool = False,
+                    listing_parser: Optional[ListingParser] = None) -> ProbeResult:
+        """`browser`: the source is known to fill its listing with JavaScript, so render it straight away.
+        `listing_parser`: the source's listing adapter; a page it reads rows from counts as found."""
         policy = policy or UrlPolicy.from_url(url)
         if browser and self.allow_browser:
-            return analyze(await self.fetch_browser(url, policy), "BROWSER", policy)
-        result = analyze(await self.fetch_http(url, policy), "HTTP", policy)
+            return analyze(await self.fetch_browser(url, policy), "BROWSER", policy, listing_parser)
+        result = analyze(await self.fetch_http(url, policy), "HTTP", policy, listing_parser)
         if browser and result.status == "NO_NOTICES":
             # Browser disabled for this run: say what is missing rather than report an empty page
             result.status, result.detail = "NEEDS_BROWSER", "source is configured for browser fetch"
         if result.status == "NEEDS_BROWSER" and self.allow_browser:
-            result = analyze(await self.fetch_browser(url, policy), "BROWSER", policy)
+            result = analyze(await self.fetch_browser(url, policy), "BROWSER", policy, listing_parser)
         return result
 
     async def sitemap_candidates(self, home: str, policy: UrlPolicy, max_sitemaps: int = 6, limit: int = 12) -> List[str]:
@@ -325,12 +341,13 @@ class PageFetcher:
             found += [u for u in sitemap_recruitment_urls(fetched.html, policy) if u not in found]
         return found[:limit]
 
-    async def discover(self, url: str, policy: Optional[UrlPolicy] = None, browser: bool = False) -> ProbeResult:
+    async def discover(self, url: str, policy: Optional[UrlPolicy] = None, browser: bool = False,
+                       listing_parser: Optional[ListingParser] = None) -> ProbeResult:
         """Probe the configured page; if it's wrong/missing, look for the site's own Vacancies/Recruitment page:
         homepage menu, the English homepage's menu (bilingual portals open in Hindi), the sitemap, then the
         JavaScript-rendered homepage menu."""
         policy = policy or UrlPolicy.from_url(url)
-        result = await self.probe(url, policy, browser)
+        result = await self.probe(url, policy, browser, listing_parser)
         if result.status not in ("HTTP_ERROR", "NO_NOTICES"):
             return result
 
@@ -343,7 +360,7 @@ class PageFetcher:
                 if candidate.rstrip("/") in tried:
                     continue
                 tried.add(candidate.rstrip("/"))
-                located = await self.probe(candidate, policy)
+                located = await self.probe(candidate, policy, listing_parser=listing_parser)
                 if located.status == "OK":
                     located.detail = f"located via {how} (configured URL: {result.status} {result.http_status or ''})".strip()
                     return located

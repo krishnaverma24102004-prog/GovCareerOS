@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
-from sqlalchemy import String, Text, ForeignKey, UniqueConstraint
+from sqlalchemy import Date, String, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
 
@@ -29,3 +29,14 @@ class RecruitmentNotice(Base, TimestampMixin):
     reviewer_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", name="fk_recruitment_notices_reviewer_id_users"))
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
     review_note: Mapped[Optional[str]] = mapped_column(Text)
+    # What the source's listing adapter read from the listing row (backend/sources/adapters); None when the page
+    # does not state it. listing_evidence is JSON {field: exact listing text}, read on the page at found_on_url
+    published_on: Mapped[Optional[date]] = mapped_column(Date)
+    last_date: Mapped[Optional[date]] = mapped_column(Date)  # closing date for applications
+    advertisement_number: Mapped[Optional[str]] = mapped_column(Text)
+    post_names: Mapped[Optional[str]] = mapped_column(Text)  # JSON list
+    kind_hint: Mapped[Optional[str]] = mapped_column(String(30))  # the listing's own label, e.g. CORRIGENDUM
+    listing_evidence: Mapped[Optional[str]] = mapped_column(Text)
+    # Rows without a document of their own (url is the listing page, e.g. EMPLOYMENT-NEWS): what tells them
+    # apart, hashed into url_hash together with the url
+    listing_row_key: Mapped[Optional[str]] = mapped_column(Text)
