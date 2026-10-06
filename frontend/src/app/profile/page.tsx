@@ -3,6 +3,7 @@
  * Master profile: edit every section (one PATCH /profile per save, each save an immutable new version),
  * browse earlier versions with what changed in each, and see the recorded facts with their evidence.
  */
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { FactsPanel } from "@/components/profile/FactsPanel";
@@ -11,6 +12,7 @@ import { VersionHistory } from "@/components/profile/VersionHistory";
 import { ErrorNote, Shell, errText, useSession } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { VersionSummary } from "@/lib/types";
+import { ELIGIBILITY_CHECK, type Consents } from "@/lib/types-privacy";
 import type { ProfileFull } from "@/lib/types-profile-editor";
 
 export default function ProfilePage() {
@@ -33,6 +35,7 @@ function ProfileWorkspace() {
   const [saved, setSaved] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("edit");
   const [historyId, setHistoryId] = useState<string | null>(null);
+  const [consented, setConsented] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -57,6 +60,9 @@ function ProfileWorkspace() {
 
   useEffect(() => {
     load();
+    api<Consents>("/privacy/consents")
+      .then((c) => setConsented(c.active.includes(ELIGIBILITY_CHECK)))
+      .catch(() => setConsented(null));
   }, [load]);
 
   async function onSaved(p: ProfileFull) {
@@ -76,6 +82,16 @@ function ProfileWorkspace() {
           </span>
         )}
       </div>
+
+      {consented === false && (
+        <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Category, date of birth, disability, certificates and government service details can be saved only with your consent
+          for eligibility checks.{" "}
+          <Link href="/privacy/consent" className="underline">
+            Read the notice and give consent
+          </Link>
+        </p>
+      )}
 
       {state === "loading" && <p className="text-slate-500">Loading profile…</p>}
 

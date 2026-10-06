@@ -24,6 +24,7 @@ from govcareeros.backend.models.eligibility import EligibilityResult
 from govcareeros.backend.models.user import ProfileVersion, User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
+from govcareeros.backend.privacy import enforcement
 from govcareeros.backend.relevance import service as relevance_service
 from govcareeros.backend.services import change_log
 from govcareeros.backend.services.application_tracker import application_update_alerts
@@ -72,6 +73,11 @@ async def run_for_user(session: AsyncSession, user: User, now: datetime, run: Ra
         select(ProfileVersion).where(ProfileVersion.user_id == user.id).order_by(ProfileVersion.version_number.desc()).limit(1)
     )).scalar_one_or_none()
     if version is None:
+        return
+    # Withdrawn ELIGIBILITY_CHECK consent (or a minor without guardian consent): no eligibility processing for this
+    # user; official notices about vacancies assessed earlier are still alerted (they use no profile data)
+    if not await enforcement.allowed_for_version(session, user.id, version.id):
+        await _assessed_notice_alerts(session, user, run)
         return
     run.users += 1
     snapshot = await eligibility_engine.load_profile_snapshot(session, version.id)
@@ -124,6 +130,9 @@ async def run_for_user(session: AsyncSession, user: User, now: datetime, run: Ra
                                           f"from {out.strftime('%d %b %Y')} unless a relaxation applies.",
                                      due_at=datetime(out.year, out.month, out.day, tzinfo=IST), **base)
 
+    await _assessed_notice_alerts(session, user, run)
+
+async def _assessed_notice_alerts(session: AsyncSession, user: User, run: RadarRun) -> None:
     # Official notices about vacancies this user has been assessed for. Those the user applied for or is eligible for
     # are alerted by change_log.change_alerts (run_radar), with the reason; the dedupe key is the same either way.
     _, watched = await change_log.watched_targets(session, user.id)

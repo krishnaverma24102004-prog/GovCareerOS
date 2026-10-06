@@ -36,6 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from govcareeros.backend.config.settings import settings
 from govcareeros.backend.eligibility import engine as eligibility_engine
 from govcareeros.backend.eligibility import rules
+from govcareeros.backend.privacy import enforcement
 from govcareeros.backend.models.alert import UserAlert
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.digest import DigestRun
@@ -238,7 +239,8 @@ async def build_digest(session: AsyncSession, user_id: uuid.UUID, now: Optional[
         if version else None
     digest = Digest(str(user.id), user.email, name or user.full_name, str(version.id) if version else None,
                     version.version_number if version else None, since, now)
-    if version is None:
+    # No active ELIGIBILITY_CHECK consent (withdrawn, or a minor without guardian consent): no eligibility content
+    if version is None or not await enforcement.allowed_for_version(session, user_id, version.id):
         return digest
 
     ctx = _Ctx(session)

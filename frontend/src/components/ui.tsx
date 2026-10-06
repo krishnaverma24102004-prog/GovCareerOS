@@ -53,6 +53,7 @@ const LINKS = [
   ["/resume", "Resume"],
   ["/profile", "Profile"],
   ["/alerts", "Alerts"],
+  ["/privacy", "Privacy"],
   ["/review", "Review"],
   ["/verify", "Check a notice"],
 ] as const;

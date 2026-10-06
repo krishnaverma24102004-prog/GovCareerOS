@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Optional
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -44,6 +45,15 @@ class Settings(BaseSettings):
     # Days an in-service applicant's office may need to forward an application; 0 = off. Shown only as a labelled
     # estimate beside the official last date, never as the date (backend/services/deadline_helper.py)
     IN_SERVICE_FORWARDING_BUFFER_DAYS: int = 0
+
+    # DPDP Act 2023. Key for field-level encryption of category/caste and disability columns: 32 random bytes,
+    # urlsafe-base64 (python -c "import os,base64;print(base64.urlsafe_b64encode(os.urandom(32)).decode())").
+    # Set it in the environment / .env only; it is never logged or returned. Empty = those fields cannot be stored.
+    FIELD_ENCRYPTION_KEY: SecretStr = SecretStr("")
+    # Shown in the consent notice and privacy page (name, email, postal address of the grievance officer)
+    PRIVACY_GRIEVANCE_CONTACT: str = ""
+    # Days between an erasure request and the hard erase (the person may cancel by contacting the grievance officer)
+    ERASURE_GRACE_DAYS: int = 30
 
     @property
     def storage_dir(self) -> Path:

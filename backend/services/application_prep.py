@@ -34,6 +34,7 @@ from govcareeros.backend.models.vacancy import Vacancy, VacancyRequirement
 from govcareeros.backend.parsing import application_rules as ar
 from govcareeros.backend.parsing import upsc_application as ua
 from govcareeros.backend.parsing.upsc_advertisement import IST
+from govcareeros.backend.privacy import enforcement
 
 class PrepInputError(Exception):
     """Vacancy or profile version not found for this user (reported as 404)."""
@@ -237,6 +238,8 @@ def _certificate_item(r: ApplicationRequirement, status: str, reason: str, cite)
 
 async def _checklist(session: AsyncSession, version: ProfileVersion, rows: List[ApplicationRequirement], post_needs_experience: bool,
                      crucial: Optional[str]) -> Dict[str, Any]:
+    # The checklist reads category, disability and service details: ELIGIBILITY_CHECK consent (raises ConsentRequired)
+    await enforcement.require_for_version(session, version.user_id, version.id)
     info = (await session.execute(select(PersonalInfo).where(PersonalInfo.profile_version_id == version.id))).scalar_one_or_none()
     has_experience = bool((await session.execute(select(Experience.id).where(Experience.profile_version_id == version.id).limit(1))).first())
     has_equivalence = bool((await session.execute(select(Education.id).where(

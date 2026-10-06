@@ -3,7 +3,8 @@ from datetime import datetime
 from typing import List, Optional
 from sqlalchemy import String, Text, Boolean, ForeignKey, DateTime, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from govcareeros.backend.models.base import Base, TimestampMixin
+from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
+from govcareeros.backend.privacy.crypto import EncryptedJSON
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
@@ -14,6 +15,13 @@ class User(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # May approve LLM extraction drafts into vacancies
     is_reviewer: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # DPDP erasure (backend/privacy/erasure.py): requested -> account deactivated; due -> hard erase by the cron script;
+    # erased -> personal data deleted, this row kept as an anonymised stub so audit/consent records stay attributable
+    erasure_requested_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
+    erasure_due_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
+    erased_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
+    # Set by an admin when the law requires keeping the data (court order, pending dispute); the hard erase skips it
+    legal_hold_reason: Mapped[Optional[str]] = mapped_column(Text)
     profile_versions: Mapped[List["ProfileVersion"]] = relationship(back_populates="user")
 
 class ProfileVersion(Base, TimestampMixin):
@@ -44,12 +52,13 @@ class PersonalInfo(Base, TimestampMixin):
     full_name: Mapped[Optional[str]] = mapped_column(String(255))
     date_of_birth: Mapped[Optional[datetime]] = mapped_column(DateTime)
     gender: Mapped[Optional[str]] = mapped_column(String(50))
-    category: Mapped[Optional[str]] = mapped_column(String(100))
+    # Category/caste and disability columns are encrypted at rest (backend/privacy/crypto.py)
+    category: Mapped[Optional[str]] = mapped_column(EncryptedJSON(str))
     # None = not stated; eligibility then cannot apply or rule out PwBD relaxation
-    is_pwbd: Mapped[Optional[bool]] = mapped_column(Boolean)
-    disability_percentage: Mapped[Optional[int]] = mapped_column(Integer)
+    is_pwbd: Mapped[Optional[bool]] = mapped_column(EncryptedJSON(bool))
+    disability_percentage: Mapped[Optional[int]] = mapped_column(EncryptedJSON(int))
     # Comma-separated sub-category codes as used in notifications, e.g. "OL" or "LV,HH"
-    disability_types: Mapped[Optional[str]] = mapped_column(String(100))
+    disability_types: Mapped[Optional[str]] = mapped_column(EncryptedJSON(str))
     # INDIAN_CITIZEN, NEPAL_SUBJECT, BHUTAN_SUBJECT, TIBETAN_REFUGEE_PRE_1962, PIO_MIGRANT, OTHER
     citizenship_status: Mapped[Optional[str]] = mapped_column(String(50))
     is_ex_serviceman: Mapped[Optional[bool]] = mapped_column(Boolean)
@@ -143,8 +152,8 @@ class ReservationCertificate(Base, TimestampMixin):
     __tablename__ = "reservation_certificates"
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     profile_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profile_versions.id"), index=True)
-    # CertificateKind: OBC_NCL, EWS, SC, ST, PWBD, ESM, DOMICILE
-    kind: Mapped[str] = mapped_column(String(20))
+    # CertificateKind: OBC_NCL, EWS, SC, ST, PWBD, ESM, DOMICILE. Reveals caste/disability: encrypted at rest
+    kind: Mapped[str] = mapped_column(EncryptedJSON(str))
     issue_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
     # EWS: the financial year whose income the certificate states, e.g. "2025-26"
     financial_year: Mapped[Optional[str]] = mapped_column(String(9))

@@ -10,6 +10,7 @@ import pytest_asyncio
 from sqlalchemy import func, select
 
 from govcareeros.backend.models import AuthToken, GovernmentSource, RawDocument, User
+from govcareeros.backend.privacy.notice import NOTICE_VERSION
 
 V1 = {
     "personal_info": {"full_name": "Asha Rao", "date_of_birth": "1996-05-01", "category": "OBC", "is_pwbd": False, "nationality": "Indian"},
@@ -138,6 +139,8 @@ async def test_concurrent_saves_get_distinct_version_numbers(api_per_request_ses
     await api.post("/auth/register", json={"email": "asha@example.com", "password": "correct-horse-battery"})
     token = (await api.post("/auth/login", json={"email": "asha@example.com", "password": "correct-horse-battery"})).json()["access_token"]
     h = {"Authorization": f"Bearer {token}"}
+    # V1 holds category and date of birth: consent first, as the signup screen does (DPDP)
+    assert (await api.post("/privacy/consents", json={"purpose": "ELIGIBILITY_CHECK", "notice_version": NOTICE_VERSION}, headers=h)).status_code == 201
     assert (await api.put("/profile", json=V1, headers=h)).status_code == 201
     # Five tabs saving at once
     responses = await asyncio.gather(*[

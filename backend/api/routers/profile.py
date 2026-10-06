@@ -1,5 +1,6 @@
 """
 Master profile API. Every PUT/PATCH creates a new immutable ProfileVersion; nothing is edited in place.
+Storing eligibility data (category, date of birth, disability, certificates, service details) needs consent (DPDP).
 All lookups are scoped to the authenticated user; other users' records are reported as 404.
 """
 import uuid
@@ -12,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from govcareeros.backend.api.deps import current_user, get_session
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.fact import Evidence, Fact
-from govcareeros.backend.models.user import ProfileVersion, User
+from govcareeros.backend.models.user import PersonalInfo, ProfileVersion, ReservationCertificate, User
+from govcareeros.backend.privacy import enforcement, notice
 from govcareeros.backend.repositories.fact_repository import FactRepository
 from govcareeros.backend.repositories.profile_repository import ProfileRepository
 from govcareeros.backend.schemas.profile import (
@@ -37,10 +39,29 @@ async def get_profile(user: User = Depends(current_user), session: AsyncSession 
         raise _not_found("profile")
     return await _profile_out(repo, latest)
 
+async def _require_consent_for(session: AsyncSession, user: User, sections: dict, carry_over: bool) -> None:
+    """The version about to be written holds category/caste, date of birth, disability, certificates or service details
+    (sent now, or carried over by PATCH): that needs active ELIGIBILITY_CHECK consent, and guardian consent if the
+    date of birth is under 18. Clearing those fields never needs consent, so a person can always remove them."""
+    personal, has_certs = sections.get("personal_info"), bool(sections.get("reservation_certificates"))
+    latest = await ProfileRepository(session).latest_version(user.id) if carry_over else None
+    if latest is not None:
+        # A section left out or sent as null is carried over from the latest version (ProfileService.save_profile)
+        if sections.get("personal_info") is None:
+            row = (await session.execute(select(PersonalInfo).where(PersonalInfo.profile_version_id == latest.id))).scalar_one_or_none()
+            personal = {k: getattr(row, k) for k in enforcement.SENSITIVE_PERSONAL_FIELDS} if row else None
+        if sections.get("reservation_certificates") is None:
+            has_certs = (await session.execute(select(ReservationCertificate.id).where(
+                ReservationCertificate.profile_version_id == latest.id).limit(1))).first() is not None
+    items = enforcement.sensitive_items(personal, has_certs)
+    if items:
+        await enforcement.require_consent(session, user.id, notice.ELIGIBILITY_CHECK, (personal or {}).get("date_of_birth"), items)
+
 async def _save(body: ProfileIn, user: User, session: AsyncSession, carry_over: bool) -> ProfileOut:
     sections = body.model_dump(exclude={"change_summary"}, exclude_none=False)
     # Distinguish "section not sent" (None) from "section sent as empty list"
     sections = {k: v for k, v in sections.items() if k in body.model_fields_set}
+    await _require_consent_for(session, user, sections, carry_over)
     version = await ProfileService(session).save_profile(user.id, sections, body.change_summary, carry_over)
     return await _profile_out(ProfileRepository(session), version)
 

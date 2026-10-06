@@ -7,6 +7,7 @@ from alembic import context
 # Importing the package registers every model on Base.metadata
 from govcareeros.backend.models import Base
 from govcareeros.backend.models.base import UTCDateTime
+from govcareeros.backend.privacy.crypto import EncryptedJSON
 from govcareeros.backend.config.settings import settings
 
 config = context.config
@@ -23,6 +24,8 @@ def render_item(type_, obj, autogen_context):
     """Keep migrations independent of app types: UTCDateTime is stored as a plain timezone-aware DateTime."""
     if type_ == "type" and isinstance(obj, UTCDateTime):
         return "sa.DateTime(timezone=True)"
+    if type_ == "type" and isinstance(obj, EncryptedJSON):
+        return "sa.Text()"  # ciphertext; encryption happens in the app
     return False
 
 def run_migrations_offline():
