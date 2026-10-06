@@ -1,0 +1,77 @@
+{
+ "model": "nvidia/nemotron-3-ultra-550b-a55b",
+ "prompt_version": "vacancy_locate/2",
+ "document": "Image_962.pdf",
+ "chunks": [
+  {
+   "pages": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "seconds": 15.8,
+   "error": null,
+   "raw": {
+    "vacancies": [
+     {
+      "post_name": {
+       "value": "Chairperson, Debts Recovery Appellate Tribunal",
+       "quote": "Applications are being invited for the vacant posts of Chairperson, DRAT Allahabad and Chairperson DRAT Kolkata",
+       "page": 1
+      },
+      "vacancy_count": {
+       "value": "2",
+       "quote": "Applications are being invited for the vacant posts of Chairperson, DRAT Allahabad and Chairperson DRAT Kolkata",
+       "page": 1
+      },
+      "last_date": {
+       "value": "31.12.2026",
+       "quote": "latest by 5:00 PM on or before 31.12.2026",
+       "page": 0
+      },
+      "age_limit": {
+       "value": "70 years",
+       "quote": "Chairperson of a DRAT shall hold office for a term of five years or till he attains the age of seventy years, whichever is earlier",
+       "page": 2
+      },
+      "organization": {
+       "value": "Department of Financial Services, Ministry of Finance",
+       "quote": "Government of India Ministry of Finance Department of Financial Services",
+       "page": 0
+      },
+      "pay_level": {
+       "value": null,
+       "quote": "",
+       "page": 0
+      },
+      "essential_qualification": {
+       "value": "i. Is, or has been, a Judge of a High Court; or ii. Has been a member of the Indian Legal Service with ten years of experience in litigation and has held a post of Additional Secretary or any equivalent or any higher post; or iii. Has held the office of Presiding Officer of a Debts Recovery Tribunal for three years.",
+       "quote": "a person shall not be qualified for appointment as Chairperson of Debts Recovery Appellate Tribunal, unless he,- i. Is, or has been, a Judge of a High Court; or ii. Has been a member of the Indian Legal Service with ten years of experience in litigation and has held a post of Additional Secretary or any equivalent or any higher post; or iii. Has held the office of Presiding Officer of a Debts Recovery Tribunal for three years.",
+       "page": 0
+      },
+      "experience": {
+       "value": "As per qualification criteria: (i) Judge of High Court; or (ii) 10 years litigation experience in Indian Legal Service plus Additional Secretary or equivalent/higher post; or (iii) 3 years as Presiding Officer of DRT",
+       "quote": "Has been a member of the Indian Legal Service with ten years of experience in litigation and has held a post of Additional Secretary or any equivalent or any higher post; or iii. Has held the office of Presiding Officer of a Debts Recovery Tribunal for three years.",
+       "page": 0
+      },
+      "mode_of_selection": {
+       "value": "Search-Cum-Selection Committee scrutinizes applications, shortlists candidates for personal interaction, final selection based on overall evaluation of qualification, experience and personal interaction",
+       "quote": "The Search-Cum-Selection Committee constituted under the Tribunal Reforms Act 2021 for recommending names for appointment to the said post shall scrutinise, or cause to be scrutinized, the applications with respect to suitability of application for the posts by giving due weightage to qualification and experience of candidates and shortlist candidates for conducting personal interaction. The final selection will be done on the basis of overall evaluation of candidates done by the Committee based on the qualification, experience and personal interaction.",
+       "page": 0
+      },
+      "how_to_apply": {
+       "value": "Duly filled original applications in prescribed format (Annexure-I) with required documents (Annexure-II, Annexure-III, CR/APAR dossier, cadre clearance, integrity certificate, penalty statement) through proper channel to Under Secretary (DRT), Department of Financial Services, 3rd Floor Jeevan Deep Building, Sansad Marg, New Delhi-110001 by 5:00 PM on or before 31.12.2026",
+       "quote": "Duly filled in original applications in the prescribed format should reach the Under Secretary (DRT), Department of Financial Services, 3d Floor Jeevan Deep Building, Sansad Marg, New Delhi-1 10001 latest by 5:00 PM on or before 31.12.2026",
+       "page": 0
+      }
+     }
+    ]
+   }
+  }
+ ]
+}

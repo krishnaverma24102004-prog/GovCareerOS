@@ -67,6 +67,8 @@ def _exact_at(q: str, text: str) -> int:
         i = text.find(q, i + 1)
     return -1
 
+_DIGITS_RE = re.compile(r"\d")
+
 def find_quote(quote: str, pages: List[PageText], hint_page: Optional[int]) -> Optional[Tuple[int, str, str]]:
     """(page, matched document text, match kind) or None. The hinted page is tried first."""
     q = _norm(quote)
@@ -106,6 +108,10 @@ def find_quote(quote: str, pages: List[PageText], hint_page: Optional[int]) -> O
             flat = re.sub(r"\s+", " ", p.text).strip()
             m = _words_pattern(best_at[1]).search(_norm(flat))
             doc_text = flat[m.start():m.end()] if m else " ".join(best_at[1])
+            # A near match tolerates misread letters, never a different number: the quote's digits must be the
+            # page's digits (a closing date the model wrote in where the page's date is illegible is not on the page)
+            if _DIGITS_RE.findall(quote) != _DIGITS_RE.findall(doc_text):
+                continue
             return p.page_number, doc_text, f"OCR_FUZZY({best:.2f})"
     return None
 

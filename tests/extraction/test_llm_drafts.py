@@ -68,7 +68,8 @@ async def test_tampered_recording_is_rejected():
     doctors, gdmo = recording["chunks"][0]["raw"]["vacancies"]
     # Not in the PDF at all
     doctors["essential_qualification"]["quote"] = "MBBS degree from a university recognised by the National Medical Commission"
-    # One digit changed: an OCR near match still finds "Not more than 67 years", but 62 is not what the notice says
+    # One digit changed: "Not more than 62 years" is a near match of the printed "Not more than 67 years", but a near
+    # match never tolerates a different number, so the quote is not in the document
     doctors["age_limit"].update(value="62 years", quote="Not more than 62 years")
     # A post the notice does not name, quoted from a line that exists
     gdmo["post_name"]["value"] = "Chief Medical Officer"
@@ -77,12 +78,19 @@ async def test_tampered_recording_is_rejected():
     result = await extract(extract_pages(PDF.read_bytes()), ReplayProvider(recording))
     fields = result.vacancies[0].fields
     assert fields["essential_qualification"].reason == "quote not found in document"
-    assert not fields["age_limit"].accepted and "disagrees" in fields["age_limit"].reason
+    assert not fields["age_limit"].accepted and fields["age_limit"].reason == "quote not found in document"
     assert not fields["last_date"].accepted and "not one of the dates" in fields["last_date"].reason
     assert [v.fields["post_name"].value for v in result.vacancies if v.fields["post_name"].accepted] == ["Specialist Doctors"]
     assert result.vacancies[1].fields["post_name"].reason == "post name is not whole words of its quote"
     # Untouched fields are still accepted
     assert fields["experience"].accepted and fields["organization"].accepted
+
+    # The printed quote with a changed value: the ages must be the quote's own
+    recording = copy.deepcopy(RECORDING)
+    recording["chunks"][0]["raw"]["vacancies"][0]["age_limit"]["value"] = "62 years"
+    result = await extract(extract_pages(PDF.read_bytes()), ReplayProvider(recording))
+    age = result.vacancies[0].fields["age_limit"]
+    assert not age.accepted and "disagrees" in age.reason
 
 async def _draft(db_session):
     sources = await sync_registry(db_session, [s for s in SOURCES if s.name == "BSF"])
