@@ -33,12 +33,13 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import pymupdf
 
 from govcareeros.backend.documents.pdf_text import PageText
-from govcareeros.backend.parsing.ssc_exam_notice import ParsedExam, ParsedExamPost, _Doc, parse_exam_notice
+from govcareeros.backend.parsing.ssc_exam_notice import (
+    CATEGORIES, ParsedExam, ParsedExamPost, _Doc, age_on, parse_exam_notice, years_before,
+)
 from govcareeros.backend.parsing.upsc_advertisement import IST, ParsedField, ParsedRequirement, Provenance
 
 TABLES_VERSION = "ssc_tables/1"
 STRATEGY = "lines_strict"  # only ruled lines make cells; also finds the borderless-header tables of addenda
-CATEGORIES = ("UR", "EWS", "OBC", "SC", "ST")
 
 _D = r"(\d{2}[.-]\d{2}[.-]\d{4})"
 # Pages worth running find_tables on (it costs ~0.2 s/page); continuation pages contain an age cell anyway
@@ -57,15 +58,6 @@ def norm(s: Optional[str]) -> str:
 def parse_date(s: str) -> date:
     d, m, y = re.split(r"[.-]", s)
     return date(int(y), int(m), int(d))
-
-def years_before(d: date, years: int) -> date:
-    try:
-        return d.replace(year=d.year - years)
-    except ValueError:  # 29 February
-        return d.replace(year=d.year - years, day=28)
-
-def age_on(dob: date, on: date) -> int:
-    return on.year - dob.year - ((on.month, on.day) < (dob.month, dob.day))
 
 # ---------- raw tables ----------
 

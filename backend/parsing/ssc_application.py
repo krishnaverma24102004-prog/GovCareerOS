@@ -36,8 +36,9 @@ _CLAIM_KINDS = {"SC": CertificateKind.SC, "ST": CertificateKind.ST, "OBC": Certi
 _PRESCRIBED_FORMAT_RE = re.compile(
     r"Candidates\s+who\s+wish\s+to\s+be\s+considered\s+against\s+reserved\s+vacancies\s+or\s+seek\s+age-?\s*relaxation\s+must\s+submit\s+"
     r"(?:the\s+)?requisite\s+certificates?\s+from\s+the\s+competent\s+authority,?\s+in\s+the\s+prescribed\s+format", re.I)
-_OBC_RE = re.compile(r"A\s+person\s+seeking\s+appointment\s+on\s+the\s+basis\s+of\s+reservation\s+to\s+OBCs?\s+must\s+ensure\s+that\s+he\s+does\s+not\s+"
-                     r"fall\s+in\s+creamy\s+layer\s+on\s+the\s+crucial\s+date.{0,600}?\(\s*Annexure\s*-?\s*[IVXL]+\s*\)\.?", re.I | re.S)
+# CAPF 2026: "... must ensure that he/she possesses the caste/community certificate and does not fall in creamy layer ..."
+_OBC_RE = re.compile(r"A\s+person\s+seeking\s+appointment\s+on\s+the\s+basis\s+of\s+reservation\s+to\s+OBCs?\s+must\s+ensure\s+that\s+he(?:\s*/\s*she)?\s+"
+                     r"(?:possesses\s+the\s+caste\s*/\s*community\s+certificate\s+and\s+)?does\s+not\s+fall\s+in\s+creamy\s+layer\s+on\s+the\s+crucial\s+date.{0,600}?\(\s*Annexure\s*-?\s*[IVXL]+\s*\)\.?", re.I | re.S)
 _EWS_RE = re.compile(r"(?:a\s+)?person,?\s+seeking\s+appointment\s+on\s+the\s+basis\s+of\s+reservation\s+to\s+EWS.{0,300}?Income\s*&\s*Asset\s+"
                      r"certificate.{0,200}?basis\s+of\s+income\s+for\s+the\s+financial\s+year\s+20\d{2}\s*-\s*\d{2,4}", re.I | re.S)
 _EWS_FORMAT_RE = re.compile(r"applicants\s+seeking\s+reservation\s+of\s+EWS\s+category\s+shall\s+invariably\s+submit\s+the\s+requisite\s+"
@@ -55,9 +56,10 @@ _FEE_EXEMPT_RE = re.compile(r"Women\s+candidates\s+and\s+candidates\s+belonging\
 _PAYMENT_RE = re.compile(r"Fee\s+can\s+be\s+paid\s+(?:only\s+through\s+online\s+payment\s+modes,?\s+namely|online\s+through)\s+(.+?)\.(?=\s)", re.I | re.S)
 _NO_REFUND_RE = re.compile(r"Fee\s+once\s+paid\s+shall\s+not\s+be\s+refunded[^.]*\.", re.I | re.S)
 
-# "15.11 Candidates will have to submit copies of following documents:", "16.5 ... copies of various documents as given below"
-_DV_HEAD_RE = re.compile(r"^[ \t]*(\d+\.\d+)\s+Candidates\s+will\s+have\s+to\s+submit\s+copies\s+of\s+(?:the\s+)?(?:following|various)\s+documents[^:]*:",
-                         re.I | re.M)
+# "15.11 Candidates will have to submit copies of following documents:", "16.5 ... copies of various documents as given below",
+# CAPF 2026 "15.3 Candidates will have to bring original as well as copies of various documents as given below at the time of ...:"
+_DV_HEAD_RE = re.compile(r"^[ \t]*(\d+\.\d+)\s+Candidates\s+will\s+have\s+to\s+(?:submit|bring\s+original\s+as\s+well\s+as)\s+copies\s+of\s+"
+                         r"(?:the\s+)?(?:following|various)\s+documents[^:]*:", re.I | re.M)
 # "(xi) It is reiterated that after scrutiny of the certificates ...": a note closing the list, not a document
 _NOTE_ITEM_RE = re.compile(r"^It\s+is\s+(?:reiterated|clarified|informed)", re.I)
 _ROMANS = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii", "xiii", "xiv", "xv"]
@@ -139,10 +141,10 @@ def _documents(doc: _Doc, info: ParsedApplicationInfo) -> None:
     stop = end.start() if end else len(text)
     starts = [(n.group(1), n.start(), n.end()) for n in re.compile(rf"^[ \t]*{re.escape(para)}\.(\d+)(?!\.\d)", re.M).finditer(text, head.end(), stop)]
     if not starts:
-        # (i), (ii), ... matched in sequence so an "(a)" sub-item is never a new item
+        # (i), (ii), ... (or CAPF's i., ii., ...) matched in sequence so an "(a)" / "a." sub-item is never a new item
         pos = head.end()
         for r in _ROMANS:
-            n = re.compile(rf"^[ \t]*\({r}\)", re.M).search(text, pos, stop)
+            n = re.compile(rf"^[ \t]*(?:\({r}\)|{r}\.)", re.M).search(text, pos, stop)
             if not n:
                 break
             starts.append((r, n.start(), n.end()))

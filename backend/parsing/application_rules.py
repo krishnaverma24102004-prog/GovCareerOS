@@ -249,6 +249,9 @@ DOCUMENT_KINDS = [
     ("NAME_CHANGE_DOCUMENTS", NAME_CHANGE, re.compile(r"change\s+(?:in|of)\s+name", re.I)),
     ("ESM_DOCUMENTS", ESM, re.compile(r"Ex-?\s*Servicemen\s*\(ESM\)|Serving\s+Defence\s+Personnel|Discharge\s+Certificate", re.I)),
     ("CENTRAL_GOVT_EMPLOYEE_CERTIFICATE", CENTRAL_GOVT_EMPLOYEE, re.compile(r"Central\s+Government\s+Civilian\s+Employees", re.I)),
+    # CAPF 2026: "Certificate as per Annexure-IX by the Departmental candidates of Delhi Police", "Driving License for Motor Cycle and Car ..."
+    ("DEPARTMENTAL_CANDIDATE_CERTIFICATE", IF_CLAIMED, re.compile(r"Departmental\s+candidates", re.I)),
+    ("DRIVING_LICENCE", IF_CLAIMED, re.compile(r"Driving\s+Licen[cs]e", re.I)),
     ("NO_OBJECTION_CERTIFICATE", GOVT_SERVICE, re.compile(r"No\s+Objection\s+Certificate", re.I)),
     ("DISABILITY_CERTIFICATE", PWBD, re.compile(r"Disabilit", re.I)),
     ("CASTE_CERTIFICATE", RESERVED, re.compile(r"Caste|Category\s+Certificate", re.I)),

@@ -21,7 +21,10 @@ Post-level requirement rows replace exam-level rows of the same type. Post-wise 
   * The birth-date window of the notice ("born not earlier than 02-08-1996 and not later than 01-08-2008"
     for an 18-30 post) decides age when a post's AGE_MAX row carries it: the upper limit must not have been
     reached on the crucial date. Older candidates go through the same relaxation rules, read that way.
-  * Relaxation rules the notice states for Group 'C' posts only apply to posts classified Group "C".
+  * Relaxation rules the notice states for Group 'C' posts only apply to posts classified Group "C"; rules stated
+    for named posts only (CAPF 2026: widows and Delhi Police departmental candidates, "For the post of SI in Delhi
+    Police") apply to those posts (post_keys). A departmental-candidate cap is never OK: the profile does not
+    record departmental service, so it is UNKNOWN up to the cap and NO above it.
   * Without a post, every post is evaluated and the best one decides ("can I sit this exam for some post?");
     the result names that post and how many posts the profile is eligible for.
 """
@@ -107,6 +110,13 @@ def exam_age_relaxations(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Re
             male = (gender or "").strip().lower() in ("male", "m")
             status = "NO" if male or age > v["max_age"] else "UNKNOWN"
             options.append(rules.RelaxationOption(basis, years, status, "the profile does not record marital status", r.source_page))
+        elif basis == "DEPARTMENTAL_CANDIDATE":
+            # e.g. Delhi Police constables/head constables/ASIs with 3 years' service; the profile does not record that service
+            years = v["max_age"] - limit.value["max_age"]
+            status = "NO" if age > v["max_age"] else "UNKNOWN"
+            options.append(rules.RelaxationOption(basis, years, status, f"departmental service ({v.get('min_service_years') or '?'} years "
+                                                  f"regular and continuous) is not recorded in the profile; up to {v['max_age']} years",
+                                                  r.source_page))
     return options
 
 def _post_group(classification: Optional[str]) -> Optional[str]:
@@ -114,10 +124,13 @@ def _post_group(classification: Optional[str]) -> Optional[str]:
     return m.group(1) if m else None
 
 def scope_to_post(reqs: Sequence[rules.Requirement], post: ExamPost) -> List[rules.Requirement]:
-    """Drops relaxation rules the notice states for another group of posts ("for Group 'C' posts")."""
+    """Drops relaxation rules the notice states for another group of posts ("for Group 'C' posts") or for named
+    posts only ("For the post of SI in Delhi Police": post_keys)."""
     group = _post_group(post.classification)
-    return [r for r in reqs if not (r.req_type == "AGE_RELAXATION_RULE" and isinstance(r.value, dict) and r.value.get("post_group")
-                                    and r.value["post_group"] != group)]
+
+    def other_posts(v) -> bool:
+        return bool((v.get("post_group") and v["post_group"] != group) or (v.get("post_keys") and post.post_key not in v["post_keys"]))
+    return [r for r in reqs if not (r.req_type == "AGE_RELAXATION_RULE" and isinstance(r.value, dict) and other_posts(r.value))]
 
 def check_exam_age(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Requirement], crucial: Optional[date],
                    closing: Optional[date], gender: Optional[str] = None) -> List[rules.RuleOutcome]:
