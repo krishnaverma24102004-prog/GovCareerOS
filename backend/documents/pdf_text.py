@@ -52,6 +52,9 @@ def _extract_cached(pdf_bytes: bytes, tessdata: Optional[str]) -> Tuple[PageText
             pages.append(PageText(page_number=page.number + 1, text=text, ocr=used_ocr))
     return tuple(pages)
 
+class PdfPasswordProtected(RuntimeError):
+    """The PDF needs a password to open (a RuntimeError, as PyMuPDF's own errors on a damaged file are)."""
+
 @dataclass
 class LimitedExtraction:
     pages: List[PageText]
@@ -71,7 +74,7 @@ def extract_pages_limited(pdf_bytes: bytes, max_pages: int, max_chars: int, seco
     chars = 0
     with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
         if doc.needs_pass:
-            raise RuntimeError("the PDF is password-protected")
+            raise PdfPasswordProtected("the PDF is password-protected")
         out.page_count = doc.page_count
         for index in range(doc.page_count):
             if index >= max_pages:

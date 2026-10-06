@@ -13,9 +13,16 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.api.deps import get_session
+from govcareeros.backend.documents.pdf_text import PdfPasswordProtected
 from govcareeros.backend.services import notice_verifier
 
 router = APIRouter(prefix="/verify", tags=["verify"])
+
+class DocumentCitationOut(BaseModel):
+    document: str
+    url: str
+    page: int
+    quote: str
 
 class DomainCheckOut(BaseModel):
     input: str
@@ -23,6 +30,7 @@ class DomainCheckOut(BaseModel):
     status: str
     official_domain: Optional[str]
     reasons: List[str]
+    citation: Optional[DocumentCitationOut]  # the official document that lists an associated domain
 
 class NoticeMatchOut(BaseModel):
     kind: str
@@ -79,6 +87,9 @@ async def verify_notice(
         raise HTTPException(422, "paste the notice text, a link, or upload a PDF")
     try:
         result = await notice_verifier.verify(session, text=text, url=url, pdf=pdf, ocr=ocr)
+    except PdfPasswordProtected as e:
+        raise HTTPException(422, "this PDF is password-protected, so it cannot be read; upload a copy without a "
+                                 "password, or paste the notice's text or link") from e
     except RuntimeError as e:  # PyMuPDF raises on a damaged file
         raise HTTPException(422, f"could not read this PDF: {e}") from e
     except notice_verifier.PdfTimeout as e:

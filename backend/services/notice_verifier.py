@@ -4,7 +4,9 @@ Public notice check: is a pasted recruitment notice, link or PDF on an official 
 Deterministic only, never an LLM. Three checks, each returning its evidence:
 
   domain     the link's host against the registry's official domains (and gov.in / nic.in, which
-             UrlPolicy already allows for official aggregators, and the banks-only bank.in); a host that
+             UrlPolicy already allows for official aggregators, and the banks-only bank.in), and the associated
+             domains a source prints as its own in an official document we hold (backend/sources/associated_domains.py,
+             each with that document's page + quote); a host that
              imitates one of them
              (official domain plus another suffix, brand name inside another domain, one or two
              letters off, "gov" used outside gov.in, punycode / look-alike letters) is a LOOKALIKE
@@ -41,10 +43,11 @@ from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance
 from govcareeros.backend.parsing.title_tokens import normalise as _norm, tokens as _tokens
 from govcareeros.backend.parsing.upsc_advertisement import IST
+from govcareeros.backend.sources.associated_domains import AssociatedDomain, DocumentCitation, associated_domains
 from govcareeros.backend.sources.registry import SOURCES
 from govcareeros.backend.sources.url_guard import GOVERNMENT_SUFFIXES, site
 
-VERIFIER_VERSION = "notice_verifier-1"
+VERIFIER_VERSION = "notice_verifier-2"  # 2: associated domains with their citation
 
 FOUND = "FOUND_ON_OFFICIAL_SOURCE"
 LOOKALIKE = "LOOKALIKE_DOMAIN"
@@ -107,6 +110,7 @@ class DomainCheck:
     status: str  # OFFICIAL, LOOKALIKE, UNOFFICIAL, INVALID
     official_domain: Optional[str] = None  # the official domain it is on, or the one it imitates
     reasons: List[str] = field(default_factory=list)
+    citation: Optional[DocumentCitation] = None  # the official document that lists an associated domain
 
 def _suffix_split(host: str) -> Tuple[List[str], str]:
     labels = host.split(".")
@@ -160,8 +164,10 @@ def host_of(value: str) -> Tuple[str, List[str]]:
             notes.append("punycode domain that does not decode")
     return host, notes
 
-def check_domain(value: str, official: Optional[Set[str]] = None) -> DomainCheck:
+def check_domain(value: str, official: Optional[Set[str]] = None,
+                 associated: Optional[Dict[str, AssociatedDomain]] = None) -> DomainCheck:
     official = official if official is not None else official_domains()
+    associated = associated if associated is not None else associated_domains()
     host, notes = host_of(value)
     if not host or "." not in host:
         return DomainCheck(value, host, "INVALID", reasons=["no domain name in this link"])
@@ -173,12 +179,20 @@ def check_domain(value: str, official: Optional[Set[str]] = None) -> DomainCheck
         for d in sorted(official, key=len, reverse=True):
             if host == d or host.endswith("." + d):
                 return DomainCheck(value, host, "OFFICIAL", d, [f"{host} is the official domain {d} (or under it)"])
+        for d in sorted(associated, key=len, reverse=True):
+            if host == d or host.endswith("." + d):
+                c = associated[d].citations[0]
+                return DomainCheck(value, host, "OFFICIAL", d, [f"{host} is listed in {c.document} p.{c.page}"],
+                                   citation=c)
         for suffix, who in _RESTRICTED_SUFFIXES.items():
             if host.endswith("." + suffix):
                 return DomainCheck(value, host, "OFFICIAL", suffix, [f"{host} is under .{suffix}, which only {who} can register"])
 
     reasons, imitated = list(notes), None
-    for d in sorted(official, key=len, reverse=True):
+    # sscwr.net.in or sscwr-jobs.net imitates an associated domain as much as an official one; a name both have
+    # ('ssc') is reported as the registry domain's
+    imitable = [*sorted(official), *sorted(set(associated) - official)]
+    for d in sorted(imitable, key=len, reverse=True):
         # upsc.gov.in.com, upsc.gov.in-jobs.org: the whole official domain followed by more
         if re.search(rf"(^|[.\-]){re.escape(d)}[.\-]", skeleton):
             imitated = imitated or d
@@ -194,22 +208,26 @@ def check_domain(value: str, official: Optional[Set[str]] = None) -> DomainCheck
         imitated = imitated or "gov.in"
 
     by_brand: Dict[str, str] = {}
-    for d in official:
-        for b in _brands(d):
+    for d in imitable:
+        for b in sorted(_brands(d)):
             by_brand.setdefault(b, d)
+    # The domain imitated is one whose name is used as it is, else embedded, else one or two letters off
+    named: List[Tuple[int, str]] = []
     for token in dict.fromkeys(tokens):
         for brand, d in sorted(by_brand.items()):
             if token == brand:
-                hit = f"uses the name {brand!r} of official domain {d}"
+                hit, rank = f"uses the name {brand!r} of official domain {d}", 0
             elif len(brand) >= 4 and brand not in _WORD_LABELS and brand in token:
-                hit = f"embeds the name {brand!r} of official domain {d} in {token!r}"
+                hit, rank = f"embeds the name {brand!r} of official domain {d} in {token!r}", 1
             elif len(brand) >= 5 and brand not in _WORD_LABELS and abs(len(token) - len(brand)) <= 2 \
                     and _levenshtein(token, brand) <= (1 if len(brand) < 8 else 2):
-                hit = f"{token!r} is one or two letters away from {brand!r} of official domain {d}"
+                hit, rank = f"{token!r} is one or two letters away from {brand!r} of official domain {d}", 2
             else:
                 continue
-            imitated = imitated or d
+            named.append((rank, d))
             reasons.append(hit)
+    if named:
+        imitated = imitated or min(named, key=lambda n: n[0])[1]
 
     if imitated:
         return DomainCheck(value, host, "LOOKALIKE", imitated, reasons)
@@ -655,8 +673,9 @@ async def verify(session: AsyncSession, text: Optional[str] = None, url: Optiona
 
     message = MESSAGES[verdict]
     if verdict == FOUND and not matches:
-        message = (f"The link is on the official domain {url_check.official_domain}; we have not indexed this "
-                   "notice yet, so open it there to confirm.")
+        on = (f"{url_check.official_domain}, listed in {url_check.citation.document} p.{url_check.citation.page}"
+              if url_check.citation else f"the official domain {url_check.official_domain}")
+        message = f"The link is on {on}; we have not indexed this notice yet, so open it there to confirm."
     return VerificationResult(verdict, message, VERIFIER_VERSION, url_check, links, matches, flags,
                               advertisement_numbers(text), len(text), pdf_pages=read.pages if read else None,
                               pdf_pages_read=read.pages_read if read else None,
