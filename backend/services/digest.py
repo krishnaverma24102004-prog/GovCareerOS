@@ -43,7 +43,7 @@ from govcareeros.backend.models.eligibility import EligibilityEvidence, Eligibil
 from govcareeros.backend.models.user import PersonalInfo, ProfileVersion, User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance, VacancyRequirement, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
-from govcareeros.backend.services import change_log, mailer
+from govcareeros.backend.services import change_log, mailer, operator_console
 from govcareeros.backend.services.radar import AGE_HEADROOM_YEARS, _current_result, age_out_date
 
 DEFAULT_PERIOD = timedelta(days=7)
@@ -517,7 +517,7 @@ async def run_all(session: AsyncSession, now: Optional[datetime] = None, send: b
     runs = []
     users = (await session.execute(select(User).where(User.is_active.is_(True)).order_by(User.email))).scalars().all()
     for user in users:
-        if await latest_profile_version(session, user.id) is None:
+        if await latest_profile_version(session, user.id) is None or not await operator_console.may_process(session, user):
             continue
         _, run = await generate(session, user, now)
         # An operator's unclaimed client has no email: the digest is written, never sent

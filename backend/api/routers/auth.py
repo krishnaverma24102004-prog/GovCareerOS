@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +30,14 @@ async def claim(body: ClaimIn, session: AsyncSession = Depends(get_session)):
         return await operator_console.claim_account(session, body.token, body.email, body.password)
     except operator_console.OperatorError as e:
         raise HTTPException(e.status, str(e))
+
+@router.post("/operator-consent/withdraw", status_code=status.HTTP_204_NO_CONTENT)
+async def withdraw_operator_consent(user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    """A client who claimed an operator-created account withdraws the operator's consent: the operator loses access."""
+    if user.managed_by_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "this account was not created by an operator")
+    await operator_console.withdraw_consent(session, user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.post("/login", response_model=TokenOut)
 async def login(body: LoginIn, session: AsyncSession = Depends(get_session)):

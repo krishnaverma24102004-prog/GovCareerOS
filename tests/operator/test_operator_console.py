@@ -324,3 +324,45 @@ async def test_expired_claim_token_is_refused(db_session):
     with pytest.raises(oc.OperatorError) as e:
         await oc.claim_account(db_session, token, "client@example.com", "client-own-password")
     assert e.value.status == 403 and client.claimed_at is None
+
+@pytest.mark.asyncio
+async def test_narrowed_consent_hides_sections_and_batch_jobs_skip_withdrawn_clients(api, login, db_session):
+    from govcareeros.backend.services import digest, radar
+    op = await _operator(login, db_session, "op@example.com")
+    client = await _client(api, op)
+    path = f"/operator/clients/{client['id']}"
+    r = await api.put(f"{path}/profile", json={"personal_info": {"full_name": "Test Client One", "category": "OBC"},
+                                               "education": [{"degree": "B.A.", "institution": "Test College"}]}, headers=op)
+    assert r.status_code == 201, r.text
+    # The client later agrees only to personal details: education is no longer shown to the operator
+    r = await api.post(f"{path}/consent", json={**CONSENT, "data_items": ["full_name", "personal_info"]}, headers=op)
+    assert r.status_code == 201
+    prof = (await api.get(f"{path}/profile", headers=op)).json()
+    assert prof["education"] == [] and prof["personal_info"]["category"] == "OBC"
+
+    row = (await db_session.execute(select(User).where(User.id == uuid.UUID(client["id"])))).scalar_one()
+    assert await oc.may_process(db_session, row) is True
+    assert (await api.post(f"{path}/consent/withdraw", headers=op)).status_code == 204
+    await db_session.refresh(row)
+    assert await oc.may_process(db_session, row) is False
+    # Neither the radar nor the digest touches the withdrawn client's profile
+    await radar.run_radar(db_session, user_ids=[row.id])
+    assert all(r.user_id != row.id for r in await digest.run_all(db_session))
+
+@pytest.mark.asyncio
+async def test_claimed_client_withdraws_operator_consent_themselves(api, login, db_session):
+    op = await _operator(login, db_session, "op@example.com")
+    client = await _client(api, op)
+    token = (await api.post(f"/operator/clients/{client['id']}/claim-token", headers=op)).json()["token"]
+    assert (await api.post("/auth/claim", json={"token": token, "email": "client.one@example.com",
+                                                "password": "client-own-password"})).status_code == 200
+    r = await api.post("/auth/login", json={"email": "client.one@example.com", "password": "client-own-password"})
+    me = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert (await api.get(f"/operator/clients/{client['id']}/profile", headers=op)).status_code in (200, 404)
+    assert (await api.post("/auth/operator-consent/withdraw", headers=me)).status_code == 204
+    assert (await api.get(f"/operator/clients/{client['id']}/profile", headers=op)).status_code == 403
+    # The claimed client keeps their own name and account
+    assert (await api.get("/auth/me", headers=me)).json()["full_name"] == "Test Client One"
+    # An ordinary self-registered user has no operator consent to withdraw
+    plain = await login("plain@example.com")
+    assert (await api.post("/auth/operator-consent/withdraw", headers=plain)).status_code == 404

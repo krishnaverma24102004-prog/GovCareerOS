@@ -168,27 +168,32 @@ async def withdraw_consent(client_id: uuid.UUID, operator: User = Depends(requir
 async def get_client_profile(client_id: uuid.UUID, operator: User = Depends(require_operator), session: AsyncSession = Depends(get_session)):
     client = await _client(session, operator, client_id)
     try:
-        await oc.require_consent(session, client)
+        record = await oc.require_consent(session, client)
     except oc.OperatorError as e:
         raise _http(e)
     repo = ProfileRepository(session)
     latest = await repo.latest_version(client.id)
     if latest is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "profile not found")
-    return ProfileOut(version=ProfileVersionSummary.model_validate(latest), **await repo.load_sections(latest.id))
+    return ProfileOut(version=ProfileVersionSummary.model_validate(latest), **_consented(await repo.load_sections(latest.id), record))
+
+def _consented(sections: Dict[str, Any], record: ConsentRecord) -> Dict[str, Any]:
+    """Only the sections the active consent covers; a section the client has since left out reads as empty."""
+    items = set(json.loads(record.data_items))
+    return {k: v if oc.SECTION_ITEMS.get(k) in items else (None if k == "personal_info" else []) for k, v in sections.items()}
 
 async def _save_profile(client_id: uuid.UUID, body: ProfileIn, operator: User, session: AsyncSession, carry_over: bool) -> ProfileOut:
     client = await _client(session, operator, client_id)
     sections = {k: v for k, v in body.model_dump(exclude={"change_summary"}).items() if k in body.model_fields_set}
     try:
         # Checked before anything is written: every section sent must be covered by the client's consent
-        await oc.require_consent(session, client, oc.profile_items(sections))
+        record = await oc.require_consent(session, client, oc.profile_items(sections))
     except oc.OperatorError as e:
         raise _http(e)
     summary = body.change_summary or f"entered by operator {operator.id} with the client present"
     version = await ProfileService(session).save_profile(client.id, sections, summary, carry_over)
     repo = ProfileRepository(session)
-    return ProfileOut(version=ProfileVersionSummary.model_validate(version), **await repo.load_sections(version.id))
+    return ProfileOut(version=ProfileVersionSummary.model_validate(version), **_consented(await repo.load_sections(version.id), record))
 
 @router.put("/clients/{client_id}/profile", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
 async def replace_client_profile(client_id: uuid.UUID, body: ProfileIn, operator: User = Depends(require_operator),

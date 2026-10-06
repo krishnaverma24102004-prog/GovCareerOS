@@ -25,7 +25,7 @@ from govcareeros.backend.models.user import ProfileVersion, User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
 from govcareeros.backend.relevance import service as relevance_service
-from govcareeros.backend.services import change_log
+from govcareeros.backend.services import change_log, operator_console
 from govcareeros.backend.services.application_tracker import application_update_alerts
 
 DEADLINE_WINDOW = timedelta(days=7)
@@ -144,6 +144,9 @@ async def run_radar(session: AsyncSession, now: Optional[datetime] = None, user_
     if user_ids is not None:
         stmt = stmt.where(User.id.in_(user_ids))
     for user in (await session.execute(stmt)).scalars().all():
+        # An operator's unclaimed client whose consent is withdrawn is not processed at all
+        if not await operator_console.may_process(session, user):
+            continue
         await run_for_user(session, user, now, run)
         # Result/corrigendum notices for advertisements the user tracks an application for
         for values in await application_update_alerts(session, user.id):

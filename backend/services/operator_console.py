@@ -131,6 +131,13 @@ async def require_consent(session: AsyncSession, client: User, items: Iterable[s
         raise OperatorError(403, f"the client has not consented to: {', '.join(missing)}")
     return record
 
+async def may_process(session: AsyncSession, user: User) -> bool:
+    """Batch jobs (radar, digest) may use this user's profile: an ordinary or claimed account always; an unclaimed
+    operator-managed client only while their OPERATOR_ASSISTED_APPLICATION consent is active."""
+    if user.managed_by_id is None or user.claimed_at is not None:
+        return True
+    return await consent.active_consent(session, user.id, PURPOSE) is not None
+
 def profile_items(sections: Iterable[str]) -> List[str]:
     return sorted({SECTION_ITEMS[s] for s in sections if s in SECTION_ITEMS})
 
