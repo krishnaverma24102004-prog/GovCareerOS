@@ -153,7 +153,12 @@ function PrintablePageLink({ path, personalised }: { path: string; personalised:
       const token = getToken();
       const res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      const url = URL.createObjectURL(new Blob([await res.text()], { type: "text/html" }));
+      // A blob page runs in this app's origin and loses the response's CSP header, so the same policy is
+      // restated as a meta tag: the notice text it carries can never run script here
+      const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">`;
+      const html = (await res.text()).replace(/<head>/i, `<head>${csp}`);
+      if (!html.includes(csp)) throw new Error("unexpected printable page");
+      const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
       if (tab) tab.location.href = url;
       else window.location.href = url;
     } catch (e) {
