@@ -92,6 +92,14 @@ async def test_tampered_recording_is_rejected():
     age = result.vacancies[0].fields["age_limit"]
     assert not age.accepted and "disagrees" in age.reason
 
+def test_parser_version_fits_its_column_when_the_chain_moved():
+    # Three models of the configured chain answered parts of one document: the approved rows' parser_version
+    # (String(100)) is cut to fit, the draft keeps every model
+    models = "nvidia/nemotron-3-ultra-550b-a55b,nvidia/nemotron-3.5-lightning-30b-a3b,nvidia/nemotron-3-super-120b-a12b"
+    draft = ExtractionDraft(prompt_version="requirements_locate/1", model=models)
+    assert len(draft.parser_version) == 100 and draft.parser_version.startswith("llm:requirements_locate/1:nvidia/nemotron-3-ultra")
+    assert ExtractionDraft(prompt_version="vacancy_locate/2", model="m").parser_version == "llm:vacancy_locate/2:m"
+
 async def _draft(db_session):
     sources = await sync_registry(db_session, [s for s in SOURCES if s.name == "BSF"])
     now = datetime.now(timezone.utc)

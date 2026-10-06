@@ -151,7 +151,7 @@ async def approve(session: AsyncSession, draft: ExtractionDraft, reviewer: User,
             external_ref=f"draft:{draft.id}:{i}", pay_scale=pay["value"] if pay else None,
             application_mode="SEE_NOTICE", application_deadline=datetime.fromisoformat(last["value"]) if last else None,
             eligibility_crucial_date=None, notification_url=raw_url, source_url=source.recruitment_url, source_id=source.id,
-            raw_document_id=draft.raw_document_id, parser_version=f"llm:{draft.prompt_version}:{draft.model}",
+            raw_document_id=draft.raw_document_id, parser_version=draft.parser_version,
             confidence=round(n_accepted / len(ALL_FIELDS), 2),
         )
         session.add(vacancy)

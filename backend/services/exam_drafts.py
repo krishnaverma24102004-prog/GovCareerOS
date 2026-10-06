@@ -85,7 +85,7 @@ async def approve_exam_draft(session: AsyncSession, draft: ExtractionDraft, revi
     exam = Exam(
         id=uuid.uuid4(), source_id=source.id, conducting_body=source.organization, name=name["value"][:500],
         exam_code=exam_code_for(name["value"]), external_ref=f"draft:{draft.id}", notification_url=notice.url if notice else None,
-        notice_id=draft.notice_id, raw_document_id=draft.raw_document_id, parser_version=f"llm:{draft.prompt_version}:{draft.model}",
+        notice_id=draft.notice_id, raw_document_id=draft.raw_document_id, parser_version=draft.parser_version,
         application_start=_dt(_ok(fields, "application_start")), application_end=_dt(last),
         age_crucial_date=_dt(_ok(fields, "age_crucial_date")), fee_amount=fee["value"] if fee else None,
         exam_dates=json.dumps([{"stage": "as stated", "schedule": schedule["value"]}], ensure_ascii=False) if schedule else None,
