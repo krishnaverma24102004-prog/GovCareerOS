@@ -242,6 +242,31 @@ def rupee_amounts(text: str) -> List[int]:
 def exemption_groups(text: str) -> List[str]:
     return sorted(code for code, rx in EXEMPTION_GROUPS if rx.search(text))
 
+# A fee clause ends at a sentence stop (not the one in "Rs."), a semicolon or ", "; a clause that exempts or excepts
+# anyone ("Candidates (Except Female/SC/ST/...) are required to pay a fee of Rs. 25/-") charges no category it names
+_FEE_CLAUSE_SPLIT_RE = re.compile(r"(?<![Rr][Ss])\.\s+|;|,\s+|\n")
+_FEE_EXCLUDES_RE = re.compile(r"exempt|no\s+fee|not\s+required\s+to\s+pay|\bexcept\b", re.I)
+
+def fee_ties(text: str) -> Dict[str, List[int]]:
+    """Category -> the rupee amounts the text charges it. A category is tied to the first amount after it in the
+    same clause ("UR/OBC: Rs. 100/-"), else to the last one before it ("Rs. 100/- for UR"); naming a category and an
+    amount somewhere in the same quote is not enough."""
+    ties: Dict[str, List[int]] = {}
+    for clause in _FEE_CLAUSE_SPLIT_RE.split(text):
+        if _FEE_EXCLUDES_RE.search(clause):
+            continue
+        amounts = [(m.start(), int(m.group(1).replace(",", ""))) for m in _RUPEES_RE.finditer(clause) if m.group(1).replace(",", "")]
+        if not amounts:
+            continue
+        for code, rx in CATEGORY_WORDS.items():
+            for m in rx.finditer(clause):
+                after = [a for pos, a in amounts if pos >= m.end()]
+                before = [a for pos, a in amounts if pos < m.start()]
+                amount = after[0] if after else before[-1]
+                if amount not in ties.setdefault(code, []):
+                    ties[code].append(amount)
+    return ties
+
 # ---------- document list items ----------
 
 # (code, applies_when, keyword regex): first match wins, checked against the item's own text

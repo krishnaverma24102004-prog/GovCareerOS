@@ -97,6 +97,12 @@ async def approve_requirements_draft(session: AsyncSession, draft: ExtractionDra
             raise DraftError(f"item {i} was not verified ({r['reason']}) and cannot be approved")
         if (r["req_type"], r["code"]) in existing:
             raise DraftError(f"document already has a {r['req_type']} {r['code']} requirement")
+    # verify_all keeps a repeated (req_type, code) as a duplicate for the reviewer to choose from: one of them, not both
+    chosen: Dict[tuple, int] = {}
+    for i in item_indexes:
+        j = chosen.setdefault((items[i]["req_type"], items[i]["code"]), i)
+        if j != i:
+            raise DraftError(f"items {j} and {i} are both {items[i]['req_type']} {items[i]['code']}; approve one of them")
     # A date read through "the closing date" is stored only with the closing date it came from, itself approved
     closing_ok = ("KEY_DATE", "APPLICATION_END") in existing or any(
         r["req_type"] == "KEY_DATE" and r["code"] == "APPLICATION_END" and (j in item_indexes or (r.get("decision") or {}).get("status") == "APPROVED")

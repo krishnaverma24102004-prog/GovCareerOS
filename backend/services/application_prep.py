@@ -40,27 +40,70 @@ class PrepInputError(Exception):
 
 REQUIRED, NOT_REQUIRED, IF_APPLICABLE, UNKNOWN = "REQUIRED", "NOT_REQUIRED", "IF_APPLICABLE", "UNKNOWN"
 
+def parser_family(parser_version: str) -> str:
+    """"upsc_application/2" -> "upsc_application"; every reviewer-approved LLM row ("llm:<prompt>:<model>") is "llm"."""
+    return "llm" if parser_version.startswith("llm:") else parser_version.split("/", 1)[0]
+
+# Where a value was read (verbatim text, clause quotes, list position) is evidence, not a fact two sources can disagree on
+_EVIDENCE_KEYS = ("text", "source_quote", "source_page", "clauses", "item")
+
+def differing_facts(a: str, b: str) -> List[str]:
+    """Keys of two stored values (JSON) whose facts differ; a key one leaves unset (None) and the other states counts."""
+    fa, fb = ({k: v for k, v in json.loads(x).items() if v is not None and k not in _EVIDENCE_KEYS} for x in (a, b))
+    return sorted(k for k in set(fa) | set(fb) if fa.get(k) != fb.get(k))
+
+def _conflict_warning(first: ApplicationRequirement, other: ApplicationRequirement, keys: List[str]) -> str:
+    return (f"{first.req_type} {first.code}: the {first.parser_version} row (page {first.source_page}) and the {other.parser_version} "
+            f"row (page {other.source_page}) differ in {', '.join(keys)}; both are kept, the official notice prevails")
+
 async def store_application_requirements(
     session: AsyncSession, source: GovernmentSource, raw: RawDocument, pages: List[PageText], advertisement_number: Optional[str],
     parse: Callable[[List[PageText]], ua.ParsedApplicationInfo] = ua.parse_application_info,
 ) -> ua.ParsedApplicationInfo:
-    """Idempotent per (document, parser version); a newer parser replaces the document's rows. `parse` is the
-    notice's deterministic parser (UPSC advertisement by default; ssc_application / upsc exam notice otherwise)."""
+    """Idempotent per (document, parser version); a newer version of the same parser replaces that parser's rows of
+    the document. Rows from elsewhere (reviewer-approved LLM drafts, services/requirement_drafts.py) are human work and
+    stay; where one states a different value than the parse, both are kept and the parse's warnings say so.
+    `parse` is the notice's deterministic parser (UPSC advertisement by default; ssc_application / upsc exam notice otherwise)."""
     info = parse(pages)
-    current = (await session.execute(select(ApplicationRequirement.parser_version).where(
-        ApplicationRequirement.raw_document_id == raw.id).limit(1))).scalar_one_or_none()
-    if current == info.parser_version or not info.items:
+    family = parser_family(info.parser_version)
+    rows = (await session.execute(select(ApplicationRequirement).where(ApplicationRequirement.raw_document_id == raw.id))).scalars().all()
+    mine = [r for r in rows if parser_family(r.parser_version) == family]
+    if any(r.parser_version == info.parser_version for r in mine) or not info.items:
         return info
-    await session.execute(delete(ApplicationRequirement).where(ApplicationRequirement.raw_document_id == raw.id))
+    if mine:
+        await session.execute(delete(ApplicationRequirement).where(ApplicationRequirement.id.in_([r.id for r in mine])))
+    others = {(r.req_type, r.code): r for r in rows if parser_family(r.parser_version) != family}
     for item in info.items:
-        session.add(ApplicationRequirement(
+        row = ApplicationRequirement(
             source_id=source.id, raw_document_id=raw.id, advertisement_number=advertisement_number,
             req_type=item.req_type, code=item.code, applies_when=item.applies_when,
             value=json.dumps(item.value, ensure_ascii=False), source_page=item.provenance.page,
             source_section=item.provenance.section, source_excerpt=item.provenance.excerpt, parser_version=info.parser_version,
-        ))
+        )
+        other = others.get((item.req_type, item.code))
+        keys = differing_facts(row.value, other.value) if other is not None else []
+        if keys:
+            info.warnings.append(_conflict_warning(row, other, keys))
+        session.add(row)
     await session.flush()
     return info
+
+def merge_sources(rows: List[ApplicationRequirement]) -> Tuple[List[ApplicationRequirement], List[str]]:
+    """One document can hold a deterministic parse and reviewer-approved LLM rows for the same (req_type, code)
+    (store_application_requirements). Equal values: the deterministic row alone. Different values: both rows,
+    deterministic first (so single-valued items such as the portal or the general fee take it), and a warning.
+    Values are compared by their facts only (differing_facts), not by the words they were read from."""
+    rows = sorted(rows, key=lambda r: parser_family(r.parser_version) == "llm")
+    groups: Dict[Tuple[str, str], List[ApplicationRequirement]] = {}
+    for r in rows:
+        groups.setdefault((r.req_type, r.code), []).append(r)
+    out, warnings = [], []
+    for group in groups.values():
+        first = group[0]
+        differing = [(r, keys) for r in group[1:] if (keys := differing_facts(first.value, r.value))]
+        out += [first, *(r for r, _ in differing)]
+        warnings += [_conflict_warning(first, r, keys) for r, keys in differing]
+    return out, warnings
 
 async def requirements_for_vacancy(session: AsyncSession, vacancy: Vacancy) -> List[ApplicationRequirement]:
     """Rows of the document the vacancy was parsed from; else the latest parse of the same advertisement number."""
@@ -161,7 +204,9 @@ def _fee(rows: List[ApplicationRequirement], info: Optional[PersonalInfo], cite)
         return None
     category = rules.normalize_category(info.category) if info else None
     # A notice may state the fee per category (FEE rows with a "category"); the profile's own one wins, else the general fee
-    by_cat = {json.loads(r.value).get("category"): r for r in fees}
+    by_cat: Dict[Optional[str], ApplicationRequirement] = {}
+    for r in fees:  # deterministic rows come first (merge_sources); a differing approved row only adds a warning
+        by_cat.setdefault(json.loads(r.value).get("category"), r)
     fee = next((by_cat[c] for c in (category, _gender(info.gender) if info else None) if c and c in by_cat), None) or by_cat.get(None)
     amount = json.loads(fee.value) if fee else None
     groups = json.loads(exemption.value)["exempt"] if exemption else []
@@ -209,7 +254,7 @@ async def build_checklist(session: AsyncSession, user_id: uuid.UUID, vacancy_id:
     return {
         "vacancy_id": str(vacancy.id), "profile_version_id": str(version.id), "advertisement_number": vacancy.advertisement_number,
         "application_deadline": vacancy.application_deadline.isoformat() if vacancy.application_deadline else None,
-        **out, "warnings": [] if rows else ["no application requirements extracted for this vacancy's advertisement"],
+        **out, "warnings": out["warnings"] + ([] if rows else ["no application requirements extracted for this vacancy's advertisement"]),
     }
 
 async def build_exam_checklist(session: AsyncSession, user_id: uuid.UUID, exam_id: uuid.UUID, profile_version_id: uuid.UUID) -> Dict[str, Any]:
@@ -220,13 +265,13 @@ async def build_exam_checklist(session: AsyncSession, user_id: uuid.UUID, exam_i
     if exam is None:
         raise PrepInputError("exam not found")
     rows = await requirements_for_exam(session, exam)
-    obc = next((json.loads(r.value) for r in rows if r.req_type == "CERTIFICATE" and r.code == "OBC_NCL"), None)
+    obc = next((json.loads(r.value) for r in merge_sources(rows)[0] if r.req_type == "CERTIFICATE" and r.code == "OBC_NCL"), None)
     crucial = obc["crucial_date"] if obc and obc.get("crucial_date") else None
     out = await _checklist(session, version, rows, False, crucial)
     return {
         "exam_id": str(exam.id), "profile_version_id": str(version.id), "exam_name": exam.name, "file_number": exam.external_ref,
         "application_deadline": exam.application_end.isoformat() if exam.application_end else None,
-        **out, "warnings": [] if rows else ["no application requirements extracted for this exam's notice"],
+        **out, "warnings": out["warnings"] + ([] if rows else ["no application requirements extracted for this exam's notice"]),
     }
 
 def _certificate_item(r: ApplicationRequirement, status: str, reason: str, cite) -> Dict[str, Any]:
@@ -237,6 +282,7 @@ def _certificate_item(r: ApplicationRequirement, status: str, reason: str, cite)
 
 async def _checklist(session: AsyncSession, version: ProfileVersion, rows: List[ApplicationRequirement], post_needs_experience: bool,
                      crucial: Optional[str]) -> Dict[str, Any]:
+    rows, warnings = merge_sources(rows)
     info = (await session.execute(select(PersonalInfo).where(PersonalInfo.profile_version_id == version.id))).scalar_one_or_none()
     has_experience = bool((await session.execute(select(Experience.id).where(Experience.profile_version_id == version.id).limit(1))).first())
     has_equivalence = bool((await session.execute(select(Education.id).where(
@@ -273,5 +319,5 @@ async def _checklist(session: AsyncSession, version: ProfileVersion, rows: List[
         "certificates": [_certificate_item(r, *decide(r), cite) for r in sorted((r for r in rows if r.req_type == "CERTIFICATE"), key=lambda r: r.code)],
         "key_dates": [{"code": r.code, **json.loads(r.value), "citation": cite(r)}
                       for r in sorted((r for r in rows if r.req_type == "KEY_DATE"), key=lambda r: json.loads(r.value)["at"])],
-        "documents": items,
+        "documents": items, "warnings": warnings,
     }

@@ -6,6 +6,9 @@
  *
  * Approval is one draft at a time and always goes through a confirm dialog listing exactly which vacancies
  * become vacancy records. Rejecting needs a note.
+ *
+ * A requirements draft (payload.kind "requirements") lists its located items instead (fee, certificates, uploads,
+ * documents, key dates); the reviewer ticks the items to store, and of two items marked duplicate approves one.
  */
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -13,11 +16,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { Dialog } from "@/components/Dialog";
 import { Badge, ErrorNote, errText } from "@/components/ui";
 import { api } from "@/lib/api";
-import type { DraftDetail, DraftPages, DraftVacancy, FieldVerdict, QuoteSpan } from "@/lib/types";
+import type { DraftDetail, DraftPages, DraftRequirement, DraftVacancy, FieldVerdict, QuoteSpan } from "@/lib/types";
 
 export type DraftCommand = { action: "approve" | "reject"; n: number } | null;
 
 const key = (vi: number, field: string) => `${vi}:${field}`;
+const reqKey = (ri: number) => `r${ri}`;
+const spanKey = (s: QuoteSpan) => (s.requirement_index != null ? reqKey(s.requirement_index) : key(s.vacancy_index ?? -1, s.field));
 
 function show(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
@@ -30,6 +35,10 @@ function postName(v: DraftVacancy): string {
 
 function approvable(v: DraftVacancy): boolean {
   return !v.decision && Boolean(v.fields.post_name?.accepted);
+}
+
+function reqApprovable(r: DraftRequirement): boolean {
+  return !r.decision && r.accepted;
 }
 
 export function DraftReview({ draftId, command, onDecided }: { draftId: string; command: DraftCommand; onDecided: (msg: string) => void }) {
@@ -66,6 +75,9 @@ export function DraftReview({ draftId, command, onDecided }: { draftId: string; 
   }, [draftId]);
 
   const pending = d?.status === "PENDING_REVIEW";
+  const isReq = d?.payload.kind === "requirements";
+  const reqs = d?.payload.requirements || [];
+  const unit = isReq ? "item(s)" : "vacancy(ies)";
 
   // Keyboard shortcuts from the console: a = approve (opens the confirm dialog), r = reject
   const lastCommand = useRef(0);
@@ -82,7 +94,7 @@ export function DraftReview({ draftId, command, onDecided }: { draftId: string; 
   }, [doc]);
   const spanOf = useMemo(() => {
     const out: Record<string, QuoteSpan> = {};
-    for (const s of doc?.spans || []) out[key(s.vacancy_index, s.field)] = s;
+    for (const s of doc?.spans || []) out[spanKey(s)] = s;
     return out;
   }, [doc]);
 
@@ -98,18 +110,22 @@ export function DraftReview({ draftId, command, onDecided }: { draftId: string; 
       return;
     }
     if (action === "approve" && selected.size === 0) {
-      setError("Tick at least one vacancy to approve.");
+      setError(`Tick at least one ${isReq ? "item" : "vacancy"} to approve.`);
       return;
     }
     setBusy(true);
     try {
-      const body = action === "approve" ? { vacancy_indexes: [...selected].sort((a, b) => a - b), note: note.trim() || null } : { note: note.trim() };
+      const picked = [...selected].sort((a, b) => a - b);
+      const body =
+        action === "approve"
+          ? { [isReq ? "requirement_indexes" : "vacancy_indexes"]: picked, note: note.trim() || null }
+          : { note: note.trim() };
       const out = await api<DraftDetail>(`/review/drafts/${draftId}/${action}`, { method: "POST", body });
       setD(out);
       setDialog(null);
       setSelected(new Set());
       setNote("");
-      onDecided(action === "approve" ? `Approved ${body.vacancy_indexes?.length} vacancy(ies); draft is ${out.status}` : `Draft rejected (${out.status})`);
+      onDecided(action === "approve" ? `Approved ${picked.length} ${unit}; draft is ${out.status}` : `Draft rejected (${out.status})`);
     } catch (e) {
       setError(errText(e));
     } finally {
@@ -150,6 +166,49 @@ export function DraftReview({ draftId, command, onDecided }: { draftId: string; 
 
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+          {isReq && (
+            <ul className="divide-y divide-slate-100 rounded border border-slate-200 bg-white text-sm">
+              {reqs.map((r, ri) => {
+                const k = reqKey(ri);
+                const s = spanOf[k];
+                return (
+                  <li
+                    key={ri}
+                    onClick={() => s?.located && focus(k)}
+                    className={`px-3 py-1.5 ${s?.located ? "cursor-pointer hover:bg-slate-50" : ""} ${active === k ? "bg-yellow-50" : ""}`}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      {pending && reqApprovable(r) && (
+                        <input
+                          type="checkbox"
+                          aria-label={`select item ${ri}`}
+                          checked={selected.has(ri)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const next = new Set(selected);
+                            if (e.target.checked) next.add(ri);
+                            else next.delete(ri);
+                            setSelected(next);
+                          }}
+                        />
+                      )}
+                      <span className="font-mono text-xs">
+                        #{ri} {r.req_type} {r.code}
+                      </span>
+                      <Badge value={r.decision ? r.decision.status : r.accepted ? "ACCEPTED" : "REJECTED"} />
+                      {r.page && <span className="text-xs text-slate-500">p.{r.page}</span>}
+                      {r.match && <span className="font-mono text-xs text-slate-500">{r.match}</span>}
+                      {r.quote && s && !s.located && <span className="text-xs text-red-700">quote not in document text</span>}
+                    </div>
+                    {r.duplicate_of && <div className="text-xs text-amber-700">Duplicate of {r.duplicate_of}: approve only one of them</div>}
+                    <div>{show(r.value)}</div>
+                    {!r.accepted && r.llm_value != null && <div className="text-xs text-slate-500">model said: {show(r.llm_value)}</div>}
+                    <div className="text-xs text-slate-500">{r.reason}</div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           {d.payload.vacancies.map((v, vi) => (
             <div key={vi} className="rounded border border-slate-200 bg-white">
               <div className="flex flex-wrap items-center gap-2 bg-slate-50 px-3 py-2 text-sm">
@@ -225,7 +284,45 @@ export function DraftReview({ draftId, command, onDecided }: { draftId: string; 
         </div>
       </div>
 
-      {dialog === "approve" && (
+      {dialog === "approve" && isReq && (
+        <Dialog title="Approve requirement items from this draft" onClose={() => setDialog(null)}>
+          <p className="text-sm text-slate-600">Only the ticked items are stored for this notice, each with its page and quote.</p>
+          <ul className="space-y-1 text-sm">
+            {reqs.map((r, ri) =>
+              reqApprovable(r) ? (
+                <li key={ri}>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(ri)}
+                      onChange={(e) => {
+                        const next = new Set(selected);
+                        if (e.target.checked) next.add(ri);
+                        else next.delete(ri);
+                        setSelected(next);
+                      }}
+                    />
+                    #{ri} {r.req_type} {r.code}
+                    <span className="text-xs text-slate-500">(p.{r.page})</span>
+                    {r.duplicate_of && <span className="text-xs text-amber-700">duplicate</span>}
+                  </label>
+                </li>
+              ) : null,
+            )}
+          </ul>
+          <input className="w-full rounded border border-slate-300 px-2 py-1 text-sm" placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <ErrorNote error={error} />
+          <div className="flex justify-end gap-2">
+            <button className="px-3 py-1 text-sm" onClick={() => setDialog(null)}>
+              Cancel
+            </button>
+            <button disabled={busy || selected.size === 0} onClick={() => decide("approve")} className="rounded bg-green-700 px-3 py-1 text-sm text-white disabled:opacity-40">
+              Approve {selected.size}
+            </button>
+          </div>
+        </Dialog>
+      )}
+      {dialog === "approve" && !isReq && (
         <Dialog title="Approve vacancies from this draft" onClose={() => setDialog(null)}>
           <p className="text-sm text-slate-600">Only the ticked vacancies become vacancy records, with their verified fields and quotes.</p>
           <ul className="space-y-1 text-sm">
@@ -265,8 +362,8 @@ export function DraftReview({ draftId, command, onDecided }: { draftId: string; 
         </Dialog>
       )}
       {dialog === "reject" && (
-        <Dialog title="Reject the remaining vacancies" onClose={() => setDialog(null)}>
-          <p className="text-sm text-slate-600">Vacancies already approved stay; every undecided one is rejected.</p>
+        <Dialog title={`Reject the remaining ${isReq ? "items" : "vacancies"}`} onClose={() => setDialog(null)}>
+          <p className="text-sm text-slate-600">{isReq ? "Items" : "Vacancies"} already approved stay; every undecided one is rejected.</p>
           <input
             autoFocus
             className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
@@ -314,14 +411,14 @@ function PageText({
       parts.push(<span key={a}>{text.slice(a, b)}</span>);
       continue;
     }
-    const keys = covering.map((s) => key(s.vacancy_index, s.field));
-    const starting = covering.filter((s) => s.start === a).map((s) => key(s.vacancy_index, s.field));
+    const keys = covering.map(spanKey);
+    const starting = covering.filter((s) => s.start === a).map(spanKey);
     const cls = active && keys.includes(active) ? "bg-yellow-300" : covering.some((s) => s.accepted) ? "bg-green-100" : "bg-red-100";
     parts.push(
       <mark
         key={a}
         className={`${cls} cursor-pointer rounded-sm`}
-        title={covering.map((s) => `#${s.vacancy_index} ${s.field}${s.accepted ? "" : " (refused)"}`).join(", ")}
+        title={covering.map((s) => `#${s.requirement_index ?? s.vacancy_index} ${s.field}${s.accepted ? "" : " (refused)"}`).join(", ")}
         onClick={() => onPick(keys[0])}
         ref={(el) => {
           for (const k of starting) marks.current[k] = el;

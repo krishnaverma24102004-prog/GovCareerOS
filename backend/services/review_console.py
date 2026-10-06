@@ -179,17 +179,27 @@ def locate(quote: str, page_text: str) -> Optional[Tuple[int, int]]:
     return offsets[i], offsets[i + len(needle) - 1] + 1
 
 def quote_spans(payload: Dict[str, Any], pages: Sequence[PageText]) -> List[Dict[str, Any]]:
+    """Vacancy drafts: one span per field quote (vacancy_index + field). Requirements drafts
+    (services/requirement_drafts.py): one per item quote (requirement_index; field = "REQ_TYPE CODE")."""
     by_page = {p.page_number: p.text for p in pages}
     spans = []
+
+    def span(f: Dict[str, Any], **where) -> None:
+        quote, page = f.get("quote"), f.get("page")
+        if not quote:
+            return
+        at = locate(quote, by_page[page]) if page in by_page else None
+        spans.append(dict(**where, accepted=bool(f.get("accepted")), reason=f.get("reason"),
+                          match=f.get("match"), page=page if at else None, start=at[0] if at else None,
+                          end=at[1] if at else None, quote=quote, located=at is not None))
+
     for vi, vacancy in enumerate(payload.get("vacancies", [])):
         for name, f in vacancy.get("fields", {}).items():
-            quote, page = f.get("quote"), f.get("page")
-            if not quote:
-                continue
-            at = locate(quote, by_page[page]) if page in by_page else None
-            spans.append(dict(vacancy_index=vi, field=name, accepted=bool(f.get("accepted")), reason=f.get("reason"),
-                              match=f.get("match"), page=page if at else None, start=at[0] if at else None,
-                              end=at[1] if at else None, quote=quote, located=at is not None))
+            span(f, vacancy_index=vi, requirement_index=None, field=name)
+    for ri, r in enumerate(payload.get("requirements", [])):
+        # The validator stores a quote only once it is found on the cited page: an item refused for its value (e.g. a
+        # fee the quote does not charge that category) is highlighted red, one whose quote is not there has no span
+        span(r, vacancy_index=None, requirement_index=ri, field=f"{r.get('req_type')} {r.get('code')}")
     return spans
 
 async def draft_pages(session: AsyncSession, draft: ExtractionDraft) -> Dict[str, Any]:
