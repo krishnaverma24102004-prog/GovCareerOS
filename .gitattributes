@@ -1,3 +1,8 @@
 * text=auto
 *.pdf binary
 *.png binary
+# Files read by Docker / Linux shells keep LF even in a Windows checkout (a CR breaks RUN line continuations)
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+docker-compose.yml text eol=lf
+*.sh text eol=lf
