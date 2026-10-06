@@ -15,8 +15,12 @@ Here each title is paired with the link that follows it inside the same <p>:
   url     that link, made absolute on nta.ac.in; only when the policy allows it
 Only notices whose title uses the generic recruitment wording (generic_notices.mentions_recruitment:
 "recruit", "vacanc", "post of", "deputation", "contractual", "notification for", ...) are kept, so the
-board's admission-exam notices (CUET, NEET, JEE, UGC-NET) stay out. That wording is a keyword test, not a
-judgement: a title such as "Invitation for Bids for Appointment of CA Firm ..." passes it and is kept.
+board's admission-exam notices (CUET, NEET, JEE, UGC-NET) stay out. That wording is a keyword test, so two kinds
+of non-job notice that pass it are left out by name (_NOT_A_JOB_RE), both seen on the 2026-10-01 capture:
+  procurement   "Invitation for Bids for Appointment of CA Firm for Internal Audit and Tax Audit (Form 10B) of
+                National Testing Agency for FY 2024-25" (bids, tenders, quotations, expressions of interest)
+  admission     "Government guidelines notification for conducting written examination for persons with
+                disabilities to be implemented in JEE (Main) Examination-reg." (JEE, NEET, CUET, UGC-NET, ...)
 The board shows no dates, numbers or labels; those fields stay None. A PDF listed twice is kept once.
 """
 import re
@@ -34,6 +38,10 @@ SOURCE = "NTA"
 _NOTICE_RE = re.compile(r"<content\b[^>]*>(.*?)</content>(.*?)(?=</p>|<content\b)", re.I | re.S)
 _HREF_RE = re.compile(r"<a\b[^>]*?\bhref\s*=\s*[\"']([^\"']+)[\"']", re.I)
 _TAG_RE = re.compile(r"<[^>]+>")
+# Procurement and the admission / eligibility exams NTA runs; neither fills a post
+_NOT_A_JOB_RE = re.compile(
+    r"\binvitation for bids\b|\bbids?\b|\b(?:e-?)?tenders?\b|\bquotations?\b|\bexpression of interest\b|"
+    r"\bJEE\b|\bNEET\b|\bCUET\b|\bUGC[- ]NET\b|\bNCET\b|\bNCHM\b", re.I)
 
 def parse_listing(html: str, base_url: str) -> List[ListingRow]:
     policy = UrlPolicy.from_url(base_url)
@@ -42,7 +50,7 @@ def parse_listing(html: str, base_url: str) -> List[ListingRow]:
     for inner, tail in _NOTICE_RE.findall(html):
         title = clean(unescape(_TAG_RE.sub(" ", inner)))
         link = _HREF_RE.search(tail)
-        if not title or not link or not mentions_recruitment(title):
+        if not title or not link or not mentions_recruitment(title) or _NOT_A_JOB_RE.search(title):
             continue
         href = unescape(link.group(1))
         url = document_url(href, base_url, policy)

@@ -86,11 +86,14 @@ async def test_discovery_stores_what_the_adapter_reads_from_the_captured_pages(d
     adapter = ADAPTERS[source]
     pages = captured(source)
     summary, requested = await _discover(db_session, source)
-    policy = source_policy((await db_session.execute(select(GovernmentSource))).scalar_one())
+    source_row = (await db_session.execute(select(GovernmentSource))).scalar_one()
+    policy = source_policy(source_row)
+    # The configured page's own result (the source's status may be OK through its listing pages alone)
+    main_ok = json.loads(source_row.configuration)["page_status"] == "OK"
 
     # The pages discovery read: the configured (or located) page when it loaded, then the adapter's LISTING_URLS
     read: List[Tuple[str, str]] = []
-    if summary.status == "OK":
+    if main_ok:
         read.append((summary.page_url, next(p for p, final in pages.values() if final == summary.page_url).read_text(encoding="utf-8")))
     for url in getattr(adapter, "LISTING_URLS", []):
         if url in pages and pages[url][1] not in {u for u, _ in read}:
@@ -117,7 +120,7 @@ async def test_discovery_stores_what_the_adapter_reads_from_the_captured_pages(d
         assert n.notice_kind == (KIND_HINT_KINDS[row.kind_hint] if explicit else classify_notice(row.title, row.url))
 
     # Generic extraction stays the fallback: every link it finds on the configured page is stored too
-    if summary.status == "OK":
+    if main_ok:
         main_html = read[0][1]
         stored = {n.url for n in notices}
         assert {l.url for l in extract_notices(main_html, summary.page_url, policy)} <= stored
@@ -152,8 +155,13 @@ async def test_employment_news_rows_share_the_listing_url_and_stay_distinct(db_s
     assert json.loads(mecl.post_names) == ["ACCOUNTANT & OTHERS"]
     assert json.loads(mecl.listing_evidence) == {"title": "MINERAL EXPLORATION AND CONSULTANCY LIMITED",
                                                  "post_names": "ACCOUNTANT & OTHERS",
-                                                 "published_on": "12/09/2026", "last_date": "11/10/2026"}
-    assert mecl.kind_hint is None and mecl.review_status == "MANUAL_REVIEW"
+                                                 "published_on": "12/09/2026", "last_date": "11/10/2026",
+                                                 "kind_hint": "All JOBS"}
+    # The table under "All JOBS" lists jobs (organisation, post, method of appointment, last date): every row is a
+    # VACANCY on the page's own word, not left to the title classifier (which reads these titles as OTHER)
+    assert mecl.kind_hint == "VACANCY" and mecl.review_status == "MANUAL_REVIEW"
+    assert all(n.kind_hint == "VACANCY" and n.notice_kind == "VACANCY" for n in rows)
+    assert classify_notice(mecl.title, mecl.url) == "OTHER"
 
 RPSC_DOC = "https://rpsc.rajasthan.gov.in/Static/RecruitmentAdvertisements/"
 
@@ -282,3 +290,4 @@ async def test_discovery_reads_the_official_json_listing_endpoint(db_session, so
     assert {n.url for n in stored} == {r.url for r in rows}
     assert all(n.found_on_url == request.url for n in stored)
     assert any(r.method == request.method and str(r.url) == request.url for r in seen)
+

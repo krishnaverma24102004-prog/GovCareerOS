@@ -235,17 +235,33 @@ def _apply_row(notice: RecruitmentNotice, row: ListingRow) -> None:
         notice.post_names = json.dumps(row.post_names, ensure_ascii=False)
     notice.listing_evidence = json.dumps(evidence, ensure_ascii=False, sort_keys=True) if evidence else None
 
-async def record_probe(session: AsyncSession, source: GovernmentSource, result: ProbeResult, now: datetime) -> SourceDiscoverySummary:
-    source.health_status = "HEALTHY" if result.status == "OK" else result.status
-    source.last_verified = now
+def source_status(result: ProbeResult) -> Tuple[str, Optional[str]]:
+    """The source's health from everything the probe read: the configured page's own status, unless that page
+    failed or listed nothing while an adapter listing page (LISTING_REQUEST / LISTING_URLS) yielded rows; then
+    the source is OK and the detail names the listing page(s) the rows came from and what the main page gave."""
     if result.status == "OK":
+        return result.status, result.detail
+    listed = [(p.final_url, len(p.listing_rows)) for p in result.listing_pages if p.status == "OK" and p.listing_rows]
+    if not listed:
+        return result.status, result.detail
+    rows = "; ".join(f"{n} rows from listing {url}" for url, n in listed)
+    main = f"configured page {result.status}" + (f" ({result.detail})" if result.detail else "")
+    return "OK", f"{rows}; {main}"
+
+async def record_probe(session: AsyncSession, source: GovernmentSource, result: ProbeResult, now: datetime) -> SourceDiscoverySummary:
+    status, detail = source_status(result)
+    source.health_status = "HEALTHY" if status == "OK" else status
+    source.last_verified = now
+    if status == "OK":
         source.last_success = now
     else:
         source.last_failure = now
     config = _config(source)
     config.update({
-        "last_probe_status": result.status, "http_status": result.http_status,
-        "fetch_mode": result.fetch_mode, "detail": result.detail,
+        "last_probe_status": status, "http_status": result.http_status,
+        "fetch_mode": result.fetch_mode, "detail": detail,
+        # The configured page's own result stays visible when listing pages carried the source
+        "page_status": result.status, "page_detail": result.detail,
     })
     if result.status == "OK" and result.final_url and source_policy(source).allows(result.final_url):
         config["resolved_url"] = result.final_url
@@ -288,8 +304,8 @@ async def record_probe(session: AsyncSession, source: GovernmentSource, result: 
             new_vacancy += notice.notice_kind in ("VACANCY", "CORRIGENDUM")
     await session.flush()
     return SourceDiscoverySummary(
-        source.name, result.status, result.fetch_mode, result.final_url,
-        len(seen), new, new_vacancy, result.detail,
+        source.name, status, result.fetch_mode, result.final_url,
+        len(seen), new, new_vacancy, detail,
     )
 
 async def discover_all(
