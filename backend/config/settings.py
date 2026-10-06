@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     # estimate beside the official last date, never as the date (backend/services/deadline_helper.py)
     IN_SERVICE_FORWARDING_BUFFER_DAYS: int = 0
 
+    # B2B API (/api/v1): requests per minute per key when the key sets none. In-process token bucket (one per API
+    # process), so N worker processes allow up to N times this; see backend/services/api_keys.py
+    B2B_RATE_LIMIT_PER_MINUTE: int = 60
+
     @property
     def storage_dir(self) -> Path:
         path = Path(self.STORAGE_PATH)

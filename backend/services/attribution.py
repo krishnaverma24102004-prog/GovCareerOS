@@ -1,5 +1,5 @@
 """
-Builds AttributionOut for vacancies, exams and exam versions in a few batched queries (never one per row).
+Builds AttributionOut for vacancies, exams, exam versions and notices in a few batched queries (never one per row).
 Everything comes from stored rows: the source registry entry, the RawDocument and the field provenance.
 """
 import uuid
@@ -73,3 +73,8 @@ async def for_exam_versions(session: AsyncSession, exam: Exam, versions: Sequenc
     # A version's document is the corrigendum/notice itself; which of its pages is cited lives in `details`
     found_on = await _notice_pages(session, (v.notice_id for v in versions))
     return await _build(session, [_Ref(exam.source_id, v.raw_document_id, found_on.get(v.notice_id), None) for v in versions])
+
+async def for_notices(session: AsyncSession, notices: Sequence[RecruitmentNotice]) -> List[Optional[AttributionOut]]:
+    """A notice link: the page it was found on, and its document once downloaded (else document_url is the link itself)."""
+    built = await _build(session, [_Ref(n.source_id, n.raw_document_id, n.found_on_url, None) for n in notices])
+    return [a.model_copy(update={"document_url": a.document_url or n.url}) if a else None for n, a in zip(notices, built)]

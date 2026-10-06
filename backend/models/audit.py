@@ -14,7 +14,7 @@ class ReviewAuditLog(Base):
     actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", name="fk_review_audit_log_actor_id_users"), index=True)
     # e.g. DRAFT_APPROVE, DRAFT_REJECT, NOTICE_SKIP, NOTICE_NOT_REQUIRED, NOTICE_REQUEUE, FACT_VERIFY, FACT_REJECT, REVIEWER_GRANT
     action: Mapped[str] = mapped_column(String(40), index=True)
-    # DRAFT, NOTICE, FACT, USER
+    # DRAFT, NOTICE, FACT, USER, SOURCE, API_ORG, API_KEY
     object_type: Mapped[str] = mapped_column(String(20))
     object_id: Mapped[uuid.UUID] = mapped_column()
     note: Mapped[Optional[str]] = mapped_column(Text)
