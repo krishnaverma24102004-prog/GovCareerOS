@@ -6,10 +6,15 @@
  *
  * Eligibility: the newest stored result for (latest version, vacancy) is shown; if there is none yet
  * the deterministic engine is run once via POST /eligibility.
+ *
+ * Also: the official closing date with its evidence (GET /vacancies/{id}/deadline), the field-level change log
+ * from corrigenda (GET /vacancies/{id}/changes) and a link to the printable apply-ready checklist.
  */
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { ChangeLog, DeadlinePanel } from "@/components/changes";
 import { Badge, ErrorNote, Shell, errText, fmtDate, useSession } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { Eligibility, Profile, Provenance, VacancyDetail } from "@/lib/types";
@@ -95,6 +100,9 @@ function VacancyView({ id }: { id: string }) {
               Apply (official site)
             </a>
           )}
+          <Link className="text-blue-700 underline" href={`/apply-ready/vacancy/${v.id}`}>
+            Apply-ready checklist
+          </Link>
         </div>
       </div>
 
@@ -109,6 +117,16 @@ function VacancyView({ id }: { id: string }) {
               </div>
             ))}
         </dl>
+      </section>
+
+      <section>
+        <h2 className="mb-2 font-medium">Closing date</h2>
+        <DeadlinePanel base={`/vacancies/${v.id}`} />
+      </section>
+
+      <section>
+        <h2 className="mb-2 font-medium">Official changes</h2>
+        <ChangeLog base={`/vacancies/${v.id}`} />
       </section>
 
       <section>
