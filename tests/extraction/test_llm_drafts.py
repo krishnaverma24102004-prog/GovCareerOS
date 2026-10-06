@@ -7,17 +7,20 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
 import pytest
 from sqlalchemy import select
 
 from govcareeros.backend.documents.pdf_text import extract_pages, tessdata_dir
 from govcareeros.backend.extraction.llm_extractor import extract
 from govcareeros.backend.extraction.validator import IST
-from govcareeros.backend.llm.provider import LLMResponse
-from govcareeros.backend.models import RecruitmentNotice, User, UserAlert, Vacancy, VacancyFieldProvenance, VacancyRequirement
-from govcareeros.backend.services.extraction_drafts import create_draft
+from govcareeros.backend.llm import provider as provider_module
+from govcareeros.backend.llm.provider import LLMResponse, NvidiaProvider
+from govcareeros.backend.models import ExtractionDraft, RecruitmentNotice, User, UserAlert, Vacancy, VacancyFieldProvenance, VacancyRequirement
+from govcareeros.backend.services.extraction_drafts import create_draft, draft_pending_notices, requeue_failed_drafts
 from govcareeros.backend.services.radar import run_radar
 from govcareeros.backend.services.source_discovery import sync_registry, url_hash
+from govcareeros.backend.sources.generic_notices import PageFetcher
 from govcareeros.backend.sources.registry import SOURCES
 
 LLM = Path(__file__).parents[1] / "fixtures" / "llm"
@@ -208,3 +211,72 @@ async def test_single_all_category_limit_drives_age_headroom(api, login, db_sess
     assert run.alerts_created.get("AGE_HEADROOM") == 1
     alert = (await db_session.execute(select(UserAlert).where(UserAlert.kind == "AGE_HEADROOM"))).scalar_one()
     assert "You are 66" in alert.body and "the ALL limit for this post is 67" in alert.body and "from 15 Jan 2027" in alert.body
+
+# ------------------------------------------------------------------ --retry-failed (scripts/draft_notices.py)
+# The body integrate.api.nvidia.com returned for every attempt during the 06-10-2026 drafting run
+OVERLOADED = {"error": {"message": "Service temporarily overloaded", "type": "Service Unavailable", "code": 503}}
+
+def _nvidia(status_for_every_request):
+    def handler(request):
+        return httpx.Response(status_for_every_request, json=OVERLOADED if status_for_every_request == 503 else None)
+    return NvidiaProvider(["nvidia/nemotron-3-ultra-550b-a55b", "nvidia/nemotron-3.5-lightning-30b-a3b"], "test-key",
+                          "https://integrate.api.nvidia.com/v1", 30, requests_per_minute=0, transport=httpx.MockTransport(handler))
+
+@pytest.fixture
+def no_waits(monkeypatch):
+    async def fake_sleep(seconds):
+        pass
+    monkeypatch.setattr(provider_module.asyncio, "sleep", fake_sleep)
+
+async def _failed_notice(db_session, provider):
+    sources = await sync_registry(db_session, [s for s in SOURCES if s.name == "BSF"])
+    now = datetime.now(timezone.utc)
+    notice = RecruitmentNotice(source_id=sources["BSF"].id, url=URL, url_hash=url_hash(URL), title="Walk-in: Specialist Doctors and GDMOs",
+                               document_type="PDF", notice_kind="VACANCY", first_seen_at=now, last_seen_at=now, review_status="MANUAL_REVIEW")
+    db_session.add(notice)
+    await db_session.flush()
+    draft = await create_draft(db_session, sources["BSF"], URL, PDF.read_bytes(), provider, notice)
+    await db_session.commit()
+    assert draft.status == "FAILED" and notice.review_status == "DRAFT_FAILED"
+    return notice, draft
+
+def _serving_the_pdf():
+    def handler(request):
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        assert str(request.url) == URL
+        return httpx.Response(200, content=PDF.read_bytes(), headers={"content-type": "application/pdf"})
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=True)
+
+@pytest.mark.asyncio
+async def test_retry_failed_redrafts_a_notice_the_provider_failed(db_session, no_waits):
+    notice, failed = await _failed_notice(db_session, _nvidia(503))
+    assert "Service temporarily overloaded" in failed.error and "lightning" in failed.error  # both models were asked
+    notice_id = notice.id
+
+    # A reviewer's decision is never undone, even when the last draft failed at the provider
+    for status in ("REJECTED", "PARSED"):
+        notice.review_status = status
+        await db_session.commit()
+        assert await requeue_failed_drafts(db_session) == []
+        assert await _notice_status(db_session) == status
+    notice.review_status = "DRAFT_FAILED"
+    await db_session.commit()
+
+    assert [n.id for n in await requeue_failed_drafts(db_session, ["BSF"])] == [notice_id]
+    assert await _notice_status(db_session) == "MANUAL_REVIEW"
+    async with PageFetcher(allow_browser=False, client=_serving_the_pdf()) as fetcher:
+        [draft] = await draft_pending_notices(db_session, fetcher, ReplayProvider(RECORDING), notice_ids=[notice_id])
+    await db_session.commit()
+    assert draft.status == "PENDING_REVIEW" and draft.fields_accepted >= 14
+    assert await _notice_status(db_session) == "DRAFTED"
+    # The failed draft stays as the record of the outage
+    assert (await db_session.get(ExtractionDraft, failed.id)).status == "FAILED"
+
+@pytest.mark.asyncio
+async def test_retry_failed_leaves_a_draft_that_did_not_fail_at_the_provider(db_session, no_waits):
+    # 400 is a request the API refused, not an outage: retrying the same request would fail the same way
+    notice, failed = await _failed_notice(db_session, _nvidia(400))
+    assert "NVIDIA API 400" in failed.error
+    assert await requeue_failed_drafts(db_session) == []
+    assert await _notice_status(db_session) == "DRAFT_FAILED"
