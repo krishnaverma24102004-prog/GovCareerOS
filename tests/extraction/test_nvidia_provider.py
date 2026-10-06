@@ -14,7 +14,8 @@ import httpx
 import pytest
 
 from govcareeros.backend.config.settings import Settings, settings
-from govcareeros.backend.extraction.llm_extractor import SCHEMA, SYSTEM
+from govcareeros.backend.documents.pdf_text import extract_pages
+from govcareeros.backend.extraction.llm_extractor import SCHEMA, SYSTEM, extract
 from govcareeros.backend.llm import provider as provider_module
 from govcareeros.backend.llm.provider import LLMError, NvidiaProvider, get_provider
 
@@ -128,6 +129,50 @@ async def test_bad_request_is_not_treated_as_a_missing_model(sleeps):
     with pytest.raises(LLMError, match=r"NVIDIA API 400 \(nvidia/nemotron-3-ultra-550b-a55b\)"):
         await p.complete_json(SYSTEM, "<document></document>", SCHEMA)
     assert served.models == [ULTRA] and p.unavailable == {}
+
+# The body integrate.api.nvidia.com returned for nemotron-3-ultra-550b-a55b during the 06-10-2026 drafting run
+OVERLOADED = {"error": {"message": "Service temporarily overloaded", "type": "Service Unavailable", "code": 503}}
+
+def _overloaded(**headers):
+    return httpx.Response(503, json=OVERLOADED, headers=headers)
+
+@pytest.mark.asyncio
+async def test_overload_that_does_not_clear_moves_to_the_next_model(sleeps):
+    served = Served({ULTRA: [_overloaded(), _overloaded(), _overloaded(), 200], LIGHTNING: [200]})
+    p = _provider(served)
+    resp = await p.complete_json(SYSTEM, "<document></document>", SCHEMA)
+    assert resp.data == ANSWER and resp.model == LIGHTNING
+    assert served.models == [ULTRA, ULTRA, ULTRA, LIGHTNING] and sleeps == [10, 20, 30]
+    # Overload is transient: the model is not dropped for the run, the next call asks it first again
+    assert p.unavailable == {} and p.model == ULTRA
+    resp = await p.complete_json(SYSTEM, "<document></document>", SCHEMA)
+    assert resp.model == ULTRA and served.models[-1] == ULTRA
+
+@pytest.mark.asyncio
+async def test_overload_on_every_model_is_an_error_naming_each(sleeps):
+    served = Served({ULTRA: [_overloaded()] * 3, LIGHTNING: [502, 503, _overloaded()]})
+    with pytest.raises(LLMError, match=r"\(nvidia/nemotron-3-ultra-550b-a55b\): HTTP 503: .*Service temporarily overloaded.*; "
+                                       r".*\(nvidia/nemotron-3.5-lightning-30b-a3b\): HTTP 503"):
+        await _provider(served).complete_json(SYSTEM, "<document></document>", SCHEMA)
+    assert served.models == [ULTRA] * 3 + [LIGHTNING] * 3
+
+@pytest.mark.asyncio
+async def test_retry_after_is_honoured_for_5xx_and_capped(sleeps):
+    served = Served({ULTRA: [_overloaded(**{"Retry-After": "45"}), httpx.Response(429, headers={"Retry-After": "3600"}), 200]})
+    resp = await _provider(served).complete_json(SYSTEM, "<document></document>", SCHEMA)
+    assert resp.model == ULTRA and sleeps == [45.0, NvidiaProvider.MAX_WAIT] and NvidiaProvider.MAX_WAIT == 120
+
+@pytest.mark.asyncio
+async def test_extraction_records_the_model_of_each_chunk_when_the_chain_moves(sleeps):
+    # A real notice (SSC JE 2026, text layer) split into chunks; the recorded answer stands in for every chunk,
+    # this test is about which model is recorded, not about what the validator accepts
+    pages = extract_pages((Path(__file__).parents[1] / "fixtures" / "ssc" / "Notice_of_adv_je_2026.pdf").read_bytes())
+    served = Served({ULTRA: [200, _overloaded(), _overloaded(), _overloaded(), 200], LIGHTNING: [200]})
+    p = _provider(served)
+    p.chunk_chars = max(len(pg.text) for pg in pages[:3]) + 1  # one page per call
+    result = await extract(pages[:3], p)
+    assert [c.model for c in result.chunks] == [ULTRA, LIGHTNING, ULTRA] and not any(c.error for c in result.chunks)
+    assert result.model == f"{ULTRA},{LIGHTNING}"
 
 def test_configured_chain_and_override(monkeypatch):
     monkeypatch.setattr(settings, "NVIDIA_API_KEY", "test-key")

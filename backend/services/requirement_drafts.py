@@ -35,7 +35,7 @@ def serialize(result: RequirementsExtractionResult) -> Dict[str, Any]:
     return {
         "kind": "requirements", "vacancies": [], "requirements": [asdict(v) for v in result.requirements],
         "chunks": [{"pages": c.pages, "seconds": c.seconds, "prompt_tokens": c.prompt_tokens,
-                    "output_tokens": c.output_tokens, "error": c.error} for c in result.chunks],
+                    "output_tokens": c.output_tokens, "error": c.error, "model": c.model} for c in result.chunks],
     }
 
 async def create_requirements_draft(session: AsyncSession, source: GovernmentSource, raw: RawDocument, pages: List[PageText],

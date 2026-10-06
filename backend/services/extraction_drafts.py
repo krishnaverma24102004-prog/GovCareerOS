@@ -43,7 +43,7 @@ def serialize(result: ExtractionResult) -> Dict[str, Any]:
     return {
         "vacancies": [{"fields": {k: {**asdict(f), "value": _jsonable(f.value)} for k, f in v.fields.items()}} for v in result.vacancies],
         "chunks": [{"pages": c.pages, "seconds": c.seconds, "prompt_tokens": c.prompt_tokens,
-                    "output_tokens": c.output_tokens, "error": c.error} for c in result.chunks],
+                    "output_tokens": c.output_tokens, "error": c.error, "model": c.model} for c in result.chunks],
     }
 
 async def create_draft(session: AsyncSession, source: GovernmentSource, url: str, body: bytes, provider,

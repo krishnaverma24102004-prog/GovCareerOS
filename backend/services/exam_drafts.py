@@ -35,7 +35,7 @@ def serialize(result: ExamExtractionResult) -> Dict[str, Any]:
         "kind": "exam", "vacancies": [], "exam": _verdicts(result.exam),
         "posts": [{"fields": _verdicts(p.fields)} for p in result.posts],
         "chunks": [{"pages": c.pages, "seconds": c.seconds, "prompt_tokens": c.prompt_tokens,
-                    "output_tokens": c.output_tokens, "error": c.error} for c in result.chunks],
+                    "output_tokens": c.output_tokens, "error": c.error, "model": c.model} for c in result.chunks],
     }
 
 async def create_exam_draft(session: AsyncSession, source: GovernmentSource, url: str, body: bytes, provider,
