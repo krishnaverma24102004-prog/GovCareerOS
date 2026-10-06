@@ -13,6 +13,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+import httpx
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -241,6 +242,12 @@ async def draft_pending_notices(session: AsyncSession, fetcher, provider, limit:
         except UrlRefused:
             # Off-domain, non-https or non-public link (or redirect): never fetched, never evidence
             notice.review_status = "URL_REFUSED"
+            continue
+        except httpx.HTTPError as e:
+            # One unreachable site (an expired certificate, a dropped connection) must not stop the run; TLS errors
+            # are never bypassed, the notice just waits for the site to be fixed
+            tls = "CERTIFICATE" in str(e).upper() or "SSL" in str(e).upper()
+            notice.review_status = "TLS_ERROR" if tls else "FETCH_FAILED_UNREACHABLE"
             continue
         if r.status_code != 200 or not r.content.startswith(b"%PDF"):
             notice.review_status = f"FETCH_FAILED_{r.status_code}"

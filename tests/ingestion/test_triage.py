@@ -353,3 +353,22 @@ def test_process_notices_on_real_listings(title, url, kind):
 def test_process_notices_from_the_october_sweep(title, url, kind):
     from govcareeros.backend.sources.notice_classifier import classify_notice
     assert classify_notice(title, url) == kind
+
+@pytest.mark.asyncio
+async def test_a_site_with_an_expired_certificate_does_not_stop_the_draft_run(db_session):
+    # Live run of 6 Oct 2026 stopped on the first notice whose site served an expired certificate (message verbatim)
+    await load_snapshot(db_session)
+    await triage_notices(db_session, now=NOW, apply=True)
+    await db_session.commit()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        raise httpx.ConnectError("A required certificate is not within its validity period when verifying against the "
+                                 "current system clock or the timestamp in the signed file.")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=True)
+    async with PageFetcher(allow_browser=False, client=client) as fetcher:
+        assert await draft_pending_notices(db_session, fetcher, provider=None, limit=3) == []
+    statuses = [n.review_status for n in (await db_session.execute(select(RecruitmentNotice))).scalars()]
+    assert statuses.count("TLS_ERROR") == 3
