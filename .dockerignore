@@ -1,0 +1,23 @@
+# Never send secrets or local data into the build context
+.env
+.env.*
+**/.env
+**/.env.*
+storage
+*.db
+*.sqlite
+*.log
+
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+.pytest_cache
+
+# Not needed by the API image (the frontend has its own image and context)
+frontend
+tests
+docs
+docker
+Dockerfile
+docker-compose.yml

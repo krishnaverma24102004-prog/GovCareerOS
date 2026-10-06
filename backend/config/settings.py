@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -33,8 +33,29 @@ class Settings(BaseSettings):
     EMAIL_USERNAME: str = ""
     EMAIL_PASSWORD: str = ""
 
-    # The only browser origin allowed to call the API (the local Next.js dashboard)
+    # The browser origin allowed to call the API (the local Next.js dashboard)
     FRONTEND_ORIGIN: str = "http://localhost:3000"
+    # Production: further allowed origins, comma-separated (e.g. "https://govcareeros.example,https://www.govcareeros.example").
+    # Explicit origins only: "*" is refused at startup
+    FRONTEND_ORIGINS: str = ""
+
+    # Largest request body accepted by any route without its own limit (the notice check allows a 10 MB PDF)
+    MAX_REQUEST_BYTES: int = 1024 * 1024
+    # Strict-Transport-Security max-age, sent only on https requests; 0 = never. Behind a TLS-terminating proxy run
+    # uvicorn with --proxy-headers so the request scheme is the client's (docs/deploy/README.md)
+    HSTS_SECONDS: int = 31_536_000
+    # "text" (default, local) or "json": one JSON object per line on stdout, secrets redacted (config/log_setup.py)
+    LOG_FORMAT: str = "text"
+    LOG_LEVEL: str = "INFO"
+
+    # docker compose scheduler (scripts/scheduler.py): "HH:MM" daily or "mon HH:MM" weekly, at SCHEDULE_UTC_OFFSET;
+    # empty = job off. Triage already runs as a step of the daily job, so its own entry is off by default
+    SCHEDULE_UTC_OFFSET: str = "+05:30"
+    SCHEDULE_DAILY_JOB: str = "07:00"
+    SCHEDULE_SEND_DIGESTS: str = "mon 08:00"
+    SCHEDULE_TRIAGE: str = ""
+    # The scheduled digest emails users only when true (and EMAIL_USERNAME / EMAIL_PASSWORD are set); else files only
+    SCHEDULE_DIGEST_SEND: bool = False
 
     STORAGE_PATH: str = str(PROJECT_ROOT / "storage")
     PLAYWRIGHT_HEADLESS: bool = True
@@ -44,6 +65,13 @@ class Settings(BaseSettings):
     # Days an in-service applicant's office may need to forward an application; 0 = off. Shown only as a labelled
     # estimate beside the official last date, never as the date (backend/services/deadline_helper.py)
     IN_SERVICE_FORWARDING_BUFFER_DAYS: int = 0
+
+    @property
+    def cors_origins(self) -> List[str]:
+        origins = [o.strip().rstrip("/") for o in [self.FRONTEND_ORIGIN, *self.FRONTEND_ORIGINS.split(",")] if o.strip()]
+        if "*" in origins:
+            raise ValueError('FRONTEND_ORIGIN(S) must list explicit origins, not "*"')
+        return list(dict.fromkeys(origins))
 
     @property
     def storage_dir(self) -> Path:

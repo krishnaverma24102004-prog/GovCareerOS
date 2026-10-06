@@ -2,10 +2,11 @@
 Request body limits per path, enforced before FastAPI parses (and spools to disk) a form or upload.
 
 A Content-Length above the limit is refused at once, without reading the body; a body without one (chunked) is
-counted as it arrives and refused as soon as it passes the limit.
+counted as it arrives and refused as soon as it passes the limit. A path without its own limit gets the default
+one (settings.MAX_REQUEST_BYTES), if given.
 """
 import json
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 
 from fastapi import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -15,12 +16,12 @@ class BodyTooLarge(HTTPException):
         super().__init__(413, f"request body is larger than {limit:,} bytes")
 
 class BodyLimitMiddleware:
-    def __init__(self, app: ASGIApp, limits: Dict[str, Callable[[], int]]):
+    def __init__(self, app: ASGIApp, limits: Dict[str, Callable[[], int]], default: Optional[Callable[[], int]] = None):
         # path -> limit in bytes, read per request (tests lower it)
-        self.app, self.limits = app, limits
+        self.app, self.limits, self.default = app, limits, default
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        limit_of = self.limits.get(scope.get("path", "")) if scope["type"] == "http" else None
+        limit_of = self.limits.get(scope.get("path", ""), self.default) if scope["type"] == "http" else None
         if limit_of is None:
             return await self.app(scope, receive, send)
         limit = limit_of()

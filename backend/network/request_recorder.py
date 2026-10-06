@@ -1,19 +1,17 @@
 import re
 from typing import Dict, Any, Optional
+from govcareeros.backend.config.redaction import REDACTED, SENSITIVE_KEYWORDS
 from govcareeros.backend.network.models import NetworkRequest, ResourceType, DataClassification
 
 class RequestRecorder:
-    SENSITIVE_KEYWORDS = {
-        "authorization", "cookie", "set-cookie", "token", "api_key", 
-        "password", "secret", "sessionid", "csrf"
-    }
+    SENSITIVE_KEYWORDS = SENSITIVE_KEYWORDS
 
     def __init__(self):
         self.requests: Dict[str, NetworkRequest] = {}
 
     def sanitize_headers(self, headers: Dict[str, str]) -> Dict[str, str]:
         return {
-            k: "[REDACTED]" if k.lower() in self.SENSITIVE_KEYWORDS else v 
+            k: REDACTED if k.lower() in self.SENSITIVE_KEYWORDS else v 
             for k, v in headers.items()
         }
 
