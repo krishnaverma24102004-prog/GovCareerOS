@@ -254,7 +254,7 @@ def input_fingerprint(exam: Exam, post_id, reqs: List[rules.Requirement]) -> str
 
 _STATUS_RANK = {"ELIGIBLE": 4, "CONDITIONAL": 3, "MANUAL_REVIEW": 2, "INELIGIBLE": 1}
 
-async def _posts_with_own_rows(session: AsyncSession, exam_id: uuid.UUID) -> List[ExamPost]:
+async def posts_with_own_rows(session: AsyncSession, exam_id: uuid.UUID) -> List[ExamPost]:
     """Posts that carry their own age/education rows (post-wise notices), in the notice's order."""
     ids = set((await session.execute(select(ExamRequirement.post_id).where(
         ExamRequirement.exam_id == exam_id, ExamRequirement.post_id.is_not(None), ExamRequirement.superseded_at.is_(None),
@@ -262,7 +262,7 @@ async def _posts_with_own_rows(session: AsyncSession, exam_id: uuid.UUID) -> Lis
     posts = (await session.execute(select(ExamPost).where(ExamPost.id.in_(ids)))).scalars().all() if ids else []
     return sorted(posts, key=lambda p: (p.source_page or 0, p.created_at, p.post_key))
 
-async def _best_post(posts: List[ExamPost], judge) -> Tuple[List[rules.RuleOutcome], List[rules.Requirement]]:
+async def best_post(posts: List[ExamPost], judge) -> Tuple[List[rules.RuleOutcome], List[rules.Requirement]]:
     """No post chosen: every post is judged with its own rows and the best one decides; the others are counted, not shown."""
     judged = []
     for i, p in enumerate(posts):
@@ -279,6 +279,20 @@ async def _best_post(posts: List[ExamPost], judge) -> Tuple[List[rules.RuleOutco
         f"{p.post_name} ({p.department or '-'}, {p.pay_level or '-'})",
         ", ".join(f"{k}: {v} posts" for k, v in sorted(counts.items(), key=lambda kv: -_STATUS_RANK[kv[0]])), source_page=p.source_page)
     return best[4] + [summary], [r for j in judged for r in j[5]]
+
+def post_judge(session: AsyncSession, exam: Exam, snapshot: rules.ProfileSnapshot, gender: Optional[str]):
+    """The hard checks for the exam as a whole (post None) or one post: (outcomes, the rows they were judged on). Nothing is stored."""
+    closing = _day(exam.application_end)
+    age_day = _day(exam.age_crucial_date) or closing
+    edu_day = _day(exam.education_cutoff_date) or closing
+
+    async def judge(p: Optional[ExamPost]) -> Tuple[List[rules.RuleOutcome], List[rules.Requirement]]:
+        reqs = await load_requirements(session, exam.id, p.id if p else None)
+        if p is not None:
+            reqs = scope_to_post(reqs, p)
+        return (check_exam_age(snapshot, reqs, age_day, closing, gender) + check_exam_education(snapshot, reqs, edu_day)
+                + rules.check_citizenship(snapshot, reqs)), reqs
+    return judge
 
 async def evaluate_exam(session: AsyncSession, user_id: uuid.UUID, profile_version_id: uuid.UUID, exam_id: uuid.UUID,
                         post_id: Optional[uuid.UUID] = None) -> ExamEligibilityResult:
@@ -297,19 +311,10 @@ async def evaluate_exam(session: AsyncSession, user_id: uuid.UUID, profile_versi
     snapshot = await load_profile_snapshot(session, profile_version_id)
     gender = (await session.execute(select(PersonalInfo.gender).where(PersonalInfo.profile_version_id == profile_version_id))).scalar_one_or_none()
     closing = _day(exam.application_end)
-    age_day = _day(exam.age_crucial_date) or closing
-    edu_day = _day(exam.education_cutoff_date) or closing
-
-    async def judge(p: Optional[ExamPost]) -> Tuple[List[rules.RuleOutcome], List[rules.Requirement]]:
-        reqs = await load_requirements(session, exam_id, p.id if p else None)
-        if p is not None:
-            reqs = scope_to_post(reqs, p)
-        return (check_exam_age(snapshot, reqs, age_day, closing, gender) + check_exam_education(snapshot, reqs, edu_day)
-                + rules.check_citizenship(snapshot, reqs)), reqs
-
-    post_wise = [] if post is not None else await _posts_with_own_rows(session, exam_id)
+    judge = post_judge(session, exam, snapshot, gender)
+    post_wise = [] if post is not None else await posts_with_own_rows(session, exam_id)
     if post_wise:
-        outcomes, reqs = await _best_post(post_wise, judge)
+        outcomes, reqs = await best_post(post_wise, judge)
     else:
         outcomes, reqs = await judge(post)
     if exam.age_crucial_date is None and closing is not None:

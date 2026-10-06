@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.documents.pdf_text import PageText
 from govcareeros.backend.eligibility import rules
-from govcareeros.backend.models.application import ApplicationRequirement
+from govcareeros.backend.models.application import ApplicationRequirement, ApplicationRequirementParse
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.exam import Exam
 from govcareeros.backend.models.source import GovernmentSource
@@ -49,6 +49,9 @@ async def store_application_requirements(
     info = parse(pages)
     current = (await session.execute(select(ApplicationRequirement.parser_version).where(
         ApplicationRequirement.raw_document_id == raw.id).limit(1))).scalar_one_or_none()
+    if info.items or current is None:
+        # The parse the stored rows (or their absence) now come from; an empty re-parse keeps the older rows and record
+        await _record_parse(session, raw.id, info)
     if current == info.parser_version or not info.items:
         return info
     await session.execute(delete(ApplicationRequirement).where(ApplicationRequirement.raw_document_id == raw.id))
@@ -61,6 +64,22 @@ async def store_application_requirements(
         ))
     await session.flush()
     return info
+
+async def _record_parse(session: AsyncSession, raw_document_id: uuid.UUID, info: ua.ParsedApplicationInfo) -> None:
+    record = (await session.execute(select(ApplicationRequirementParse).where(
+        ApplicationRequirementParse.raw_document_id == raw_document_id))).scalar_one_or_none()
+    if record is None:
+        record = ApplicationRequirementParse(raw_document_id=raw_document_id)
+        session.add(record)
+    record.parser_version, record.warnings = info.parser_version, json.dumps(info.warnings, ensure_ascii=False)
+
+async def parse_warnings(session: AsyncSession, raw_document_id: Optional[uuid.UUID]) -> List[str]:
+    """What the deterministic parser could not find in the document (stored at ingestion), e.g. "certificate clause not found: obc"."""
+    if raw_document_id is None:
+        return []
+    stored = (await session.execute(select(ApplicationRequirementParse.warnings).where(
+        ApplicationRequirementParse.raw_document_id == raw_document_id))).scalar_one_or_none()
+    return json.loads(stored) if stored else []
 
 async def requirements_for_vacancy(session: AsyncSession, vacancy: Vacancy) -> List[ApplicationRequirement]:
     """Rows of the document the vacancy was parsed from; else the latest parse of the same advertisement number."""
@@ -229,6 +248,30 @@ async def build_exam_checklist(session: AsyncSession, user_id: uuid.UUID, exam_i
         **out, "warnings": [] if rows else ["no application requirements extracted for this exam's notice"],
     }
 
+_ROMAN = {"i": 1, "v": 5, "x": 10, "l": 50}
+
+def _roman(item: str) -> Optional[int]:
+    if not item or any(c not in _ROMAN for c in item):
+        return None
+    values = [_ROMAN[c] for c in item]
+    return sum(-v if i + 1 < len(values) and v < values[i + 1] else v for i, v in enumerate(values))
+
+def document_order(rows: List[ApplicationRequirement]) -> Callable[[ApplicationRequirement], tuple]:
+    """Sort key for DOCUMENT rows in the notice's own list order. SSC numbers its items ("1".."10") or uses roman
+    numerals ("i".."x", JE 2026), UPSC letters them ("a".."l", where "i" is a letter): numerals are read as numbers
+    only when every item of the list is one."""
+    labels = [i for i in (json.loads(r.value).get("item") for r in rows) if i]
+    roman = bool(labels) and all(_roman(i) for i in labels)
+
+    def key(r: ApplicationRequirement):
+        item = json.loads(r.value).get("item") or "~"
+        if item.isdigit():
+            return (int(item), ""), r.code
+        if roman and _roman(item):
+            return (_roman(item), ""), r.code
+        return (10 ** 6, item), r.code
+    return key
+
 def _certificate_item(r: ApplicationRequirement, status: str, reason: str, cite) -> Dict[str, Any]:
     value = json.loads(r.value)
     return {"kind": r.code, "applies_when": r.applies_when, "status": status, "reason": reason,
@@ -253,11 +296,7 @@ async def _checklist(session: AsyncSession, version: ProfileVersion, rows: List[
         r = next((r for r in rows if r.req_type == req_type), None)
         return {**json.loads(r.value), "citation": cite(r)} if r else None
 
-    def order(r: ApplicationRequirement):
-        item = json.loads(r.value).get("item") or "~"
-        # SSC numbers its list items ("1".."10"), UPSC letters them; numbers sort as numbers
-        return (int(item), "") if item.isdigit() else (10 ** 6, item), r.code
-
+    order = document_order([r for r in rows if r.req_type == "DOCUMENT"])
     decide = lambda r: _decide(r.applies_when, r.code, info, has_experience, has_equivalence, post_needs_experience, crucial)
     items = []
     for r in sorted((r for r in rows if r.req_type == "DOCUMENT"), key=order):

@@ -15,7 +15,7 @@ from govcareeros.backend.models.extraction import ExtractionDraft
 from govcareeros.backend.models.digest import DigestRun
 from govcareeros.backend.models.exam import Exam, ExamPost, ExamRequirement, ExamFieldProvenance, ExamEligibilityResult, ExamEligibilityEvidence
 from govcareeros.backend.models.exam_prep import Syllabus, QuestionPaper, StudyPlan, StudyPlanItem
-from govcareeros.backend.models.application import Application, ApplicationRequirement, ApplicationStatusHistory
+from govcareeros.backend.models.application import Application, ApplicationRequirement, ApplicationRequirementParse, ApplicationStatusHistory
 from govcareeros.backend.models.resume import Resume, ResumeClaim
 from govcareeros.backend.models.audit import ReviewAuditLog
 from govcareeros.backend.models.triage import NoticeTriage, TriageDecision

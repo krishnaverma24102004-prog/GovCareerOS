@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -30,6 +30,18 @@ async def current_user(
     unauthorized = HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated", headers={"WWW-Authenticate": "Bearer"})
     if creds is None or creds.scheme.lower() != "bearer":
         raise unauthorized
+    return await _token_user(session, creds, unauthorized)
+
+async def optional_user(
+    creds: HTTPAuthorizationCredentials = Depends(_bearer),
+    session: AsyncSession = Depends(get_session),
+) -> Optional[User]:
+    """Public pages that add the caller's own data when logged in: no token is anonymous, a bad token is still a 401."""
+    if creds is None:
+        return None
+    return await current_user(creds, session)
+
+async def _token_user(session: AsyncSession, creds: HTTPAuthorizationCredentials, unauthorized: HTTPException) -> User:
     res = await session.execute(
         select(User).join(AuthToken, AuthToken.user_id == User.id).where(
             AuthToken.token_hash == token_hash(creds.credentials),

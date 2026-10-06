@@ -11,7 +11,7 @@ from govcareeros.backend.config.settings import settings
 from govcareeros.backend.api.body_limit import BodyLimitMiddleware
 from govcareeros.backend.services import notice_verifier
 from govcareeros.backend.api.routers import (
-    admin, admin_console, alerts, applications, auth, digest, eligibility, exam_versions, exams, gaps, prep, profile,
+    admin, admin_console, alerts, applications, apply_ready, auth, digest, eligibility, exam_versions, exams, gaps, prep, profile,
     relevance, resume, review, review_console, vacancies, verify,
 )
 
@@ -25,7 +25,8 @@ def create_app() -> FastAPI:
                        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type"])
     for router in (auth.router, profile.router, vacancies.router, eligibility.router, relevance.router, alerts.router,
                    review.router, admin.router, digest.router, exams.router, prep.router, gaps.router, applications.router,
-                   resume.router, review_console.router, admin_console.router, exam_versions.router, verify.router):
+                   resume.router, review_console.router, admin_console.router, exam_versions.router, verify.router,
+                   apply_ready.router):
         app.include_router(router)
 
     @app.get("/health", tags=["meta"])
