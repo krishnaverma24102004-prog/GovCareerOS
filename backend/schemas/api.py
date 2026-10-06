@@ -100,21 +100,38 @@ class EligibilityEvidenceOut(BaseModel):
 
 _CERTIFICATE_CHECK = "CERTIFICATE"
 _CERTIFICATE_SEVERITY = ("FAILS", "NEEDS_DOCUMENT", "CANNOT_DECIDE", "OK", "NOT_APPLICABLE")
+# eligibility.esm: check names ESM_STATUS, ESM_RELEASE, ESM_AGE, ESM_RESERVATION_REUSE, ESM_AGNIVEER
+_ESM_PREFIX = "ESM_"
+_ESM_SEVERITY = ("FAILS", "NEEDS_HUMAN_REVIEW", "CANNOT_DECIDE", "OK", "NOT_APPLICABLE")
 
 def _check_name(e) -> str:
     return e.get("check_name") if isinstance(e, dict) else e.check_name
 
 class EligibilitySectionsOut(BaseModel):
     """`evidence` holds the hard checks behind `status`; `certificates` is the separate certificate-validity section
-    (eligibility.certificate_check), stored as evidence rows but never counted in `status` or `confidence`."""
+    (eligibility.certificate_check) and `esm` the ex-servicemen / Agniveer section (eligibility.esm), both stored as
+    evidence rows but never counted in `status` or `confidence`."""
     model_config = ConfigDict(from_attributes=True)
     evidence: List[EligibilityEvidenceOut]
     certificates: List[EligibilityEvidenceOut] = Field([], validation_alias="evidence")
+    esm: List[EligibilityEvidenceOut] = Field([], validation_alias="evidence")
 
     @field_validator("evidence", mode="before")
     @classmethod
     def _hard_checks(cls, v):
-        return [e for e in v if _check_name(e) != _CERTIFICATE_CHECK]
+        return [e for e in v if _check_name(e) != _CERTIFICATE_CHECK and not _check_name(e).startswith(_ESM_PREFIX)]
+
+    @field_validator("esm", mode="before")
+    @classmethod
+    def _esm_checks(cls, v):
+        return [e for e in v if _check_name(e).startswith(_ESM_PREFIX)]
+
+    @computed_field
+    @property
+    def esm_status(self) -> Optional[str]:
+        """Worst ex-servicemen row; null when the profile claims neither ex-serviceman nor Agniveer service."""
+        present = {c.outcome for c in self.esm}
+        return next((s for s in _ESM_SEVERITY if s in present), None)
 
     @field_validator("certificates", mode="before")
     @classmethod

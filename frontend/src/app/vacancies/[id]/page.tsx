@@ -10,6 +10,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { EsmSection } from "@/components/EsmSection";
 import { Badge, ErrorNote, Shell, errText, fmtDate, useSession } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { Eligibility, Profile, Provenance, VacancyDetail } from "@/lib/types";
@@ -234,6 +235,7 @@ function EligibilityPanel({ e, pdf }: { e: Eligibility; pdf: string | null }) {
           </li>
         ))}
       </ul>
+      <EsmSection rows={e.esm} status={e.esm_status} pageHref={(page) => pageLink(pdf, page)} />
     </div>
   );
 }

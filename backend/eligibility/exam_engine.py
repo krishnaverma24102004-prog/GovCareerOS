@@ -37,7 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from govcareeros.backend.eligibility import rules
-from govcareeros.backend.eligibility import certificate_check
+from govcareeros.backend.eligibility import certificate_check, esm
 from govcareeros.backend.eligibility.engine import EligibilityInputError, load_profile_snapshot, requirement_value
 from govcareeros.backend.models.exam import Exam, ExamEligibilityEvidence, ExamEligibilityResult, ExamPost, ExamRequirement
 from govcareeros.backend.models.user import PersonalInfo, ProfileVersion
@@ -55,7 +55,7 @@ async def load_requirements(session: AsyncSession, exam_id: uuid.UUID, post_id: 
     for r in rows:
         if r.post_id is None and r.req_type in post_types:
             continue
-        out.append(rules.Requirement(r.id, r.req_type, requirement_value(r), r.source_page))
+        out.append(rules.Requirement(r.id, r.req_type, requirement_value(r), r.source_page, r.source_excerpt))
     return out
 
 # ---------- age ----------
@@ -64,7 +64,8 @@ def _applies(rule: dict, category: str) -> bool:
     return category in rule.get("categories", [category])
 
 def exam_age_relaxations(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Requirement], category: str, age: int,
-                         limit: rules.Requirement, closing: Optional[date], gender: Optional[str] = None) -> List[rules.RelaxationOption]:
+                         limit: rules.Requirement, closing: Optional[date], gender: Optional[str] = None,
+                         crucial: Optional[date] = None) -> List[rules.RelaxationOption]:
     """Relaxations stated as a cap or as years after service deduction; each judged for this candidate."""
     options = []
     base_max = limit.value.get("base_max_age", limit.value["max_age"])
@@ -75,16 +76,18 @@ def exam_age_relaxations(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Re
         basis = v.get("basis")
         if basis == "EX_SERVICEMEN_SERVICE_DEDUCTED":
             allowed = limit.value["max_age"] + v["years"]
+            # "after deduction of the military service rendered from the actual age as on" the crucial date
+            months = rules.military_service_months(profile, crucial)
             if profile.is_ex_serviceman is False:
                 options.append(rules.RelaxationOption(basis, v["years"], "NO", "profile: not an ex-serviceman", r.source_page))
-            elif profile.is_ex_serviceman is None or profile.armed_forces_service_months is None:
+            elif profile.is_ex_serviceman is None or months is None:
                 options.append(rules.RelaxationOption(basis, v["years"], "UNKNOWN",
                                                       "ex-serviceman status or length of military service not stated", r.source_page))
             else:
-                effective = age - profile.armed_forces_service_months / 12
+                effective = age - months / 12
                 status = "OK" if effective <= allowed else "NO"
                 options.append(rules.RelaxationOption(basis, v["years"], status,
-                                                      f"age {age} minus {profile.armed_forces_service_months} months service = {effective:.1f} vs {allowed}",
+                                                      f"age {age} minus {months} months service = {effective:.1f} vs {allowed}",
                                                       r.source_page, "needs the ex-serviceman certificate and undertaking"))
         elif basis == "DISABLED_DEFENCE_PERSONNEL":
             status = "NO" if profile.is_ex_serviceman is False or age > base_max + v["years"] else "UNKNOWN"
@@ -148,7 +151,7 @@ def _check_birth_window(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Req
         value = dict(r.value, max_age=r.value["max_age"] - 1)
         if "base_max_age" in value:
             value["base_max_age"] -= 1
-        return rules.Requirement(r.id, r.req_type, value, r.source_page)
+        return rules.Requirement(r.id, r.req_type, value, r.source_page, r.source_quote)
     o = _check_exam_age_years(profile, [reached(r) for r in reqs], crucial, closing, gender)[0]
     return [replace(o, requirement=stated, rule=f"born before {earliest.isoformat()} (limit {v['max_age']} reached); {o.rule}")]
 
@@ -161,7 +164,7 @@ def _check_exam_age_years(profile: rules.ProfileSnapshot, reqs: Sequence[rules.R
     category = rules.normalize_category(profile.category)
     age = rules.age_on(profile.date_of_birth, crucial)
     limit = rules.age_limit_for([r for r in reqs if r.req_type == "AGE_MAX"], category)
-    options = exam_age_relaxations(profile, reqs, category, age, limit, closing, gender)
+    options = exam_age_relaxations(profile, reqs, category, age, limit, closing, gender, crucial)
     usable = [x for x in options if x.status == "OK"]
     if usable:
         best = usable[0]
@@ -319,6 +322,7 @@ async def evaluate_exam(session: AsyncSession, user_id: uuid.UUID, profile_versi
     # Separate section, after the verdict so it cannot change status/confidence (see certificate_check)
     outcomes += certificate_check.check_certificates(snapshot, reqs, await certificate_check.load_held(session, profile_version_id),
                                                      closing, datetime.now(IST).date())
+    outcomes += esm.check_esm(snapshot, reqs, closing, age_day)
     result = ExamEligibilityResult(
         id=uuid.uuid4(), user_id=user_id, exam_id=exam_id, post_id=post_id, profile_version_id=profile_version_id,
         engine_version=ENGINE_VERSION, crucial_date=exam.age_crucial_date or exam.application_end, status=status,

@@ -67,6 +67,17 @@ class ProfileSnapshot:
     current_level_regular_since: Optional[date] = None
     organisation_cadre: Optional[str] = None
     last_deputation_end: Optional[date] = None
+    # Ex-servicemen / Agniveer (eligibility/esm.py); release date is expected, not actual, while STILL_SERVING
+    esm_service_branch: Optional[str] = None
+    esm_enrolment_date: Optional[date] = None
+    esm_release_date: Optional[date] = None
+    esm_release_type: Optional[str] = None
+    esm_rank: Optional[str] = None
+    esm_civil_post_secured: Optional[bool] = None
+    esm_reservation_used: Optional[bool] = None
+    esm_civil_post_group: Optional[str] = None
+    esm_undertaking_given: Optional[bool] = None
+    is_agniveer: Optional[bool] = None
 
 @dataclass
 class Requirement:
@@ -74,6 +85,7 @@ class Requirement:
     req_type: str
     value: object  # dict for AGE_MAX / AGE_RELAXATION / RESERVATION, text otherwise
     source_page: Optional[int] = None
+    source_quote: Optional[str] = None  # the notice's own words for the row (shown by the ESM section)
 
 @dataclass
 class RuleOutcome:
@@ -189,6 +201,17 @@ class RelaxationOption:
     note: Optional[str] = None
     missing: Optional[str] = None  # profile field that would settle an UNKNOWN option
 
+def military_service_months(profile: ProfileSnapshot, until: Optional[date]) -> Optional[int]:
+    """Armed Forces service as the profile states it, else completed months from enrolment to release (or to `until`
+    while the candidate is still serving or the release lies after `until`); None when neither is recorded."""
+    if profile.armed_forces_service_months is not None:
+        return profile.armed_forces_service_months
+    start, end = profile.esm_enrolment_date, profile.esm_release_date
+    if start is None or (end is None and until is None):
+        return None
+    end = min(d for d in (end, until) if d is not None)
+    return max(0, (end.year - start.year) * 12 + end.month - start.month - (end.day < start.day))
+
 def _service_years(start: Optional[date], until: date) -> Optional[float]:
     return None if start is None else (until - start).days / 365.25
 
@@ -235,20 +258,21 @@ def relaxation_options(profile: ProfileSnapshot, reqs: Sequence[Requirement], ca
     exsm = general.get("EX_SERVICEMEN")
     if exsm:
         need = exsm.value.get("min_service_months_after_attestation")
+        served_months = military_service_months(profile, crucial)
         if profile.is_ex_serviceman is False:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO", "profile: not an ex-serviceman", exsm.source_page))
         elif profile.is_ex_serviceman is None:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "ex-serviceman status not stated", exsm.source_page,
                                             missing="is_ex_serviceman"))
-        elif need and profile.armed_forces_service_months is None:
+        elif need and served_months is None:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "armed forces service months not stated", exsm.source_page,
                                             missing="armed_forces_service_months"))
-        elif need and profile.armed_forces_service_months < need:
+        elif need and served_months < need:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO",
-                                            f"{profile.armed_forces_service_months} months service < {need}", exsm.source_page))
+                                            f"{served_months} months service < {need}", exsm.source_page))
         else:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "OK",
-                                            f"ex-serviceman, {profile.armed_forces_service_months} months service", exsm.source_page,
+                                            f"ex-serviceman, {served_months} months service", exsm.source_page,
                                             "needs a release certificate from the Defence Forces"))
 
     cgs = general.get("CENTRAL_GOVT_SERVANT")

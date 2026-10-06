@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { EsmSection } from "@/components/EsmSection";
 import { Badge, ErrorNote, Shell, errText, fmtDate, useSession } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { Profile, Provenance } from "@/lib/types";
@@ -459,6 +460,7 @@ function EligibilityPanel({ e, pdf, fresh, postName }: { e: ExamEligibility; pdf
           </li>
         ))}
       </ul>
+      <EsmSection rows={e.esm} status={e.esm_status} pageHref={(page) => pageLink(pdf, page)} />
     </div>
   );
 }

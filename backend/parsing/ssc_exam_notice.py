@@ -23,6 +23,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from govcareeros.backend.documents.pdf_text import PageText
+from govcareeros.backend.parsing.esm_clauses import parse_esm_clauses
 from govcareeros.backend.parsing.upsc_advertisement import IST, ParsedField, ParsedRequirement, Provenance
 
 PARSER_VERSION = "ssc_exam_notice/1"
@@ -291,6 +292,8 @@ def parse_exam_notice(pages: List[PageText]) -> ParsedExam:
         warnings.append(f"post-wise age limits {tiers} are not mapped to posts; no exam-level age limit stored" if tiers
                         else "age limit not found")
     _parse_relaxations(doc, base, age_prov, reqs, warnings)
+    # Ex-servicemen status, release, crucial-date and re-use clauses (ESM_RULE rows, eligibility/esm.py)
+    reqs += parse_esm_clauses(text, doc.prov, warnings)
 
     m = _EDU_HEAD_RE.search(text)
     if m:

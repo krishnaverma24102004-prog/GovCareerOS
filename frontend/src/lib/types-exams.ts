@@ -81,4 +81,6 @@ export interface ExamEligibility {
   crucial_date: string | null;
   created_at: string;
   evidence: EligibilityEvidence[];
+  esm?: EligibilityEvidence[];
+  esm_status?: string | null;
 }

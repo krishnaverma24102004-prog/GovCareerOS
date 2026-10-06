@@ -264,6 +264,9 @@ def _parse_general_rules(doc: _PagedText, warnings: List[str]) -> List[ParsedReq
         }, False, doc.prov(m.start(), m.end(), "Concessions & Relaxations")))
     else:
         warnings.append("ex-servicemen age relaxation not found")
+    # The NOTE after the ex-servicemen relaxation: no ESM reservation once a Central Govt civil post is held
+    from govcareeros.backend.parsing.esm_clauses import parse_esm_clauses  # esm_clauses imports this module
+    rules += parse_esm_clauses(text, doc.prov, warnings)
 
     m = _CGS_RE.search(text)
     if m:
