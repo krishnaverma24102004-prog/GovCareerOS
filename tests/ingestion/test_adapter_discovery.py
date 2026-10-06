@@ -258,3 +258,27 @@ async def test_forced_browser_source_is_read_by_its_adapter_from_the_rendered_pa
     officer = by_url["https://agriwelfare.gov.in/Documents/Recruitment/VC_SO_18092026.pdf"]
     assert (officer.published_on, officer.last_date) == (date(2026, 9, 13), date(2026, 11, 11))
     assert json.loads(officer.listing_evidence)["last_date"] == "11-11-2026"
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source, capture", [("NHAI", "sources/nhai/vacancies-current-en.json"), ("NVS", "sources/nvs/api_jobs.json")])
+async def test_discovery_reads_the_official_json_listing_endpoint(db_session, source, capture):
+    """Single-page apps: the rows come from the endpoint their own page calls (LISTING_REQUEST), captured 2026-10-01."""
+    adapter = ADAPTERS[source]
+    request, body = adapter.LISTING_REQUEST, (FIXTURES / capture).read_bytes()
+    seen: List[httpx.Request] = []
+
+    def handler(r: httpx.Request) -> httpx.Response:
+        seen.append(r)
+        if str(r.url) == request.url and r.method == request.method:
+            return httpx.Response(200, content=body, headers={"content-type": "application/json"})
+        return httpx.Response(404, text="not found")
+
+    async with PageFetcher(allow_browser=False, client=httpx.AsyncClient(transport=httpx.MockTransport(handler))) as f:
+        await discover_all(db_session, f, [SPECS[source]])
+        await db_session.commit()
+    rows = [r for r in adapter.parse_listing(body.decode("utf-8"), request.url)]
+    stored = [n for n in await _notices(db_session, source) if n.listing_evidence]
+    assert rows and len(stored) == len({r.url for r in rows})
+    assert {n.url for n in stored} == {r.url for r in rows}
+    assert all(n.found_on_url == request.url for n in stored)
+    assert any(r.method == request.method and str(r.url) == request.url for r in seen)

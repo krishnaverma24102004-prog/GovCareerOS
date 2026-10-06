@@ -27,7 +27,7 @@ from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.sources.adapters import all_adapters
 from govcareeros.backend.sources.adapters.base import ListingRow
-from govcareeros.backend.sources.generic_notices import PageFetcher, ProbeResult, _doc_type
+from govcareeros.backend.sources.generic_notices import PageFetcher, ProbeResult, _doc_type, analyze
 from govcareeros.backend.sources import ssc
 from govcareeros.backend.sources.notice_classifier import classify_notice
 from govcareeros.backend.sources.registry import SOURCES, SourceSpec
@@ -143,6 +143,16 @@ async def _listing_pages(fetcher: PageFetcher, adapter: ModuleType, source: Gove
     """The adapter's further listing pages (LISTING_URLS), each probed like the main page (policy + robots)."""
     done = {_page(u) for u in (_probe_url(source), main.final_url) if u}
     pages: List[ProbeResult] = []
+    request = getattr(adapter, "LISTING_REQUEST", None)
+    if request is not None:
+        # The official JSON endpoint the source's single-page app reads its listing from (adapters/base.py)
+        try:
+            page = analyze(await fetcher.fetch_listing(request, source_policy(source)), "HTTP", source_policy(source),
+                           adapter.parse_listing)
+        except Exception as e:
+            page = ProbeResult("UNREACHABLE", detail=f"{type(e).__name__}: {str(e)[:200]}")
+        page.final_url = page.final_url or request.url
+        pages.append(page)
     for url in getattr(adapter, "LISTING_URLS", []):
         if _page(url) in done:
             continue
