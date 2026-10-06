@@ -27,9 +27,15 @@ class LoginIn(BaseModel):
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    email: str
+    email: Optional[str]  # None only for an unclaimed operator-managed client, who cannot log in
     full_name: Optional[str]
     is_reviewer: bool = False
+    is_operator: bool = False
+
+class ClaimIn(RegisterIn):
+    """A client an operator created takes over the account: the one-time code from the operator, own email and password."""
+    token: str = Field(min_length=10, max_length=200)
+    full_name: Optional[str] = None
 
 class TokenOut(BaseModel):
     access_token: str

@@ -5,25 +5,32 @@ from datetime import datetime, timezone
 from typing import Any, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.api.deps import get_session
 from govcareeros.backend.api.reviewer_deps import require_reviewer
 from govcareeros.backend.models.audit import ReviewAuditLog
+from govcareeros.backend.models.operator import BillingPrice
 from govcareeros.backend.models.source import REUSE_LEVELS, GovernmentSource
 from govcareeros.backend.models.user import User
-from govcareeros.backend.services import review_audit
+from govcareeros.backend.services import billing, review_audit
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 class UserRow(BaseModel):
     id: uuid.UUID
-    email: str
+    email: Optional[str]  # None: an operator's client who has not claimed the account
     full_name: Optional[str]
     is_active: bool
     is_reviewer: bool
+    is_operator: bool = False
+    managed_by_id: Optional[uuid.UUID] = None
+
+def _row(u: User) -> "UserRow":
+    return UserRow(id=u.id, email=u.email, full_name=u.full_name, is_active=u.is_active, is_reviewer=u.is_reviewer,
+                   is_operator=u.is_operator, managed_by_id=u.managed_by_id)
 
 @router.get("/users", response_model=List[UserRow])
 async def list_users(q: Optional[str] = Query(None, max_length=200), limit: int = Query(100, ge=1, le=500),
@@ -32,8 +39,7 @@ async def list_users(q: Optional[str] = Query(None, max_length=200), limit: int 
     stmt = select(User).order_by(User.is_reviewer.desc(), User.email).offset(offset).limit(limit)
     if q and q.strip():
         stmt = stmt.where(func.lower(User.email).contains(q.strip().lower(), autoescape=True))
-    return [UserRow(id=u.id, email=u.email, full_name=u.full_name, is_active=u.is_active, is_reviewer=u.is_reviewer)
-            for u in (await session.execute(stmt)).scalars()]
+    return [_row(u) for u in (await session.execute(stmt)).scalars()]
 
 class ReviewerFlagIn(BaseModel):
     is_reviewer: bool
@@ -57,8 +63,63 @@ async def set_reviewer(user_id: uuid.UUID, body: ReviewerFlagIn, user: User = De
         review_audit.record(session, user, "REVIEWER_GRANT" if body.is_reviewer else "REVIEWER_REVOKE", "USER", target.id,
                             note, {"from": before, "to": body.is_reviewer})
         await session.flush()
-    return UserRow(id=target.id, email=target.email, full_name=target.full_name, is_active=target.is_active,
-                   is_reviewer=target.is_reviewer)
+    return _row(target)
+
+class OperatorFlagIn(BaseModel):
+    is_operator: bool
+    note: Optional[str] = None
+
+@router.post("/users/{user_id}/operator", response_model=UserRow)
+async def set_operator(user_id: uuid.UUID, body: OperatorFlagIn, user: User = Depends(require_reviewer),
+                       session: AsyncSession = Depends(get_session)):
+    """Grant or revoke the cyber-cafe / CSC operator role. Only a reviewer (admin) can; an operator's own client cannot be one."""
+    target = await session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user not found")
+    if body.is_operator and (target.managed_by_id is not None or target.email is None):
+        raise HTTPException(status.HTTP_409_CONFLICT, "an operator-managed client account cannot be an operator")
+    if target.is_operator != body.is_operator:
+        before = target.is_operator
+        target.is_operator = body.is_operator
+        review_audit.record(session, user, "OPERATOR_GRANT" if body.is_operator else "OPERATOR_REVOKE", "USER", target.id,
+                            (body.note or "").strip() or None, {"from": before, "to": body.is_operator})
+        await session.flush()
+    return _row(target)
+
+class PriceIn(BaseModel):
+    """TEST-MODE price of one per-application report, in paise; operator_id None sets the default for all operators."""
+    amount_paise: int = Field(ge=0, le=1_000_000)
+    operator_id: Optional[uuid.UUID] = None
+    effective_from: Optional[AwareDatetime] = None
+
+class PriceRow(BaseModel):
+    id: uuid.UUID
+    item: str
+    operator_id: Optional[uuid.UUID]
+    amount_paise: int
+    effective_from: datetime
+    set_by_id: uuid.UUID
+
+def _price_row(p: BillingPrice) -> PriceRow:
+    return PriceRow(id=p.id, item=p.item, operator_id=p.operator_id, amount_paise=p.amount_paise,
+                    effective_from=p.effective_from, set_by_id=p.set_by_id)
+
+@router.get("/billing/prices", response_model=List[PriceRow])
+async def list_prices(user: User = Depends(require_reviewer), session: AsyncSession = Depends(get_session)):
+    return [_price_row(p) for p in (await session.execute(select(BillingPrice).order_by(BillingPrice.effective_from.desc()))).scalars()]
+
+@router.post("/billing/prices", response_model=PriceRow, status_code=status.HTTP_201_CREATED)
+async def set_price(body: PriceIn, user: User = Depends(require_reviewer), session: AsyncSession = Depends(get_session)):
+    """A new price row (rows are never edited, so past charges keep the price they were made at)."""
+    if body.operator_id is not None:
+        op = await session.get(User, body.operator_id)
+        if op is None or not op.is_operator:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "operator not found")
+    row = BillingPrice(id=uuid.uuid4(), item=billing.ITEM_REPORT, operator_id=body.operator_id, amount_paise=body.amount_paise,
+                       effective_from=body.effective_from or datetime.now(timezone.utc), set_by_id=user.id)
+    session.add(row)
+    await session.flush()
+    return _price_row(row)
 
 class SourceRow(BaseModel):
     id: uuid.UUID

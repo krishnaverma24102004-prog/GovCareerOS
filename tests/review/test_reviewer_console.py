@@ -247,7 +247,7 @@ async def test_admin_users_and_last_reviewer(api, login, db_session):
     await _make_reviewer(db_session, "first@example.com")
     users = (await api.get("/admin/users", headers=a)).json()
     assert [(u["email"], u["is_reviewer"]) for u in users] == [("first@example.com", True), ("second@example.com", False)]
-    assert set(users[0]) == {"id", "email", "full_name", "is_active", "is_reviewer"}
+    assert set(users[0]) == {"id", "email", "full_name", "is_active", "is_reviewer", "is_operator", "managed_by_id"}
     first_id, second_id = users[0]["id"], users[1]["id"]
 
     r = await api.post(f"/admin/users/{first_id}/reviewer", json={"is_reviewer": False}, headers=a)

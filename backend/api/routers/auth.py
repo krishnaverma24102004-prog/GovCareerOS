@@ -9,7 +9,8 @@ from govcareeros.backend.api.deps import current_user, get_session
 from govcareeros.backend.api.security import hash_password, new_token, token_hash, verify_password
 from govcareeros.backend.models.auth_token import AuthToken
 from govcareeros.backend.models.user import User
-from govcareeros.backend.schemas.api import LoginIn, RegisterIn, TokenOut, UserOut
+from govcareeros.backend.schemas.api import ClaimIn, LoginIn, RegisterIn, TokenOut, UserOut
+from govcareeros.backend.services import operator_console
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -21,6 +22,14 @@ async def register(body: RegisterIn, session: AsyncSession = Depends(get_session
     session.add(user)
     await session.flush()
     return user
+
+@router.post("/claim", response_model=UserOut)
+async def claim(body: ClaimIn, session: AsyncSession = Depends(get_session)):
+    """Set email and password on an operator-created client account with the one-time code; then log in as usual."""
+    try:
+        return await operator_console.claim_account(session, body.token, body.email, body.password)
+    except operator_console.OperatorError as e:
+        raise HTTPException(e.status, str(e))
 
 @router.post("/login", response_model=TokenOut)
 async def login(body: LoginIn, session: AsyncSession = Depends(get_session)):

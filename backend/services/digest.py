@@ -520,7 +520,8 @@ async def run_all(session: AsyncSession, now: Optional[datetime] = None, send: b
         if await latest_profile_version(session, user.id) is None:
             continue
         _, run = await generate(session, user, now)
-        if send:
+        # An operator's unclaimed client has no email: the digest is written, never sent
+        if send and user.email:
             await send_run(session, run, user.email)
         runs.append(run)
     return runs
