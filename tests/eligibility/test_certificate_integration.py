@@ -8,6 +8,7 @@ of a real captured notice, checked against the PDF text:
     of FY 2025-26; page 1: last date 22.09.2026; para 8.7: crucial date = closing date of the Online Application Form.
 """
 import json
+import uuid
 from datetime import date, datetime
 from pathlib import Path
 
@@ -15,7 +16,10 @@ import pymupdf
 import pytest
 from sqlalchemy import select
 
-from govcareeros.backend.models import Exam, ExamRequirement, User, Vacancy, VacancyRequirement
+from govcareeros.backend.eligibility import engine
+from govcareeros.backend.models import (
+    EligibilityResult, Exam, ExamRequirement, Fact, ReviewAuditLog, User, Vacancy, VacancyRequirement,
+)
 from govcareeros.backend.parsing.upsc_advertisement import IST
 from govcareeros.backend.services.document_ingestion import get_or_create_source, ingest_pdf_bytes, store_raw_document
 from govcareeros.backend.services.exam_ingestion import ingest_exam_pdf
@@ -125,6 +129,79 @@ async def test_vacancy_certificate_section_is_separate_and_follows_review(api, l
     # Re-running version 1 reproduces its section
     again = await evaluate(v1)
     assert [(c["outcome"], c["match_type"]) for c in again["certificates"]] == [("CANNOT_DECIDE", "REVIEWER_VERIFIED")]
+
+async def _reviewer(login, db_session):
+    h = await login("reviewer@example.com")
+    (await db_session.execute(select(User).where(User.email == "reviewer@example.com"))).scalar_one().is_reviewer = True
+    await db_session.commit()
+    return h
+
+async def _cert_fact(api, h, version):
+    return next(f for f in (await api.get(f"/profile/facts?version_id={version}", headers=h)).json()
+                if f["subject"] == "reservation_certificates")
+
+@pytest.mark.asyncio
+async def test_unchanged_certificate_keeps_the_reviewer_decision(api, login, db_session):
+    vacancy, _ = await _law_officer(db_session)
+    h = await login("asha@example.com")
+    reviewer = await _reviewer(login, db_session)
+    v1 = (await api.put("/profile", json={**LAW_GRAD, "reservation_certificates": [OBC_CERT]}, headers=h)).json()["version"]["id"]
+    f1 = await _cert_fact(api, h, v1)
+    r = await api.post(f"/profile/facts/{f1['id']}/evidence",
+                       json={"evidence_type": "DOCUMENT", "raw_document_id": str(vacancy.raw_document_id), "source": "OBC certificate"},
+                       headers=h)
+    assert r.status_code == 201, r.text
+    assert (await api.post(f"/review/facts/{f1['id']}/verify", json={"note": "matches certificate"}, headers=reviewer)).status_code == 200
+
+    # A save that leaves the certificate as it was: the new version's Fact carries the decision and its document chain
+    v2 = (await api.patch("/profile", json={"personal_info": {**PERSON, "full_name": "Asha R. Rao"}}, headers=h)).json()["version"]["id"]
+    f2 = await _cert_fact(api, h, v2)
+    assert f2["id"] != f1["id"] and (f2["value"], f2["status"]) == (f1["value"], "VERIFIED")
+    evidence = (await api.get(f"/profile/facts/{f2['id']}/evidence", headers=h)).json()
+    assert [e["evidence_type"] for e in evidence] == ["USER_ATTESTED", "DOCUMENT", "APPROVED"]
+    assert evidence[1]["artifact_id"] == str(vacancy.raw_document_id)
+    stored = await db_session.get(Fact, uuid.UUID(f2["id"]))
+    first = await db_session.get(Fact, uuid.UUID(f1["id"]))
+    assert (stored.reviewer_id, stored.reviewed_at, stored.review_note) == (first.reviewer_id, first.reviewed_at, "matches certificate")
+    [audit] = (await db_session.execute(select(ReviewAuditLog).where(ReviewAuditLog.object_id == stored.id))).scalars().all()
+    owner = (await db_session.execute(select(User).where(User.email == "asha@example.com"))).scalar_one()
+    detail = json.loads(audit.detail)
+    assert (audit.action, audit.object_type, audit.actor_id) == ("FACT_CARRY_OVER", "FACT", owner.id)
+    assert (detail["from_fact"], detail["status"], detail["reviewer_id"]) == (f1["id"], "VERIFIED", str(first.reviewer_id))
+    res = (await api.post("/eligibility", json={"profile_version_id": v2, "vacancy_id": str(vacancy.id)}, headers=h)).json()
+    assert res["certificates"][0]["match_type"] == "REVIEWER_VERIFIED"
+
+    # A changed certificate is a new claim: UNVERIFIED, no carried evidence, no audit entry
+    v3 = (await api.patch("/profile", json={"reservation_certificates": [{**OBC_CERT, "issuing_authority": "SDM, New Delhi"}]},
+                          headers=h)).json()["version"]["id"]
+    f3 = await _cert_fact(api, h, v3)
+    assert f3["status"] == "UNVERIFIED"
+    assert [e["evidence_type"] for e in (await api.get(f"/profile/facts/{f3['id']}/evidence", headers=h)).json()] == ["USER_ATTESTED"]
+    assert not (await db_session.execute(select(ReviewAuditLog).where(
+        ReviewAuditLog.object_id == uuid.UUID(f3["id"])))).scalars().all()
+
+    # A rejection is carried the same way (PUT replaces the whole profile; the certificate is unchanged)
+    assert (await api.post(f"/review/facts/{f3['id']}/reject", json={"note": "authority does not match"}, headers=reviewer)).status_code == 200
+    body = {**LAW_GRAD, "reservation_certificates": [{**OBC_CERT, "issuing_authority": "SDM, New Delhi"}]}
+    v4 = (await api.put("/profile", json=body, headers=h)).json()["version"]["id"]
+    assert (await _cert_fact(api, h, v4))["status"] == "REJECTED"
+    res = (await api.post("/eligibility", json={"profile_version_id": v4, "vacancy_id": str(vacancy.id)}, headers=h)).json()
+    assert res["certificate_status"] == "NEEDS_DOCUMENT"
+
+@pytest.mark.asyncio
+async def test_certificate_section_date_is_part_of_the_fingerprint(api, login, db_session):
+    vacancy, _ = await _law_officer(db_session)
+    h = await login("asha@example.com")
+    v1 = (await api.put("/profile", json={**LAW_GRAD, "reservation_certificates": [OBC_CERT]}, headers=h)).json()["version"]["id"]
+    res = (await api.post("/eligibility", json={"profile_version_id": v1, "vacancy_id": str(vacancy.id)}, headers=h)).json()
+    stored = await db_session.get(EligibilityResult, uuid.UUID(res["id"]))
+    reqs = await engine.load_requirements(db_session, vacancy.id)
+    today = datetime.now(IST).date()
+    assert stored.input_fingerprint == engine.input_fingerprint(vacancy, reqs, today) == engine.input_fingerprint(vacancy, reqs)
+    assert stored.input_fingerprint != engine.input_fingerprint(vacancy, reqs, date(2026, 9, 1))
+    # Without CERTIFICATE rows the date is not an input
+    plain = [r for r in reqs if r.req_type != "CERTIFICATE"]
+    assert engine.input_fingerprint(vacancy, plain, today) == engine.input_fingerprint(vacancy, plain, date(2026, 9, 1))
 
 @pytest.mark.asyncio
 async def test_vacancy_without_certificate_rows_has_no_section(api, login, db_session):

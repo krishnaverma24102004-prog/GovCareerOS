@@ -3,12 +3,13 @@ Runs hard eligibility for (profile_version_id, vacancy_id) and stores the decisi
 
 Reads only rows that belong to the given ProfileVersion, which are never modified after
 creation, so re-running for an old version reproduces the old decision. (The certificate section also reads
-reviewer decisions on the version's certificate Facts and today's date; see certificate_check.)
+reviewer decisions on the version's certificate Facts and today's date, which is then part of the input
+fingerprint; see certificate_check.)
 """
 import hashlib
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import date, timezone
 from typing import List, Optional
 
 from sqlalchemy import select
@@ -79,11 +80,13 @@ async def load_requirements(session: AsyncSession, vacancy_id: uuid.UUID) -> Lis
         VacancyRequirement.vacancy_id == vacancy_id, VacancyRequirement.superseded_at.is_(None)))
     return [rules.Requirement(r.id, r.req_type, requirement_value(r), r.source_page) for r in res.scalars()]
 
-def input_fingerprint(vacancy: Vacancy, reqs: List[rules.Requirement]) -> str:
-    """Identifies the vacancy-side inputs of a decision; requirement rows are never edited in place, only superseded."""
+def input_fingerprint(vacancy: Vacancy, reqs: List[rules.Requirement], as_of: Optional[date] = None) -> str:
+    """Identifies the vacancy-side inputs of a decision; requirement rows are never edited in place, only superseded.
+    With CERTIFICATE rows the certificate section's as_of date (default today, IST) is an input too."""
     crucial_dt = vacancy.eligibility_crucial_date or vacancy.application_deadline
     parts = [rules.ENGINE_VERSION, crucial_dt.astimezone(timezone.utc).isoformat() if crucial_dt else "-",
-             vacancy.recruitment_mode or "UNKNOWN", *sorted(str(r.id) for r in reqs)]
+             vacancy.recruitment_mode or "UNKNOWN", *sorted(str(r.id) for r in reqs),
+             *certificate_check.fingerprint_part(reqs, as_of)]
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
 async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id: uuid.UUID, vacancy_id: uuid.UUID) -> EligibilityResult:
@@ -108,13 +111,14 @@ async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id
     status, confidence = rules.overall_status(outcomes)
     # Separate section, after the verdict so it cannot change status/confidence (see certificate_check)
     closing = vacancy.application_deadline.astimezone(IST).date() if vacancy.application_deadline else None
+    as_of = certificate_check.today()
     outcomes += certificate_check.check_certificates(snapshot, reqs, await certificate_check.load_held(session, profile_version_id),
-                                                     closing, datetime.now(IST).date())
+                                                     closing, as_of)
 
     result = EligibilityResult(
         id=uuid.uuid4(), user_id=user_id, vacancy_id=vacancy_id, profile_version_id=profile_version_id,
         engine_version=rules.ENGINE_VERSION, crucial_date=crucial_dt, status=status, confidence=confidence,
-        input_fingerprint=input_fingerprint(vacancy, reqs),
+        input_fingerprint=input_fingerprint(vacancy, reqs, as_of),
     )
     session.add(result)
     for o in outcomes:
