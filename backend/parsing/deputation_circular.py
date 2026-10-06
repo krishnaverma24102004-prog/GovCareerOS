@@ -19,16 +19,20 @@ Posts (one block per post: "Name of post:", "RECRUITMENT RULES FOR THE POST OF",
 single-post circular) carry the post's own pay level, mode, "holding analogous post on regular basis" clause,
 "N years' regular service in Level X" clauses, max age and tenure notes. A clause the layout breaks apart
 (e.g. a level number pushed to the next column) keeps levels=() rather than a guess.
+
+to_json / from_json turn a parsed circular into the plain JSON stored on a DeputationCircular row and back
+(from_json(to_json(c)) == c); PARSER_VERSION is stored with it so a parser change can re-read stored PDFs.
 """
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import date
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from govcareeros.backend.documents.pdf_text import PageText
 from govcareeros.backend.parsing.upsc_advertisement import words_to_number
 
+PARSER_VERSION = "deputation_circular/1"
 MODES = ("DEPUTATION", "DEPUTATION_STC", "ABSORPTION", "COMPOSITE", "RE_EMPLOYMENT")
 DOCUMENTS = ("APAR_LAST_5_YEARS", "VIGILANCE_CLEARANCE", "INTEGRITY_CERTIFICATE", "PENALTY_STATEMENT",
              "CADRE_CLEARANCE", "NOC", "PROPER_CHANNEL")
@@ -325,3 +329,54 @@ def parse_circular(pages: Sequence[PageText]) -> DeputationCircular:
     out.asks_last_deputation = doc.quoted(True, m) if m else None
     out.posts = [_post(doc, *block) for block in _post_blocks(doc)]
     return out
+
+# ---------- stored form ----------
+
+def _plain(v):
+    if isinstance(v, date):
+        return v.isoformat()
+    if isinstance(v, (tuple, list)):
+        return [_plain(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _plain(x) for k, x in v.items()}
+    return v
+
+def _quoted_out(q: Optional[Quoted]) -> Optional[dict]:
+    return None if q is None else {"value": _plain(q.value), "page": q.page, "quote": q.quote}
+
+def _quoted_in(d: Optional[dict], name: str) -> Optional[Quoted]:
+    if d is None:
+        return None
+    value = d["value"]
+    if name == "mode":
+        value = tuple(value)
+    elif name == "closing" and value.get("kind") == "DATE":
+        value = {**value, "date": date.fromisoformat(value["date"])}
+    return Quoted(value, d["page"], d["quote"])
+
+def to_json(c: DeputationCircular) -> dict:
+    out: dict = {}
+    for f in fields(c):
+        v = getattr(c, f.name)
+        if f.name == "posts":
+            out["posts"] = [{
+                **{pf.name: _quoted_out(getattr(p, pf.name)) for pf in fields(p) if pf.name != "service"},
+                "service": [{"years": s.years, "levels": list(s.levels), "regular": s.regular, "combined": s.combined,
+                             "page": s.page, "quote": s.quote} for s in p.service],
+            } for p in v]
+        elif f.name == "documents":
+            out["documents"] = {k: _quoted_out(q) for k, q in v.items()}
+        else:
+            out[f.name] = _quoted_out(v)
+    return out
+
+def from_json(d: dict) -> DeputationCircular:
+    c = DeputationCircular(**{f.name: _quoted_in(d.get(f.name), f.name) for f in fields(DeputationCircular)
+                              if f.name not in ("posts", "documents")})
+    c.documents = {k: _quoted_in(q, k) for k, q in d.get("documents", {}).items()}
+    for p in d.get("posts", []):
+        post = DeputationPost(**{pf.name: _quoted_in(p.get(pf.name), pf.name) for pf in fields(DeputationPost) if pf.name != "service"})
+        post.service = [ServiceClause(s["years"], tuple(s["levels"]), s["regular"], s["combined"], s["page"], s["quote"])
+                        for s in p.get("service", [])]
+        c.posts.append(post)
+    return c

@@ -28,7 +28,7 @@ class PersonalInfoIn(_In):
     is_state_govt_employee: Optional[bool] = None
     current_pay_level: Optional[int] = Field(None, ge=1, le=18, description="7th CPC pay-matrix level held on regular basis (not ACP/MACP)")
     current_level_regular_since: Optional[date] = None
-    organisation_cadre: Optional[str] = None
+    organisation_cadre: Optional[str] = Field(None, max_length=255)
     last_deputation_end: Optional[date] = Field(None, description="date of return from the last deputation")
     career_interests: Optional[str] = None
     nationality: Optional[str] = None
