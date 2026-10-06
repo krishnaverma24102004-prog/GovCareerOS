@@ -332,3 +332,24 @@ async def test_reclassify_brings_stored_notices_up_to_the_current_classifier(db_
 def test_process_notices_on_real_listings(title, url, kind):
     from govcareeros.backend.sources.notice_classifier import classify_notice
     assert classify_notice(title, url) == kind
+
+# Live sweep of 6 Oct 2026, titles as stored from the official listings
+@pytest.mark.parametrize("title, url, kind", [
+    ("Announcement dated 04.10.2026 regarding Inspection of Answer Booklet of the Subject Knowledge Test for the post of "
+     "Assistant Professor (College Cadre)", "https://hpsc.gov.in/Portals/0/Ann_Insp_Ans_Booklet_AP_14_Subject_04_10_2026.pdf", "RESULT"),
+    ("Notice - Deferment of Monthly Walk-in Interview for the Month of October 2026",
+     "https://esic.gov.in/attachments/recruitmentfile/Notice_Deferment_of_Monthly_Walk_in_Interview_for_the_Month_of_October_2026_1791178284.pdf",
+     "CORRIGENDUM"),
+    ("Inviting comments/observation of stakeholder on the post of Assistant Director (Official Language) and Junior "
+     "Translation Officer at NSI, Kanpur (Dated 25/09/2026)",
+     "https://dfpd.gov.in/WriteReadData/Notices/4728df01-33e4-4735-8645-80f9190ee8e5_document - 2026-09-24T150146.556.pdf", "RULES"),
+    ("Application for Direct Recruitment on All India Competitive examination basis for the posts of Deputy Manager "
+     "(Finance & Accounts), Library & Information Assistant, Junior Translation Officer, Accountant, Stenographer - Public "
+     "Notice dated 01.10.2026 w.r.t. revised instrcutions for Skill test",
+     "https://nhai.gov.in/nhai/sites/default/files/vacancy_files/Public-Notice-dated-01-10-2026-wrt-revised-instrcutions-for-Skill-test.pdf",
+     "EXAM_SCHEDULE"),
+    ("Advt. No. 25 of 2026 - Food Safety Officer (Group-B) in Food", "https://hpsc.gov.in/Portals/0/Advt_25_2026_FSO_18_09_2026.pdf", "VACANCY"),
+])
+def test_process_notices_from_the_october_sweep(title, url, kind):
+    from govcareeros.backend.sources.notice_classifier import classify_notice
+    assert classify_notice(title, url) == kind

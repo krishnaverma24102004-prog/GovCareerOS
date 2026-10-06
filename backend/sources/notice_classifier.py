@@ -14,15 +14,16 @@ _RULES = [
         # Candidature decisions on an existing recruitment (JKPSC / HPSC / PPSC public notices)
         r"rejection\s+(?:of\s+(?:the\s+)?candidature|notice|list)|provisionally\s+reject|ineligibility\s+of\s+candidates|"
         r"deficienc(?:y|ies)|discrepanc(?:y|ies)|qualified\s+candidates|(?:sports|pwd)\s+(?:category\s+)?candidates|"
-        r"person\s+with\s+disability\s+candidates", re.I)),
-    ("RULES", re.compile(r"recruitment\s+rules|\bRRs?\b|comments\s+on\s+recruitment|service\s+rules", re.I)),
-    ("CORRIGENDUM", re.compile(r"corrigendum|addendum|clarification|extension\s+(?:of|in)\s+(?:the\s+)?(?:last\s+)?dates?|date\s+extended|cancell?ation|cancell?ed|postpone", re.I)),
+        r"person\s+with\s+disability\s+candidates|inspection\s+of\s+(?:the\s+)?answer\s+(?:booklets?|sheets?|scripts?)", re.I)),
+    ("RULES", re.compile(r"recruitment\s+rules|\bRRs?\b|comments\s+on\s+recruitment|service\s+rules|"
+                         r"inviting\s+comments(?:\s*/\s*observations?)?\s+of\s+stakeholders?", re.I)),
+    ("CORRIGENDUM", re.compile(r"corrigendum|addendum|clarification|extension\s+(?:of|in)\s+(?:the\s+)?(?:last\s+)?dates?|date\s+extended|cancell?ation|cancell?ed|postpone|deferment", re.I)),
     # Process notices about an existing recruitment (interview/PMT schedules, exam scheme and syllabus), not new vacancies
     ("EXAM_SCHEDULE", re.compile(
         r"schedule\s+of\s+(?:the\s+)?(?:interviews?|written|physical|pmt|pet|pst|exam(?:ination)?s?|tests?|document|dv|skill)|"
         r"scheme\s+(?:and|&)\s+(?:pattern|syllabus)|\bsyllabus\b|time[\s-]?slots?\b|re-?schedul|tentative\s+schedule|"
         r"date\s+of\s+(?:the\s+)?(?:competitive\s+)?exam(?:ination)?|exam(?:ination)?\s+date|scrutiny\s+of\s+documents|"
-        r"date\s*sheet", re.I)),
+        r"date\s*sheet|for\s+(?:the\s+)?skill\s+test", re.I)),
     ("VACANCY", re.compile(
         r"vacanc|advertis|\badvt\b|recruitment\s+(?:of|for|to|through)|filling\s*up|deputation|engagement\s+of|"
         r"walk[\s-]?in|applications?\s+(?:are\s+)?invited|inviting\s+(?:online\s+)?applications|"
