@@ -15,6 +15,10 @@ Rules:
   education/experience requirement text. The "Meets requirement" section comes from a stored eligibility result:
   each MET/CONDITIONAL education or experience check quotes the notification requirement (with page) next to the
   profile fact the engine matched.
+- Consent (DPDP): building a resume is the RESUME purpose and needs active RESUME consent (guardian-named for a minor);
+  it quotes only the data items that purpose lists in the notice (backend/privacy/notice.py), so e.g. date of birth
+  and nationality, which are ELIGIBILITY_CHECK items, are left out. Tailoring to a vacancy also runs the eligibility
+  engine, which needs ELIGIBILITY_CHECK consent.
 """
 import uuid
 from dataclasses import dataclass
@@ -31,6 +35,7 @@ from govcareeros.backend.models.user import (
     Achievement, Certification, Education, Experience, Language, PersonalInfo, ProfileVersion, Project, Skill,
 )
 from govcareeros.backend.models.vacancy import Vacancy, VacancyRequirement
+from govcareeros.backend.privacy import enforcement, notice
 from govcareeros.backend.relevance.scoring import terms
 
 BUILDER_VERSION = "truth_locked_resume/1"
@@ -49,6 +54,19 @@ _SECTIONS: Dict[str, Tuple[type, Tuple[str, ...]]] = {
     "achievements": (Achievement, ("title", "date", "description")),
 }
 MEETS = "meets_requirement"
+# Section (or personal_info column) -> the notice data item it is; a column is quoted only if RESUME lists its item
+_SECTION_ITEMS = {"education": "education", "experience": "experience", "projects": "skills_projects", "skills": "skills_projects",
+                  "certifications": "skills_projects", "languages": "skills_projects", "achievements": "skills_projects"}
+_PERSONAL_ITEMS = {"full_name": "name_and_contact", "contact": "name_and_contact", "address": "name_and_contact",
+                   "date_of_birth": "date_of_birth", "nationality": "citizenship_status"}
+
+def data_item(section: str, field: str) -> Optional[str]:
+    return _PERSONAL_ITEMS.get(field) if section == "personal_info" else _SECTION_ITEMS.get(section)
+
+def resume_sections() -> Dict[str, Tuple[type, Tuple[str, ...]]]:
+    """_SECTIONS restricted to the columns whose data item the RESUME purpose of the current notice lists."""
+    allowed = set(notice.data_items(notice.RESUME))
+    return {s: (model, tuple(c for c in cols if data_item(s, c) in allowed)) for s, (model, cols) in _SECTIONS.items()}
 
 class ResumeInputError(ValueError):
     pass
@@ -129,6 +147,10 @@ async def build_resume(session: AsyncSession, user_id: uuid.UUID, profile_versio
     vacancy = await session.get(Vacancy, vacancy_id) if vacancy_id else None
     if vacancy_id and vacancy is None:
         raise ResumeInputError("vacancy not found")
+    sections = resume_sections()
+    # RESUME consent before anything is read or written (raises enforcement.ConsentRequired -> 403)
+    await enforcement.require_consent(session, user_id, notice.RESUME, await enforcement.version_date_of_birth(session, profile_version_id),
+                                      sorted({data_item(s, c) for s, (_, cols) in sections.items() for c in cols}))
 
     facts = (await session.execute(select(Fact).where(Fact.profile_version_id == profile_version_id))).scalars().all()
     evidence = (await session.execute(select(Evidence).where(Evidence.fact_id.in_([f.id for f in facts])))).scalars().all() if facts else []
@@ -143,7 +165,7 @@ async def build_resume(session: AsyncSession, user_id: uuid.UUID, profile_versio
     # section -> [(relevance, recency, row, [lines])]
     items: Dict[str, list] = {}
     rows_by_section: Dict[str, list] = {}
-    for section, (model, columns) in _SECTIONS.items():
+    for section, (model, columns) in sections.items():
         rows = (await session.execute(select(model).where(model.profile_version_id == profile_version_id))).scalars().all()
         rows_by_section[section] = rows
         for row in rows:

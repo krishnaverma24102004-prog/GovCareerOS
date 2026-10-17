@@ -22,6 +22,7 @@ from govcareeros.backend.models.eligibility import EligibilityEvidence, Eligibil
 from govcareeros.backend.models.user import Certification, Education, Experience, PersonalInfo, ProfileVersion
 from govcareeros.backend.models.vacancy import Vacancy, VacancyRequirement
 from govcareeros.backend.parsing.upsc_advertisement import IST
+from govcareeros.backend.privacy import enforcement
 
 # Requirement types whose value column holds JSON
 JSON_REQUIREMENTS = {"AGE_MAX", "AGE_RELAXATION", "RESERVATION", "AGE_RELAXATION_RULE", "CITIZENSHIP", "PWBD_SUITABILITY", "GOVT_SERVICE",
@@ -34,6 +35,9 @@ async def load_profile_snapshot(session: AsyncSession, profile_version_id: uuid.
     version = await session.get(ProfileVersion, profile_version_id)
     if version is None:
         raise EligibilityInputError("profile version not found")
+    # Every eligibility computation reads the profile through here: no active ELIGIBILITY_CHECK consent (or no
+    # guardian consent for a minor), no processing (DPDP s.6(4), s.9). Raises enforcement.ConsentRequired.
+    await enforcement.require_for_version(session, version.user_id, profile_version_id)
 
     async def rows(model):
         res = await session.execute(select(model).where(model.profile_version_id == profile_version_id))

@@ -6,6 +6,9 @@ Everything an alert says comes from stored data: the deterministic eligibility r
 the vacancy's stated deadline and age limits, and official notices (VacancyVersion, and ExamVersion for
 exams the user applied for or is eligible for, with old and new evidence: services/change_log.py).
 Alerts are de-duplicated per user, so running the radar repeatedly is safe.
+
+Consent (DPDP): eligibility is re-checked only under active ELIGIBILITY_CHECK consent, and alerts are written only
+under active ALERTS consent (without it the results are still kept current for the dashboard, but nothing is alerted).
 """
 import uuid
 from dataclasses import dataclass, field
@@ -24,6 +27,7 @@ from govcareeros.backend.models.eligibility import EligibilityResult
 from govcareeros.backend.models.user import ProfileVersion, User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
+from govcareeros.backend.privacy import enforcement, notice
 from govcareeros.backend.relevance import service as relevance_service
 from govcareeros.backend.services import change_log, operator_console
 from govcareeros.backend.services.application_tracker import application_update_alerts
@@ -67,11 +71,18 @@ def age_out_date(dob: date, max_age: int) -> date:
     except ValueError:  # 29 Feb
         return date(dob.year + max_age + 1, 3, 1)
 
-async def run_for_user(session: AsyncSession, user: User, now: datetime, run: RadarRun) -> None:
+async def run_for_user(session: AsyncSession, user: User, now: datetime, run: RadarRun, alerts: bool = True) -> None:
+    """alerts=False (no active ALERTS consent): evaluate, but write no alert."""
     version = (await session.execute(
         select(ProfileVersion).where(ProfileVersion.user_id == user.id).order_by(ProfileVersion.version_number.desc()).limit(1)
     )).scalar_one_or_none()
     if version is None:
+        return
+    # Withdrawn ELIGIBILITY_CHECK consent (or a minor without guardian consent): no eligibility processing for this
+    # user; official notices about vacancies assessed earlier are still alerted (they use no profile data)
+    if not await enforcement.allowed_for_version(session, user.id, version.id):
+        if alerts:
+            await _assessed_notice_alerts(session, user, run)
         return
     run.users += 1
     snapshot = await eligibility_engine.load_profile_snapshot(session, version.id)
@@ -87,6 +98,8 @@ async def run_for_user(session: AsyncSession, user: User, now: datetime, run: Ra
             result = await eligibility_engine.evaluate(session, user.id, version.id, vacancy.id)
             await relevance_service.evaluate(session, user.id, version.id, vacancy.id)
             run.evaluations += 1
+        if not alerts:
+            continue
         base = dict(user_id=user.id, vacancy_id=vacancy.id, profile_version_id=version.id, eligibility_result_id=result.id)
         where = f"{vacancy.post_name} ({vacancy.organization}, Advt {vacancy.advertisement_number or '-'})"
 
@@ -124,6 +137,10 @@ async def run_for_user(session: AsyncSession, user: User, now: datetime, run: Ra
                                           f"from {out.strftime('%d %b %Y')} unless a relaxation applies.",
                                      due_at=datetime(out.year, out.month, out.day, tzinfo=IST), **base)
 
+    if alerts:
+        await _assessed_notice_alerts(session, user, run)
+
+async def _assessed_notice_alerts(session: AsyncSession, user: User, run: RadarRun) -> None:
     # Official notices about vacancies this user has been assessed for. Those the user applied for or is eligible for
     # are alerted by change_log.change_alerts (run_radar), with the reason; the dedupe key is the same either way.
     _, watched = await change_log.watched_targets(session, user.id)
@@ -147,7 +164,11 @@ async def run_radar(session: AsyncSession, now: Optional[datetime] = None, user_
         # An operator's unclaimed client whose consent is withdrawn is not processed at all
         if not await operator_console.may_process(session, user):
             continue
-        await run_for_user(session, user, now, run)
+        # Alerts are the ALERTS purpose; eligibility results are kept current under ELIGIBILITY_CHECK alone
+        alerts = await enforcement.allowed_for_user(session, user.id, notice.ALERTS)
+        await run_for_user(session, user, now, run, alerts)
+        if not alerts:
+            continue
         # Result/corrigendum notices for advertisements the user tracks an application for
         for values in await application_update_alerts(session, user.id):
             await _add_alert(session, run, **values)

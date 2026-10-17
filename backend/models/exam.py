@@ -13,6 +13,7 @@ from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text, Unique
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
+from govcareeros.backend.privacy.crypto import EncryptedJSON
 
 class Exam(Base, TimestampMixin):
     __tablename__ = "exams"
@@ -136,9 +137,10 @@ class ExamEligibilityEvidence(Base, TimestampMixin):
     requirement_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("exam_requirements.id", name="fk_exam_eligibility_evidence_requirement_id"))
     check_name: Mapped[str] = mapped_column(String(100))
     match_type: Mapped[Optional[str]] = mapped_column(String(100))
-    requirement: Mapped[str] = mapped_column(Text)
-    profile_evidence: Mapped[str] = mapped_column(Text)
-    rule: Mapped[str] = mapped_column(Text)
+    # Encrypted at rest, as eligibility_evidence (quotes DOB, category, PwBD % and the category-specific rule)
+    requirement: Mapped[str] = mapped_column(EncryptedJSON(str))
+    profile_evidence: Mapped[str] = mapped_column(EncryptedJSON(str))
+    rule: Mapped[str] = mapped_column(EncryptedJSON(str))
     outcome: Mapped[str] = mapped_column(String(100))
     source_page: Mapped[Optional[str]] = mapped_column(String(500))
 

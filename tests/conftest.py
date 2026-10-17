@@ -1,8 +1,11 @@
 import asyncio
+import base64
+import os
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from pydantic import SecretStr
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -26,6 +29,13 @@ def _postgres_reachable(url: str) -> bool:
 
 _PG_URL = settings.TEST_DATABASE_URL
 _PG_OK = bool(_PG_URL) and _postgres_reachable(_PG_URL)
+
+@pytest.fixture(autouse=True)
+def field_encryption_key(monkeypatch):
+    """A fresh, test-only key for the encrypted category/disability columns (never the configured one)."""
+    key = base64.urlsafe_b64encode(os.urandom(32)).decode()
+    monkeypatch.setattr(settings, "FIELD_ENCRYPTION_KEY", SecretStr(key))
+    return key
 
 @pytest_asyncio.fixture(params=["sqlite", "postgres"])
 async def db_session(request, tmp_path, monkeypatch):
@@ -77,16 +87,38 @@ async def api(db_session):
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
         yield client
 
+# What the signup consent screen records when the person ticks eligibility checks, alerts/digests and resumes
+DEFAULT_CONSENTS = ("ELIGIBILITY_CHECK", "ALERTS", "RESUME")
+
 @pytest.fixture
 def login(api):
-    """Register + log in a user; returns the Authorization header."""
-    async def _login(email, password="correct-horse-battery"):
+    """Register + log in a user; returns the Authorization header. Like the signup screen with those purposes ticked,
+    it then gives the DEFAULT_CONSENTS through the API. consent=False gives none (tests of consent itself); a list of
+    purposes gives just those."""
+    async def _login(email, password="correct-horse-battery", consent=True):
         r = await api.post("/auth/register", json={"email": email, "password": password, "full_name": email.split("@")[0]})
         assert r.status_code == 201, r.text
         r = await api.post("/auth/login", json={"email": email, "password": password})
         assert r.status_code == 200, r.text
-        return {"Authorization": f"Bearer {r.json()['access_token']}"}
+        headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        for purpose in (DEFAULT_CONSENTS if consent is True else consent or ()):
+            await give_consent_api(api, headers, purpose)
+        return headers
     return _login
+
+async def give_consent_api(api, headers, purpose="ELIGIBILITY_CHECK", guardian_name=None):
+    from govcareeros.backend.privacy.notice import NOTICE_VERSION
+    r = await api.post("/privacy/consents", headers=headers,
+                       json={"purpose": purpose, "notice_version": NOTICE_VERSION, "guardian_name": guardian_name})
+    assert r.status_code == 201, r.text
+    return r.json()
+
+async def give_consent(session, user_id, purpose="ELIGIBILITY_CHECK", guardian_name=None):
+    """For tests that build users directly in the database: the person's consent, as the consent API records it."""
+    from govcareeros.backend.privacy import notice
+    from govcareeros.backend.services.consent import record_consent
+    return await record_consent(session, user_id, purpose, notice.data_items(purpose), notice.NOTICE_VERSION,
+                                guardian_name=guardian_name)
 
 @pytest.fixture
 def apply_extension(db_session):
@@ -107,3 +139,10 @@ def apply_extension(db_session):
                                           title=f"Extension of closing date, notice of {notice_day.isoformat()}")
         return await apply_notice(db_session, source, raw.id, parsed, url)
     return _apply
+
+@pytest.fixture
+def grant_consent(db_session):
+    """await grant_consent(user_id[, purpose, guardian_name]) for users created directly in the database."""
+    async def _grant(user_id, purpose="ELIGIBILITY_CHECK", guardian_name=None):
+        return await give_consent(db_session, user_id, purpose, guardian_name)
+    return _grant

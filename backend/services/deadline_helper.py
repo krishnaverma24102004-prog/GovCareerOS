@@ -32,6 +32,7 @@ from govcareeros.backend.documents.pdf_text import extract_pages
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.user import ProfileVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
+from govcareeros.backend.privacy import enforcement
 
 _EN = r"(?:Employments?\s+News|Rozgaa?r\s*Samachar)"
 _UNITS = {w: n for n, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
@@ -189,7 +190,8 @@ async def user_in_service(session: AsyncSession, user_id: uuid.UUID) -> bool:
     from govcareeros.backend.eligibility import engine as eligibility_engine
     version = (await session.execute(select(ProfileVersion).where(ProfileVersion.user_id == user_id)
                                      .order_by(ProfileVersion.version_number.desc()).limit(1))).scalar_one_or_none()
-    if version is None:
+    # Service details are eligibility data: without consent they are not read, and no estimate is offered
+    if version is None or not await enforcement.allowed_for_version(session, user_id, version.id):
         return False
     snap = await eligibility_engine.load_profile_snapshot(session, version.id)
     return bool(snap.is_central_govt_employee or snap.is_state_govt_employee)

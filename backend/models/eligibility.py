@@ -4,6 +4,7 @@ from datetime import date, datetime
 from sqlalchemy import Boolean, Date, String, Text, ForeignKey, Float, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
+from govcareeros.backend.privacy.crypto import EncryptedJSON
 
 class EligibilityResult(Base, TimestampMixin):
     __tablename__ = 'eligibility_results'
@@ -31,9 +32,10 @@ class EligibilityEvidence(Base, TimestampMixin):
     requirement_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey('vacancy_requirements.id', name='fk_eligibility_evidence_requirement_id'))
     check_name: Mapped[str] = mapped_column(String(100), default='', server_default='')  # AGE, EDUCATION, EXPERIENCE, ...
     match_type: Mapped[Optional[str]] = mapped_column(String(100))  # EXACT_MATCH, EXPLICIT_EQUIVALENCE, ...
-    requirement: Mapped[str] = mapped_column(Text)
-    profile_evidence: Mapped[str] = mapped_column(Text)
-    rule: Mapped[str] = mapped_column(Text)
+    # Encrypted at rest: the explanation quotes the profile (DOB, category, PwBD %) and the category-specific rule
+    requirement: Mapped[str] = mapped_column(EncryptedJSON(str))
+    profile_evidence: Mapped[str] = mapped_column(EncryptedJSON(str))
+    rule: Mapped[str] = mapped_column(EncryptedJSON(str))
     outcome: Mapped[str] = mapped_column(String(100))
     source_page: Mapped[Optional[str]] = mapped_column(String(500))
     
@@ -58,7 +60,9 @@ class SkillGap(Base, TimestampMixin):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('users.id'), index=True)
     vacancy_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('vacancies.id'), index=True)
     gap_type: Mapped[str] = mapped_column(String(100))  # AGE, EDUCATION, EXPERIENCE, ..., PROFILE_MISSING_INFO, RELEVANCE_*
-    requirement: Mapped[str] = mapped_column(Text)
+    # requirement, requirement_quote, profile_has and next_step are encrypted at rest: like eligibility evidence they
+    # quote the profile and the rule chosen for the candidate's category / disability
+    requirement: Mapped[str] = mapped_column(EncryptedJSON(str))
     suggested_resource: Mapped[Optional[str]] = mapped_column(Text)
     # Gaps are derived from one stored eligibility decision for one immutable profile version
     profile_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey('profile_versions.id', name='fk_skill_gaps_profile_version_id'), index=True)
@@ -68,9 +72,9 @@ class SkillGap(Base, TimestampMixin):
     reason_code: Mapped[Optional[str]] = mapped_column(String(60))
     blocking: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
     # The notification's own words and page; empty only for gaps that come from the profile side alone
-    requirement_quote: Mapped[Optional[str]] = mapped_column(Text)
+    requirement_quote: Mapped[Optional[str]] = mapped_column(EncryptedJSON(str))
     requirement_page: Mapped[Optional[int]] = mapped_column(Integer)
-    profile_has: Mapped[Optional[str]] = mapped_column(Text)
+    profile_has: Mapped[Optional[str]] = mapped_column(EncryptedJSON(str))
     profile_field: Mapped[Optional[str]] = mapped_column(String(100))
-    next_step: Mapped[Optional[str]] = mapped_column(Text)
+    next_step: Mapped[Optional[str]] = mapped_column(EncryptedJSON(str))
     due_date: Mapped[Optional[date]] = mapped_column(Date)

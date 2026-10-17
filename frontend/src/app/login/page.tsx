@@ -26,7 +26,8 @@ export default function LoginPage() {
       }
       const token = await api<Token>("/auth/login", { method: "POST", auth: false, body: { email, password } });
       setToken(token.access_token);
-      router.replace("/matches");
+      // A new account goes to the consent screen first (DPDP); it can be skipped there
+      router.replace(mode === "register" ? "/privacy/consent" : "/matches");
     } catch (err) {
       setError(errText(err));
     } finally {

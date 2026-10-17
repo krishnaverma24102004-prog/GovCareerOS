@@ -4,15 +4,16 @@ GovCareerOS API.
     $env:PYTHONPATH="C:\\Users\\krishna"
     uvicorn govcareeros.backend.api.main:app --port 8080
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from govcareeros.backend.config.settings import settings
 from govcareeros.backend.api.body_limit import BodyLimitMiddleware
+from govcareeros.backend.privacy.enforcement import ConsentRequired
 from govcareeros.backend.services import notice_verifier
 from govcareeros.backend.api.routers import (
-    admin, admin_console, alerts, applications, apply_ready, auth, deputation, digest, eligibility, exam_versions, exams, gaps, operator, prep, profile,
-    relevance, resume, review, review_console, vacancies, verify,
+    admin, admin_console, alerts, applications, apply_ready, auth, deputation, digest, eligibility, exam_versions, exams, gaps, operator, prep, privacy, profile, relevance, resume, review, review_console, vacancies, verify,
 )
 
 def create_app() -> FastAPI:
@@ -25,8 +26,13 @@ def create_app() -> FastAPI:
                        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type"])
     for router in (auth.router, profile.router, vacancies.router, eligibility.router, relevance.router, alerts.router,
                    review.router, admin.router, digest.router, exams.router, prep.router, gaps.router, applications.router,
-                   resume.router, review_console.router, admin_console.router, exam_versions.router, verify.router, deputation.router, operator.router, apply_ready.router):
+                   resume.router, review_console.router, admin_console.router, exam_versions.router, verify.router, deputation.router, operator.router, apply_ready.router, privacy.router):
         app.include_router(router)
+
+    @app.exception_handler(ConsentRequired)
+    async def consent_required(request: Request, exc: ConsentRequired):
+        # Raised wherever eligibility data would be stored or processed without consent (backend/privacy/enforcement.py)
+        return JSONResponse(status_code=403, content={"detail": exc.detail})
 
     @app.get("/health", tags=["meta"])
     async def health():

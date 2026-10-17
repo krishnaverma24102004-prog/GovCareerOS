@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Optional
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -50,6 +51,14 @@ class Settings(BaseSettings):
     OPERATOR_REPORT_PRICE_PAISE: int = 2000
     # Hours a client account claim token stays usable
     CLAIM_TOKEN_TTL_HOURS: int = 72
+    # DPDP Act 2023. Key for field-level encryption of category/caste and disability columns: 32 random bytes,
+    # urlsafe-base64 (python -c "import os,base64;print(base64.urlsafe_b64encode(os.urandom(32)).decode())").
+    # Set it in the environment / .env only; it is never logged or returned. Empty = those fields cannot be stored.
+    FIELD_ENCRYPTION_KEY: SecretStr = SecretStr("")
+    # Shown in the consent notice and privacy page (name, email, postal address of the grievance officer)
+    PRIVACY_GRIEVANCE_CONTACT: str = ""
+    # Days between an erasure request and the hard erase (the person may cancel by contacting the grievance officer)
+    ERASURE_GRACE_DAYS: int = 30
 
     @property
     def storage_dir(self) -> Path:

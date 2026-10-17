@@ -4,6 +4,7 @@ from typing import Optional, List
 from sqlalchemy import String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
+from govcareeros.backend.privacy.crypto import EncryptedJSON
 
 class Fact(Base, TimestampMixin):
     __tablename__ = "profile_facts"
@@ -12,7 +13,8 @@ class Fact(Base, TimestampMixin):
     profile_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profile_versions.id"), index=True)
     subject: Mapped[str] = mapped_column(String(255))
     predicate: Mapped[str] = mapped_column(String(255))
-    value: Mapped[str] = mapped_column(Text)
+    # Encrypted at rest: a claim can state caste/category, disability or a certificate kind (backend/privacy/crypto.py)
+    value: Mapped[str] = mapped_column(EncryptedJSON(str))
     # UNVERIFIED, VERIFIED, REJECTED
     status: Mapped[str] = mapped_column(String(100), default="UNVERIFIED")
     # Who set VERIFIED/REJECTED (never the fact's own user); history is in review_audit_log

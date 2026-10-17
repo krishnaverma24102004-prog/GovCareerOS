@@ -38,6 +38,11 @@ function detail(body: unknown, fallback: string): string {
   if (typeof d === "string") return d;
   // FastAPI validation errors: [{loc, msg}, ...]
   if (Array.isArray(d)) return d.map((e) => `${(e.loc || []).slice(1).join(".")}: ${e.msg}`).join("; ");
+  // Consent refusals (403): {code, message, action, ...}
+  if (d && typeof d === "object" && "message" in d) {
+    const { message, action } = d as { message?: string; action?: string };
+    return [message, action].filter(Boolean).join(" ");
+  }
   return fallback;
 }
 

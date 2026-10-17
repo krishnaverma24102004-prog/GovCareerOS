@@ -20,6 +20,7 @@ from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.extraction import ExtractionDraft
 from govcareeros.backend.models.fact import Evidence, Fact
 from govcareeros.backend.models.user import ProfileVersion, User
+from govcareeros.backend.privacy import enforcement
 from govcareeros.backend.services import extraction_drafts, review_audit, review_console
 
 router = APIRouter(prefix="/review", tags=["review-console"])
@@ -202,11 +203,18 @@ def _fact_view(fact: Fact, version: ProfileVersion, reviewer: User, evidence: Li
                     reviewed_at=fact.reviewed_at, review_note=fact.review_note, created_at=fact.created_at,
                     evidence=evidence)
 
+def _reviewable():
+    """(Fact, ProfileVersion) rows a reviewer may see and decide. Facts of a person who closed the account, asked for
+    erasure or withdrew the consent the claim needs are neither listed nor decidable (404), as for a missing fact."""
+    return (select(Fact, ProfileVersion).join(ProfileVersion, ProfileVersion.id == Fact.profile_version_id)
+            .join(User, User.id == ProfileVersion.user_id)
+            .where(enforcement.reviewable_fact_clause(Fact, ProfileVersion, User)))
+
 @router.get("/facts", response_model=FactPage)
 async def list_facts(status_filter: Literal["UNVERIFIED", "VERIFIED", "REJECTED"] = Query("UNVERIFIED", alias="status"),
                      limit: int = Query(50, ge=1, le=MAX_PAGE), offset: int = Query(0, ge=0, le=1_000_000),
                      user: User = Depends(require_reviewer), session: AsyncSession = Depends(get_session)):
-    base = select(Fact, ProfileVersion).join(ProfileVersion, ProfileVersion.id == Fact.profile_version_id).where(Fact.status == status_filter)
+    base = _reviewable().where(Fact.status == status_filter)
     total = (await session.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
     rows = (await session.execute(base.order_by(Fact.created_at, Fact.id).offset(offset).limit(limit))).all()
     evidence = await _evidence(session, [f.id for f, _ in rows])
@@ -216,8 +224,7 @@ class FactDecisionIn(BaseModel):
     note: Optional[str] = Field(None, max_length=2000)
 
 async def _decide(session: AsyncSession, reviewer: User, fact_id: uuid.UUID, target: str, note: Optional[str]) -> FactView:
-    row = (await session.execute(select(Fact, ProfileVersion).join(ProfileVersion, ProfileVersion.id == Fact.profile_version_id)
-                                 .where(Fact.id == fact_id))).first()
+    row = (await session.execute(_reviewable().where(Fact.id == fact_id))).first()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "fact not found")
     fact, version = row

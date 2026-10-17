@@ -55,6 +55,7 @@ const LINKS = [
   ["/profile", "Profile"],
   ["/alerts", "Alerts"],
   ["/digest", "Digest"],
+  ["/privacy", "Privacy"],
   ["/review", "Review"],
   ["/verify", "Check a notice"],
 ] as const;

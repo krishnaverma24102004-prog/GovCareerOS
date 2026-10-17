@@ -95,6 +95,30 @@ async def test_daily_job_radar_step_over_real_upsc_data(api, login, db_session):
     assert run_log.last_run()["status"] == "LOCKED" and len(run_log.read_runs(10)) == 3
 
 @pytest.mark.asyncio
+async def test_daily_job_erase_step_hard_erases_accounts_past_their_grace_period(api, login, db_session):
+    """POST /privacy/erase promises a hard erase after the grace period: the scheduled daily job carries it out."""
+    h = await login("erase-due@test.invalid")
+    assert (await api.put("/profile", json=law_profile("1993-06-01"), headers=h)).status_code == 201
+    r = await api.post("/privacy/erase", json={"confirm": "ERASE"}, headers=h)
+    assert r.status_code == 202, r.text
+    due = datetime.fromisoformat(r.json()["erasure_due_at"])
+    uid = (await db_session.execute(select(User.id).where(User.email == "erase-due@test.invalid"))).scalar_one()
+    factory = async_sessionmaker(db_session.bind, expire_on_commit=False, class_=AsyncSession)
+
+    # Inside the grace period: nothing is erased
+    assert await daily_job.main(["--only", "erase"], session_factory=factory, now=NOW) == 0
+    steps = {s["name"]: s for s in run_log.last_run()["steps"]}
+    assert steps["erase"] == {**steps["erase"], "status": "ok", "counts": {"erased": 0, "held": 0}}
+    # Past it: the account is erased and the run log holds counts, not ids or emails
+    assert await daily_job.main(["--only", "erase"], session_factory=factory, now=due) == 0
+    record = run_log.last_run()
+    assert {s["name"]: s for s in record["steps"]}["erase"]["counts"] == {"erased": 1, "held": 0}
+    assert str(uid) not in json.dumps(record) and "erase-due@test.invalid" not in json.dumps(record)
+    db_session.expire_all()
+    user = await db_session.get(User, uid)
+    assert user.erased_at is not None and user.email == f"erased-{uid}@erased.invalid"
+
+@pytest.mark.asyncio
 async def test_admin_runs_is_reviewer_only(api, login, db_session, monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "STORAGE_PATH", str(tmp_path / "storage"))
     run_log.append_run({"run_id": "a", "steps": [{"name": "radar", "status": "error", "traceback": "Traceback ..."}]})
