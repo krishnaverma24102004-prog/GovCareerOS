@@ -181,6 +181,55 @@ async def test_key_scopes_revocation_and_usage_metering(api, admin, new_key, db_
     assert {a.action for a in (await db_session.execute(select(ReviewAuditLog))).scalars()} >= {"API_KEY_REVOKE"}
 
 @pytest.mark.asyncio
+async def test_requests_with_invalid_parameters_are_not_billed(api, admin, new_key, db_session):
+    await load_snapshot(db_session)
+    notice_id = (await db_session.execute(select(RecruitmentNotice.id).limit(1))).scalar_one()
+    key, row, org_id = await new_key(["notices:read", "changes:read", "verify:use", "webhooks:manage"])
+    h = {"X-API-Key": key}
+    # Refused by parameter or body validation (422) after the key was accepted
+    for request in (
+        api.get("/api/v1/notices", params={"jurisdiction": "Haryana"}, headers=h),
+        api.get("/api/v1/notices", params={"limit": 0}, headers=h),
+        api.get("/api/v1/notices/not-a-uuid", headers=h),
+        api.get("/api/v1/changes", params={"type": "notice.deleted"}, headers=h),
+        api.post("/api/v1/verify", data={"ocr": "perhaps"}, headers=h),
+        api.post("/api/v1/webhooks", json={"events": ["notice.new"]}, headers=h),
+        api.get(f"/api/v1/webhooks/{uuid.uuid4()}/deliveries", params={"limit": 0}, headers=h),
+        api.delete("/api/v1/webhooks/not-a-uuid", headers=h),
+    ):
+        r = await request
+        assert r.status_code == 422, (r.request.url, r.text)
+    assert (await api.get("/api/v1/webhooks", headers=h)).status_code == 200
+    usage = (await api.get(f"/admin/api/orgs/{org_id}/usage", headers=admin)).json()
+    assert [(u["endpoint"], u["requests"]) for u in usage] == [("webhooks.list", 1)]
+
+    # Every endpoint bills each answered request once
+    hook = (await api.post("/api/v1/webhooks", json={"url": HOOK_URL}, headers=h)).json()
+    for request in (
+        api.get("/api/v1/notices", headers=h),
+        api.get(f"/api/v1/notices/{notice_id}", headers=h),
+        api.get("/api/v1/changes", headers=h),
+        api.post("/api/v1/verify", data={"url": "https://www.upsc.gov.in/sites/default/files/AdvtNo-12-2026-Engl-250926_0.pdf"}, headers=h),
+        api.get(f"/api/v1/webhooks/{hook['id']}/deliveries", headers=h),
+        api.delete(f"/api/v1/webhooks/{hook['id']}", headers=h),
+    ):
+        r = await request
+        assert r.status_code in (200, 204), (r.request.url, r.text)
+    usage = (await api.get(f"/admin/api/orgs/{org_id}/usage", headers=admin)).json()
+    assert sorted((u["endpoint"], u["requests"]) for u in usage) == [
+        ("changes.list", 1), ("notices.get", 1), ("notices.list", 1), ("verify", 1), ("webhooks.create", 1),
+        ("webhooks.delete", 1), ("webhooks.deliveries", 1), ("webhooks.list", 1)]
+
+def test_every_keyed_v1_endpoint_meters_its_requests():
+    """Metering is in each endpoint's body (b2b_deps): a new endpoint taking a key must meter too."""
+    from govcareeros.backend.api.b2b_deps import ApiCaller
+    from govcareeros.backend.api.routers import api_v1
+    keyed = [r.endpoint for r in api_v1.router.routes
+             if any(p.annotation is ApiCaller for p in inspect.signature(r.endpoint).parameters.values())]
+    assert len(keyed) == 8
+    assert all("await caller.meter(session)" in inspect.getsource(e) for e in keyed), [e.__name__ for e in keyed]
+
+@pytest.mark.asyncio
 async def test_rate_limit_per_key_is_a_token_bucket(api, new_key, db_session, monkeypatch):
     clock = [1000.0]
     monkeypatch.setattr(api_keys, "limiter", api_keys.RateLimiter(clock=lambda: clock[0]))

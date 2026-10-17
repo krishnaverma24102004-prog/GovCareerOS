@@ -1,6 +1,8 @@
 """
 API-key authentication for /api/v1: `X-API-Key: gco_...`. In this order: the key (401), its rate limit (429),
-its scope (403); then the request is metered (services/api_keys.py).
+its scope (403). The endpoint then meters the request first thing in its body (`await caller.meter(session)`):
+FastAPI rejects invalid parameters or bodies (422) only after its dependencies have run, and the session
+dependency commits on that path, so a request counted here would be billed although it was refused.
 """
 import math
 from dataclasses import dataclass
@@ -21,6 +23,11 @@ _api_key = APIKeyHeader(name=API_KEY_HEADER, auto_error=False, scheme_name="ApiK
 class ApiCaller:
     key: ApiKey
     org: ApiOrg
+    endpoint: str  # its name in the usage table, e.g. "notices.list"
+
+    async def meter(self, session: AsyncSession) -> None:
+        """Count this request (in its own transaction: a request that then fails is rolled back, not counted)."""
+        await api_keys.record_use(session, self.key, self.endpoint)
 
 def require_scope(scope: str, endpoint: str):
     """Dependency for one endpoint: `endpoint` names it in the usage table (e.g. "notices.list")."""
@@ -40,7 +47,6 @@ def require_scope(scope: str, endpoint: str):
                                 headers={"Retry-After": str(max(1, math.ceil(wait))), "X-RateLimit-Limit": str(per_minute)})
         if scope not in api_keys.scopes_of(key):
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"this key lacks the {scope} scope")
-        await api_keys.record_use(session, key, endpoint)
-        return ApiCaller(key, org)
+        return ApiCaller(key, org, endpoint)
 
     return caller

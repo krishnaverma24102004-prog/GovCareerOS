@@ -51,6 +51,7 @@ async def list_notices(
     caller: ApiCaller = Depends(require_scope("notices:read", "notices.list")),
     session: AsyncSession = Depends(get_session),
 ):
+    await caller.meter(session)
     try:
         rows, nxt = await b2b_notices.list_notices(
             session, source=source, jurisdiction=jurisdiction, kind=kind, status=status_,
@@ -62,6 +63,7 @@ async def list_notices(
 @router.get("/notices/{notice_id}", response_model=NoticeDetailOut, tags=["v1: notices"])
 async def get_notice(notice_id: uuid.UUID, caller: ApiCaller = Depends(require_scope("notices:read", "notices.get")),
                      session: AsyncSession = Depends(get_session)):
+    await caller.meter(session)
     notice = await session.get(RecruitmentNotice, notice_id)
     if notice is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "notice not found")
@@ -76,6 +78,7 @@ async def changes(
     session: AsyncSession = Depends(get_session),
 ):
     """Events in the order they were recorded. Keep next_cursor and poll with it; nothing recorded later is skipped."""
+    await caller.meter(session)
     try:
         after = b2b_events.feed_seq(since)
     except b2b_notices.BadCursor as e:
@@ -96,6 +99,7 @@ async def verify(
     session: AsyncSession = Depends(get_session),
 ):
     """Same check as the public POST /verify: is this notice, link or PDF on an official source? The link is never fetched."""
+    await caller.meter(session)
     return await run_check(session, text, url, file, ocr)
 
 # ---------- webhooks ----------
@@ -113,6 +117,7 @@ async def _own_hook(session: AsyncSession, caller: ApiCaller, webhook_id: uuid.U
 async def register_webhook(body: WebhookIn, caller: ApiCaller = Depends(require_scope("webhooks:manage", "webhooks.create")),
                            session: AsyncSession = Depends(get_session)):
     """An https URL on a public host. The signing secret is in this response only."""
+    await caller.meter(session)
     try:
         hook, secret = await webhooks.register(session, caller.org, body.url.strip(), body.events)
     except webhooks.WebhookUrlRefused as e:
@@ -123,12 +128,14 @@ async def register_webhook(body: WebhookIn, caller: ApiCaller = Depends(require_
 @router.get("/webhooks", response_model=List[WebhookOut], tags=["v1: webhooks"])
 async def list_webhooks(caller: ApiCaller = Depends(require_scope("webhooks:manage", "webhooks.list")),
                         session: AsyncSession = Depends(get_session)):
+    await caller.meter(session)
     rows = (await session.execute(select(Webhook).where(Webhook.org_id == caller.org.id).order_by(Webhook.created_at, Webhook.id))).scalars()
     return [_hook_out(h) for h in rows]
 
 @router.delete("/webhooks/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["v1: webhooks"])
 async def remove_webhook(webhook_id: uuid.UUID, caller: ApiCaller = Depends(require_scope("webhooks:manage", "webhooks.delete")),
                          session: AsyncSession = Depends(get_session)):
+    await caller.meter(session)
     await webhooks.disable(session, await _own_hook(session, caller, webhook_id))
 
 @router.get("/webhooks/{webhook_id}/deliveries", response_model=List[DeliveryOut], tags=["v1: webhooks"])
@@ -136,6 +143,7 @@ async def deliveries(webhook_id: uuid.UUID, limit: int = Query(100, ge=1, le=500
                      caller: ApiCaller = Depends(require_scope("webhooks:manage", "webhooks.deliveries")),
                      session: AsyncSession = Depends(get_session)):
     """The delivery log, newest event first."""
+    await caller.meter(session)
     hook = await _own_hook(session, caller, webhook_id)
     rows = (await session.execute(select(WebhookDelivery, ApiEvent.event_type).join(ApiEvent, ApiEvent.seq == WebhookDelivery.event_seq)
                                   .where(WebhookDelivery.webhook_id == hook.id).order_by(WebhookDelivery.event_seq.desc()).limit(limit))).all()
