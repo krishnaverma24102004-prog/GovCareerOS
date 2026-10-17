@@ -7,7 +7,7 @@ Every cited quote is checked against the text of the page it cites. Profiles are
 import json
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -227,7 +227,29 @@ async def test_printable_page(api, login, db_session):
     assert (await api.get(f"/apply-ready/vacancies/{vacancy.id}.html?profile_version_id={v}")).status_code == 401
 
 @pytest.mark.asyncio
-async def test_ssc_chsl_2026_page(api, db_session):
+async def test_closing_date_changed_by_a_later_notice(api, db_session, apply_extension):
+    """A later notice moves Advt 12's closing date. No real UPSC notice in the fixtures extends a closing date, so the
+    extension is the HAND-BUILT one of conftest.apply_extension (findings stated by hand, recorded against a real
+    captured notice PDF); it carries no page or sentence for the new date."""
+    vacancy = await _ingest_advt12(db_session)
+    source = await get_or_create_source(db_session, upsc.UPSC_SOURCE)
+    await apply_extension(source, "NoticeCancellation-06-Posts-Advt-13-25-Engl-200826.pdf", LAW_OFFICER,
+                          date(2026, 10, 10), datetime(2026, 10, 23, 18, 0, tzinfo=IST))
+    await db_session.commit()
+    page = (await api.get(f"/apply-ready/vacancies/{vacancy.id}")).json()
+    assert datetime.fromisoformat(page["deadline"]) == datetime(2026, 10, 23, 18, 0, tzinfo=IST)
+    # The record's date is not the one the advertisement's general instructions state: said so, with both dates
+    assert page["warnings"] == ["the closing date on record (23 Oct 2026, 18:00 IST) differs from the one in the notice's general "
+                                "instructions (16 Oct 2026, 18:00 IST); the cited source of the closing date applies"]
+    # Nothing cites the new date (no page or sentence), so the advertisement's own cited date stays in the dates section
+    [end] = _sections(page)["dates"]
+    assert (end["detail"], end["citation"]["page"]) == ("16 Oct 2026, 18:00 IST", 13)
+    # The status follows the record's closing date
+    assert (await apply_ready.vacancy_page(db_session, vacancy.id, now=datetime(2026, 10, 20, 12, 0, tzinfo=IST)))["status"] == "OPEN"
+    assert (await apply_ready.vacancy_page(db_session, vacancy.id, now=datetime(2026, 10, 23, 18, 1, tzinfo=IST)))["status"] == "CLOSED"
+
+@pytest.mark.asyncio
+async def test_ssc_chsl_2026_page(api, login, db_session):
     exam = await _ingest_ssc(db_session, "Notice_of_adv_chsle_2026.pdf")
     url = SSC_URLS["Notice_of_adv_chsle_2026.pdf"]["url"]
     r = await api.get(f"/apply-ready/exams/{exam.id}")
@@ -270,6 +292,36 @@ async def test_ssc_chsl_2026_page(api, db_session):
     assert "Aavedan abhi shuru nahi hua" in printable and "Aavedan shuru: <strong>07 Sep 2026</strong>" in printable
     assert "Aavedan khula hai" not in printable
     assert (await apply_ready.exam_page(db_session, exam.id, now=datetime(2026, 9, 7, 0, 0, tzinfo=IST)))["status"] == "OPEN"
+
+    # Printable exam page
+    r = await api.get(f"/apply-ready/exams/{exam.id}.html")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+    assert r.headers["content-security-policy"] == "default-src 'none'; style-src 'unsafe-inline'"
+    assert "<title>Combined Higher Secondary (10+2) Level Examination, 2026 — apply checklist</title>" in r.text
+    assert f'href="{url}#page=1"' in r.text and "<script" not in r.text and "Theek hai" not in r.text
+
+    # Personal view of the exam page: own profile version only, and only with a token (test-only user; an error response
+    # rolls the shared session back, so the id is kept)
+    exam_id = exam.id
+    h = await login("ravi@example.com")
+    v = await _version(api, h, {"full_name": "Ravi", "date_of_birth": "2004-05-05", "gender": "Male", "category": "UR",
+                                "is_pwbd": False, "nationality": "Indian", "is_ex_serviceman": False})
+    personal = f"/apply-ready/exams/{exam_id}?profile_version_id={v}"
+    r = await api.get(personal, headers=h)
+    assert r.status_code == 200, r.text
+    elig = _sections(r.json())["eligibility"]
+    assert next(it for it in elig if it["label"] == "Nagrikta (citizenship)")["status"] == "OK"
+    # 22 on the crucial date 01.08.2026, UR: the UR/EWS row (18-27) decides; the other categories' rows are not his
+    ages = {it["detail"]: it["status"] for it in elig if it["label"] == "Aayu seema (age limit)"}
+    assert ages == {"UR: 18-27 saal; EWS: 18-27 saal": "OK", "OBC: 18-30 saal": None, "SC: 18-32 saal; ST: 18-32 saal": None}
+    r = await api.get(f"/apply-ready/exams/{exam_id}.html?profile_version_id={v}", headers=h)
+    assert r.status_code == 200 and "Theek hai" in r.text
+    other = await login("sita@example.com")
+    assert (await api.get(personal)).status_code == 401
+    assert (await api.get(personal, headers={"Authorization": "Bearer not-a-token"})).status_code == 401
+    assert (await api.get(f"/apply-ready/exams/{exam_id}.html?profile_version_id={v}")).status_code == 401
+    assert (await api.get(personal, headers=other)).status_code == 404
+    assert (await api.get("/apply-ready/exams/00000000-0000-0000-0000-000000000000")).status_code == 404
 
 @pytest.mark.asyncio
 async def test_ssc_je_2026_page(api, login, db_session):
