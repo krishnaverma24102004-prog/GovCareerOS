@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.models.b2b import ApiEvent, ApiOrg, Webhook, WebhookDelivery
 from govcareeros.backend.services import b2b_events
-from govcareeros.backend.sources.url_guard import GuardedTransport, UrlRefused, literal_non_public
+from govcareeros.backend.sources.url_guard import GuardedTransport, UnresolvedHost, UrlRefused, literal_non_public
 
 SIGNATURE_HEADER = "X-GovCareerOS-Signature"
 EVENT_HEADER = "X-GovCareerOS-Event"
@@ -47,6 +47,7 @@ MAX_ATTEMPTS = len(BACKOFF) + 1
 TIMEOUT_SECONDS = 10  # one attempt in all: connecting, sending, the answer's status and headers
 LEASE = timedelta(minutes=5)  # a claimed delivery is left to its dispatcher this long (well over one attempt)
 MAX_WEBHOOKS_PER_ORG = 10
+REFUSED_NON_PUBLIC = "refused: the host resolves to a non-public address"
 _PRIVATE_SUFFIXES = (".local", ".internal", ".intranet", ".lan", ".home", ".corp", ".home.arpa", ".localhost")
 _LABEL = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)")  # one DNS label as sent (letters, digits, hyphens; IDNs as xn--)
 
@@ -227,9 +228,16 @@ async def _attempt(client: httpx.AsyncClient, d: WebhookDelivery, hook: Webhook,
                    SIGNATURE_HEADER: signature_header(hook.secret, int(now.timestamp()), body)}
         # TIMEOUT_SECONDS in all, connection to answer (httpx's own timeout is per read, so a trickle never ends it)
         resp = await asyncio.wait_for(_post(client, hook.url, body, headers), TIMEOUT_SECONDS)
+    # The org reads `error` (delivery log): what our resolver answered (addresses, whether an internal name exists)
+    # stays in the server log
     except (UrlRefused, httpx.InvalidURL) as e:  # resolved to a non-public address / unusable URL: never retried
-        d.status, d.next_attempt_at, d.error = "REFUSED", None, str(e)[:1000]
+        log.warning("webhook %s delivery %s refused: %s", hook.id, d.id, e)
+        d.status, d.next_attempt_at = "REFUSED", None
+        d.error = REFUSED_NON_PUBLIC if isinstance(e, UrlRefused) else "refused: the URL's host name cannot be used"
         return "REFUSED"
+    except UnresolvedHost as e:
+        log.warning("webhook %s delivery %s: %s", hook.id, d.id, e)
+        _failed(d, now, "could not resolve the host name")
     except httpx.HTTPError as e:
         _failed(d, now, f"{type(e).__name__}: {e}")
     except TimeoutError:

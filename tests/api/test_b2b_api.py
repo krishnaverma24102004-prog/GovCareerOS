@@ -532,8 +532,21 @@ async def test_never_delivers_to_a_private_address(api, new_key, db_session):
     async with client:
         assert (await webhooks.deliver_due(db_session, client, now=datetime.now(timezone.utc)))["REFUSED"] == 1
     (d,) = (await db_session.execute(select(WebhookDelivery))).scalars().all()
-    assert (d.status, d.next_attempt_at) == ("REFUSED", None) and "non-public" in d.error
+    assert (d.status, d.next_attempt_at, d.error) == ("REFUSED", None, webhooks.REFUSED_NON_PUBLIC)
     assert wire.requests == []
+    # The org's delivery log does not tell it what the name resolved to on the server
+    (logged,) = (await api.get(f"/api/v1/webhooks/{hook['id']}/deliveries", headers=h)).json()
+    assert logged["error"] == webhooks.REFUSED_NON_PUBLIC and "10.0.0.7" not in json.dumps(logged)
+
+    # Nor what the resolver said about a name it could not resolve (retried: it may be a passing DNS failure)
+    async def unresolvable(host, port):
+        raise OSError("test-only resolver: name or service not known (internal resolver detail)")
+    d.status, d.attempts, d.next_attempt_at, d.error = "PENDING", 0, datetime(2026, 1, 1, tzinfo=timezone.utc), None
+    await db_session.commit()
+    transport = _Net(resolve=unresolvable)
+    async with httpx.AsyncClient(transport=transport) as client:
+        assert (await webhooks.deliver_due(db_session, client))["RETRY"] == 1
+    assert (d.status, d.attempts, d.error) == ("PENDING", 1, "could not resolve the host name") and transport.requests == []
 
     # A stored URL that is no longer allowed is refused before any lookup
     row = await db_session.get(Webhook, uuid.UUID(hook["id"]))
