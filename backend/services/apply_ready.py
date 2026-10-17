@@ -238,6 +238,16 @@ def _eligibility_items(rows: Sequence, statuses: Dict[Any, str], urls: Dict[uuid
 def _no_validity(value: Dict[str, Any]) -> bool:
     return not any(value.get(k) for k in ("crucial_date", "issued_on_or_after", "issued_on_or_before", "financial_year"))
 
+def _clauses_quote(r: ApplicationRequirement) -> Optional[str]:
+    """A certificate row's quote, clause by clause: a clause on another page than the first is marked with its own
+    page (" | p.10: ..."), as post-wise rows mark theirs. Rows without stored clauses keep their excerpt."""
+    v = _value(r)
+    clauses = v.get("clauses") if isinstance(v, dict) else None
+    if not clauses:
+        return r.source_excerpt
+    first = clauses[0]["page"]
+    return " | ".join([clauses[0]["quote"]] + [(f"p.{c['page']}: " if c["page"] != first else "") + c["quote"] for c in clauses[1:]])
+
 def _certificate_items(rows: Sequence[ApplicationRequirement], cite, outcomes: Optional[Dict[Any, rules.RuleOutcome]]) -> List[Dict[str, Any]]:
     order = list(_CERTIFICATES)
     items = []
@@ -260,7 +270,10 @@ def _certificate_items(rows: Sequence[ApplicationRequirement], cite, outcomes: O
             status = _CERT.get(o.outcome) if o else None
             why = None if o is None else ("aap par lagu nahi: " if o.outcome == certificates.NOT_APPLICABLE else "") + o.rule
             detail = _join(detail, f"Aapke liye: {why}" if why else None)
-        items.append(_item(_CERTIFICATES.get(r.code, _humanize(r.code)), detail, cite(r), status))
+        citation = cite(r)
+        if citation is not None:
+            citation["quote"] = _clauses_quote(r)
+        items.append(_item(_CERTIFICATES.get(r.code, _humanize(r.code)), detail, citation, status))
     return items
 
 def _fee_items(rows: Sequence[ApplicationRequirement], cite, fee: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:

@@ -38,17 +38,24 @@ def _sections(page):
 def _quotes_on_their_pages(page, pdf, url):
     """Each item's quote is the notice's own text on the page it cites (a table row or list item may run on)."""
     pages = extract_pages(pdf.read_bytes(), ocr=False)
-    whole = " ".join(re.sub(r"\s+", " ", p.text) for p in pages)
+    flat = {p.page_number: re.sub(r"\s+", " ", p.text) for p in pages}
     for s in page["sections"]:
         for it in s["items"]:
             c = it["citation"]
             assert c and c["page"] and c["quote"] and c["document_url"] == url, (s["key"], it)
-            # Post-wise rows join a table row with the clauses it relies on (" | p.8: ...") and the table parser notes
-            # cells carried down from a merged row ("[merged cell(s) continued ...]"): check each part of the notice's text
+            # Post-wise rows join a table row with the clauses it relies on, and certificate rows join their clauses
+            # (" | ..."); a part on another page names it (" | p.8: ..."). The table parser notes cells carried down from
+            # a merged row ("[merged cell(s) continued ...]"). Each part must start on its own page: the cited page, or
+            # the one it names
             quote = re.sub(r"\s*\[merged cell\(s\) continued from the row above:[^\]]*\]", "", c["quote"])
-            for part in re.split(r" \| (?:p\.\d+: )?", quote):
+            split = re.split(r" \| (?:p\.(\d+): )?", quote)
+            parts = [(c["page"], split[0])] + [(int(n) if n else c["page"], part) for n, part in zip(split[1::2], split[2::2])]
+            for on, part in parts:
                 head = " ".join(part.split()[:10])
-                assert find_quote_on_page(head, pages, c["page"]) or head in whole, (s["key"], it["label"], part)
+                if len(head) < 3:  # a table's serial number ("6."): too short to locate, so only checked as text of the page
+                    assert head in flat[on], (s["key"], it["label"], on, part)
+                    continue
+                assert find_quote_on_page(head, pages, on), (s["key"], it["label"], on, part)
 
 async def _ingest_advt12(db_session):
     source = await get_or_create_source(db_session, upsc.UPSC_SOURCE)
@@ -241,6 +248,9 @@ async def test_ssc_chsl_2026_page(api, db_session):
     assert certs["EWS Income & Asset certificate"]["detail"] == \
         "Kis par lagu: EWS ummeedwar; Financial year (aay): 2025-26; Format: Annexure-XIV"
     assert certs["OBC (Non-Creamy Layer) certificate"]["citation"]["page"] == 7
+    # SC: the crucial-date clause (p.7) and the format clause (p.6), each with its own page
+    sc = certs["SC certificate"]["citation"]
+    assert sc["page"] == 7 and " | p.6: Candidates who wish to be considered against reserved vacancies" in sc["quote"], sc
     fee = {it["label"]: it for it in s["fee"]}
     assert (fee["Application fee"]["detail"], fee["Application fee"]["citation"]["quote"]) == ("₹100", "Fee payable: Rs 100/- (Rs one hundred only).")
     sig = next(it for it in s["uploads"] if it["label"] == "Signature")
@@ -291,6 +301,8 @@ async def test_ssc_je_2026_page(api, login, db_session):
     assert next(it for it in s["eligibility"] if it["label"] == "Nagrikta (citizenship)")["status"] == "OK"
     obc = next(it for it in s["certificates"] if it["label"].startswith("OBC"))
     assert obc["status"] == "NEEDS_DOCUMENT" and obc["citation"]["page"] == 11
+    # The crucial-date clause is on p.11, the format clause on p.10: that part names its own page
+    assert " | p.10: Candidates who wish to be considered against reserved vacancies" in obc["citation"]["quote"], obc["citation"]
 
     # No date of birth: every post's own age rows (judged post by post) say the profile lacks it; education is judged as for
     # the same degree with a date of birth
