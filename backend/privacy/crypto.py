@@ -1,6 +1,7 @@
 """
 Field-level encryption at rest (DPDP Act 2023 s.8(5), reasonable security safeguards) for the columns that reveal
-caste/category and disability. AES-256-GCM with a random 96-bit nonce per value; the plaintext is the value's JSON
+caste/category and disability, and for the stored texts that quote them (profile claims, eligibility evidence, skill
+gaps, alert bodies). AES-256-GCM with a random 96-bit nonce per value; the plaintext is the value's JSON
 so booleans and integers come back with their type. Stored form: "enc:v1:" + urlsafe-base64(nonce | ciphertext | tag).
 
 The key comes from settings.FIELD_ENCRYPTION_KEY (environment / .env) and never appears in an error or log line.
@@ -35,6 +36,10 @@ def _key(raw: Optional[str] = None) -> bytes:
     if len(key) != 32:
         raise FieldEncryptionError("FIELD_ENCRYPTION_KEY must decode to 32 bytes")
     return key
+
+def require_key() -> None:
+    """Raise FieldEncryptionError now if no valid key is configured (e.g. before a migration changes anything)."""
+    _key()
 
 def is_ciphertext(stored: Any) -> bool:
     return isinstance(stored, str) and stored.startswith(PREFIX)

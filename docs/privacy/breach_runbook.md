@@ -39,8 +39,8 @@ T0 = the moment anyone on the team becomes aware of a possible breach. Write it 
 - Revoke all login tokens if accounts may be compromised:
   `UPDATE auth_tokens SET revoked_at = now() WHERE revoked_at IS NULL;`
 - Rotate any exposed secret (database password, `NVIDIA_API_KEY`, SMTP password).
-- If `FIELD_ENCRYPTION_KEY` may be exposed, treat category/caste and disability values as disclosed, generate a new
-  key and re-encrypt (decrypt with the old key and write with the new one, the same way the migration
+- If `FIELD_ENCRYPTION_KEY` may be exposed, treat category/caste and disability values (and the texts that quote
+  them) as disclosed, generate a new key and re-encrypt (decrypt with the old key and write with the new one, the same way the migration
   `alembic/versions/e3b7a91c5d20_dpdp_encryption_and_erasure.py` does; there is no key-rotation script yet).
 - Do not delete logs, database rows or files that show what happened. Copy them (read-only) to the incident folder.
 
@@ -51,7 +51,9 @@ Answer, in the incident log:
 - What happened, when it started, when it was found, when it was stopped.
 - Which people: list user ids (not names) from the database.
 - Which data items, using `docs/privacy/data_inventory.md`. Note whether the encrypted columns were exposed with or
-  without the key; ciphertext without the key is a lower risk but is still reported.
+  without the key; ciphertext without the key is a lower risk but is still reported. Without the key, requirement
+  links, verdicts and the digest / resume files can still reveal category (data_inventory.md, "What field encryption
+  does not hide"): if those were exposed, treat category as disclosed.
 - Likely consequences for the people (e.g. caste or disability disclosed, identity theft risk from DOB + address).
 - `GET /privacy/export` for an affected user shows exactly what was held about them.
 

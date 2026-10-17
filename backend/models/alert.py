@@ -4,6 +4,7 @@ from typing import Optional
 from sqlalchemy import String, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
+from govcareeros.backend.privacy.crypto import EncryptedJSON
 
 class UserAlert(Base, TimestampMixin):
     """In-app alert produced by the eligibility radar. One per (user, dedupe_key).
@@ -17,7 +18,8 @@ class UserAlert(Base, TimestampMixin):
     kind: Mapped[str] = mapped_column(String(40), index=True)
     dedupe_key: Mapped[str] = mapped_column(String(200))
     title: Mapped[str] = mapped_column(Text)
-    body: Mapped[str] = mapped_column(Text)
+    # Encrypted at rest: e.g. an age-headroom alert names the category limit that applies to the candidate
+    body: Mapped[str] = mapped_column(EncryptedJSON(str))
     vacancy_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("vacancies.id"), index=True)
     profile_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("profile_versions.id"))
     eligibility_result_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("eligibility_results.id"))

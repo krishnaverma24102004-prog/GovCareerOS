@@ -21,10 +21,10 @@ and `backend/privacy/rights.py` (export and erase). `tests/privacy/test_privacy.
 | Contact, address, preferred locations, career interests | `personal_info` | RESUME, ALERTS | Plain | Kept | Deleted |
 | Education, experience, projects, skills, certifications, languages, achievements | per-section tables, one row set per `profile_versions` row | ELIGIBILITY_CHECK, RESUME | Plain | Kept | Deleted |
 | Uploaded documents (path only) | `user_documents` | OPERATOR_ASSISTED_APPLICATION | Plain | Kept | Rows deleted |
-| Claims and their evidence | `profile_facts`, `profile_evidence` | ELIGIBILITY_CHECK, RESUME | Plain | Kept | Deleted |
-| Eligibility results and evidence | `eligibility_results`, `eligibility_evidence`, `exam_eligibility_results`, `exam_eligibility_evidence` | ELIGIBILITY_CHECK | Plain (quote profile values) | Kept as history; no new runs | Deleted |
-| Relevance scores, skill gaps | `match_scores`, `skill_gaps` | ELIGIBILITY_CHECK | Plain | Kept; no new runs | Deleted |
-| Alerts and digests | `user_alerts`, `digest_runs` + files `storage/digests/<user_id>/` | ALERTS | Plain | Kept | Rows and folder deleted |
+| Claims and their evidence | `profile_facts`, `profile_evidence` | ELIGIBILITY_CHECK, RESUME | `profile_facts.value` **AES-256-GCM** (a claim can name a certificate kind or category); evidence plain | Kept | Deleted |
+| Eligibility results and evidence | `eligibility_results`, `eligibility_evidence`, `exam_eligibility_results`, `exam_eligibility_evidence` | ELIGIBILITY_CHECK | Evidence `requirement`, `profile_evidence`, `rule` **AES-256-GCM** (they quote DOB, category, PwBD %); verdicts, check names, outcomes, pages, requirement ids plain | Kept as history; no new runs | Deleted |
+| Relevance scores, skill gaps | `match_scores`, `skill_gaps` | ELIGIBILITY_CHECK | `skill_gaps.requirement`, `requirement_quote`, `profile_has`, `next_step` **AES-256-GCM**; scores plain | Kept; no new runs | Deleted |
+| Alerts and digests | `user_alerts`, `digest_runs` + files `storage/digests/<user_id>/` | ALERTS | `user_alerts.body` **AES-256-GCM** (an age-headroom alert names the category limit); titles, digest rows and digest files plain | Kept | Rows and folder deleted |
 | Applications tracked | `applications`, `application_status_history` | OPERATOR_ASSISTED_APPLICATION / self-tracking | Plain | Kept | Deleted |
 | Resumes | `resumes`, `resume_claims` + files `storage/resumes/<user_id>/` | RESUME | Plain | Kept | Rows and folder deleted |
 | Study plans | `study_plans`, `study_plan_items` | Exam preparation | Plain | Kept | Deleted |
@@ -36,12 +36,27 @@ until erasure so earlier eligibility results remain reproducible. Clearing a fie
 ## Encryption at rest
 
 - Columns marked AES-256-GCM are encrypted in the application (`backend/privacy/crypto.py`) before they reach the
-  database; the database, its backups and its logs only see `enc:v1:...` ciphertext. The API returns plaintext to
-  the account owner.
+  database; for those columns the database, its backups and its logs only see `enc:v1:...` ciphertext. That covers
+  the source values (category, PwBD flag / % / types, certificate kind) and every stored text that quotes them:
+  profile claims, eligibility and exam-eligibility evidence, skill gaps and alert bodies
+  (`tests/privacy/test_privacy.py` scans every text value of a person's rows for plaintext). The API returns
+  plaintext to the account owner.
 - Key: `FIELD_ENCRYPTION_KEY` (32 bytes, urlsafe base64) from the environment / `.env`, a `SecretStr` that is never
   printed or logged. Losing it makes those columns unreadable; store a copy offline, separately from backups.
-- Existing plaintext was encrypted by migration `e3b7a91c5d20`; it refuses to run without a key when values exist.
+- Existing plaintext, in the source columns and in the quoting texts, was encrypted by migration `e3b7a91c5d20`; it
+  refuses to run without a key when such values exist.
 - Because the values are encrypted, SQL cannot filter or sort on them.
+
+What field encryption does not hide, so a dump without the key is still treated as exposing these:
+
+- Links and verdicts: `eligibility_evidence.requirement_id` / `skill_gaps.requirement_id` point at the vacancy
+  requirement a check was judged against, and for a category-specific age limit or reservation that official row
+  names the category; ELIGIBLE / INELIGIBLE verdicts on reserved posts hint at it too.
+- Files on disk: digests (`storage/digests/<user_id>/`) and resumes (`storage/resumes/<user_id>/`) are plaintext
+  (they are what the person reads); they rely on disk and backup protection.
+- Fields that are not encrypted at all: date of birth, gender, citizenship/nationality, ex-serviceman and service
+  details, certificate dates and issuing authority, and free text the person types (change summaries, application
+  notes, evidence descriptions).
 
 ## Withdrawal (`DELETE /privacy/consents/{purpose}`)
 

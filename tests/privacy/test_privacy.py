@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import bindparam, select, text
 
 from govcareeros.backend.config.settings import settings
 from govcareeros.backend.eligibility import engine as eligibility_engine
@@ -304,6 +304,68 @@ async def test_category_and_disability_are_ciphertext_in_the_database_and_plaint
     res = (await api.post("/eligibility", json={"profile_version_id": v, "vacancy_id": str(vacancy_id)}, headers=h)).json()
     age = next(e for e in res["evidence"] if e["check_name"] == "AGE")
     assert age["requirement"] == "max age 33 for OBC"
+
+# The person acting on other people's records (reviewer, operator), not data about them
+_ACTOR_COLUMNS = {"reviewer_id", "captured_by_id", "actor_id"}
+
+async def _owned_raw_rows(db_session, email: str) -> dict:
+    """Every row reachable from the person's users row through foreign keys, exactly as the database holds it (raw
+    SQL, so nothing is decrypted): table -> [row dicts]."""
+    uid = (await db_session.execute(text("SELECT id FROM users WHERE email = :e"), {"e": email})).scalar_one()
+    owned, rows, grew = {"users": {uid}}, {"users": [dict((await db_session.execute(
+        text("SELECT * FROM users WHERE id = :i"), {"i": uid})).mappings().one())]}, True
+    while grew:
+        grew = False
+        for table in Base.metadata.sorted_tables:
+            if "id" not in table.c:
+                continue
+            for fk in table.foreign_keys:
+                parent, col = fk.column.table.name, fk.parent.name
+                if parent not in owned or col in _ACTOR_COLUMNS or fk.column.name != "id":
+                    continue
+                stmt = text(f"SELECT * FROM {table.name} WHERE {col} IN :ids").bindparams(bindparam("ids", expanding=True))
+                for r in (await db_session.execute(stmt, {"ids": list(owned[parent])})).mappings():
+                    if r["id"] not in owned.setdefault(table.name, set()):
+                        owned[table.name].add(r["id"])
+                        rows.setdefault(table.name, []).append(dict(r))
+                        grew = True
+    return rows
+
+@pytest.mark.asyncio
+async def test_no_stored_text_holds_category_disability_or_certificate_kind_in_plaintext(api, login, db_session):
+    """Profile claims, eligibility evidence, skill gaps and alerts quote category, PwBD % and certificate kind; a
+    database dump without the key must not show them anywhere in the person's rows."""
+    from govcareeros.backend.services import radar
+    vacancy_id = await _law_officer(db_session)
+    experience = [{"organization": "Test Chambers", "designation": "Legal Associate", "domain": "Legal", "start_date": "2017-01-01"}]
+    # A: over the OBC limit of 33, within it with the PwBD relaxation (+10). B: 33 on the crucial date, at the limit.
+    people = {"atrest-a@test.invalid": "1990-01-01", "atrest-b@test.invalid": "1993-06-01"}
+    for email, dob in people.items():
+        h = await login(email)
+        profile = {**PROFILE, "personal_info": {**PROFILE["personal_info"], "date_of_birth": dob}, "experience": experience}
+        v = (await api.put("/profile", json=profile, headers=h)).json()["version"]["id"]
+        assert (await api.post("/eligibility", json={"profile_version_id": v, "vacancy_id": str(vacancy_id)}, headers=h)).status_code == 201
+        assert (await api.get(f"/gaps?profile_version_id={v}&vacancy_id={vacancy_id}", headers=h)).status_code == 200
+    users = (await db_session.execute(select(User.id).where(User.email.in_(list(people))))).scalars().all()
+    await radar.run_radar(db_session, now=datetime(2026, 10, 1, tzinfo=timezone.utc), user_ids=list(users))   # before the closing date
+    await db_session.commit()
+
+    decrypted = []
+    for email in people:
+        rows = await _owned_raw_rows(db_session, email)
+        for table in ("profile_facts", "eligibility_evidence", "skill_gaps", "user_alerts"):
+            assert rows.get(table), (email, table)
+        leaks = [(t, k, v) for t, rs in rows.items() for r in rs for k, v in r.items()
+                 if isinstance(v, str) and not crypto.is_ciphertext(v) and any(m in v for m in ("OBC", "PwBD", "45%"))]
+        assert leaks == [], leaks
+        decrypted += [crypto.decrypt_value(r[k]) for t, k in (("profile_facts", "value"), ("eligibility_evidence", "profile_evidence"),
+                                                              ("eligibility_evidence", "requirement"), ("skill_gaps", "profile_has"),
+                                                              ("user_alerts", "body")) for r in rows[t]]
+    # ... while the texts themselves do say it (so the check above looked at the right places)
+    assert any(d.startswith("OBC_NCL certificate;") for d in decrypted)
+    assert any("category OBC" in d and "PwBD 45%" in d for d in decrypted)
+    assert any("the OBC limit for this post is 33" in d for d in decrypted)      # B's age-headroom alert
+    assert any(d.startswith("max age 33 for OBC") for d in decrypted)
 
 def test_crypto_refuses_missing_wrong_or_tampered_keys(monkeypatch, field_encryption_key):
     token = crypto.encrypt_value({"x": 1})
