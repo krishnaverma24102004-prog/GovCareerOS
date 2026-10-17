@@ -1,7 +1,7 @@
 """application requirement parses (parser warnings per notice document)
 
 Revision ID: 969b734aaf03
-Revises: 497e36d5ddc3
+Revises: a6c1d94e2b70
 Create Date: 2026-10-06 18:40:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '969b734aaf03'
-down_revision: Union[str, Sequence[str], None] = '497e36d5ddc3'
+down_revision: Union[str, Sequence[str], None] = 'a6c1d94e2b70'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

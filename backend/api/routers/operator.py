@@ -262,4 +262,4 @@ async def monthly_statement(month: Optional[str] = Query(None, pattern=r"^\d{4}-
     try:
         return await billing.statement(session, operator.id, month)
     except ValueError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
+        raise HTTPException(422, str(e))

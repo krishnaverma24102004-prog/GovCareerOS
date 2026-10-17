@@ -1,7 +1,7 @@
 """ex-servicemen and Agniveer profile fields
 
 Revision ID: e5a1c7d93b20
-Revises: 497e36d5ddc3
+Revises: d616c69d4062
 Create Date: 2026-10-06 12:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'e5a1c7d93b20'
-down_revision: Union[str, Sequence[str], None] = '497e36d5ddc3'
+down_revision: Union[str, Sequence[str], None] = 'd616c69d4062'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

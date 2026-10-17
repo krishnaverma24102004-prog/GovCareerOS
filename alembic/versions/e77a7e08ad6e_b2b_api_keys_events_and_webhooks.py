@@ -1,7 +1,7 @@
 """b2b api keys, events and webhooks
 
 Revision ID: e77a7e08ad6e
-Revises: 497e36d5ddc3
+Revises: e5a1c7d93b20
 Create Date: 2026-10-06 13:53:22.452837
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'e77a7e08ad6e'
-down_revision: Union[str, Sequence[str], None] = '497e36d5ddc3'
+down_revision: Union[str, Sequence[str], None] = 'e5a1c7d93b20'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -1,7 +1,7 @@
 """DPDP: field-level encryption of category/caste and disability columns; erasure and legal-hold columns on users
 
 Revision ID: e3b7a91c5d20
-Revises: 497e36d5ddc3
+Revises: e77a7e08ad6e
 Create Date: 2026-10-06 15:00:00
 
 Existing plaintext values are read with their old types, the columns become Text, and the values are written back
@@ -20,7 +20,7 @@ from govcareeros.backend.privacy.crypto import decrypt_value, encrypt_value, is_
 
 # revision identifiers, used by Alembic.
 revision: str = 'e3b7a91c5d20'
-down_revision: Union[str, Sequence[str], None] = '497e36d5ddc3'
+down_revision: Union[str, Sequence[str], None] = 'e77a7e08ad6e'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

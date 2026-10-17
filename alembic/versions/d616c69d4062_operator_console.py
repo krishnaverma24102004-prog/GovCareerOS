@@ -1,7 +1,7 @@
 """operator console: operator role, managed client accounts, claim tokens, reports and the TEST-MODE billing ledger
 
 Revision ID: d616c69d4062
-Revises: 497e36d5ddc3
+Revises: 969b734aaf03
 Create Date: 2026-10-06 13:43:27.512360
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'd616c69d4062'
-down_revision: Union[str, Sequence[str], None] = '497e36d5ddc3'
+down_revision: Union[str, Sequence[str], None] = '969b734aaf03'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
