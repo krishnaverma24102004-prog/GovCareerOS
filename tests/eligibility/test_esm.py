@@ -13,6 +13,7 @@ None of these notices (nor any other captured fixture) mentions Agniveers: a for
 """
 import json
 import re
+import uuid
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
@@ -21,11 +22,11 @@ from typing import List
 
 import pymupdf
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from govcareeros.backend.documents.pdf_text import extract_pages
-from govcareeros.backend.eligibility import esm, exam_engine, rules
-from govcareeros.backend.models import Exam, ExamRequirement, Vacancy, VacancyRequirement
+from govcareeros.backend.eligibility import engine as eligibility_engine, esm, exam_engine, rules
+from govcareeros.backend.models import EligibilityEvidence, EligibilityResult, Exam, ExamRequirement, Vacancy, VacancyRequirement
 from govcareeros.backend.parsing.ssc_exam_notice import parse_exam_notice
 from govcareeros.backend.parsing.upsc_advertisement import IST, parse_advertisement
 from govcareeros.backend.services.document_ingestion import get_or_create_source, ingest_pdf_bytes
@@ -360,6 +361,38 @@ async def test_exam_result_has_a_separate_esm_section(api, login, db_session):
     assert res["esm_status"] == "FAILS" and section["ESM_AGE"]["requirement_id"] is not None
     # The ESM section never moves the verdict
     assert res["status"] == "CONDITIONAL"
+
+@pytest.mark.asyncio
+async def test_a_result_stored_before_the_esm_section_is_not_current(api, login, db_session, monkeypatch):
+    """A decision stored by the engine before the ESM section (hard_eligibility/3: no ESM rows, service months only as
+    stated) must not be served as current once the section exists: gaps (and radar, by the same fingerprint) recompute."""
+    source = await get_or_create_source(db_session, upsc.UPSC_SOURCE)
+    await ingest_pdf_bytes(db_session, source, f"https://www.upsc.gov.in/sites/default/files/{UPSC_12}", (FIXTURES / "upsc" / UPSC_12).read_bytes())
+    await db_session.commit()
+    vacancy = (await db_session.execute(select(Vacancy).where(Vacancy.external_ref == "26091203226"))).scalar_one()
+    h = await login("esm-stale@example.com")
+    law = {"personal_info": {**ESM_PERSON, "date_of_birth": "1992-10-01", "armed_forces_service_months": 144},
+           "education": [{"degree": "LL.B.", "institution": "Faculty of Law, University of Delhi", "education_level": "BACHELORS",
+                          "end_date": "2011-06-30"}]}
+    version = (await api.put("/profile", json=law, headers=h)).json()["version"]["id"]
+    old_id = (await api.post("/eligibility", json={"profile_version_id": version, "vacancy_id": str(vacancy.id)}, headers=h)).json()["id"]
+
+    # Make it the result the earlier engine stored: its version and fingerprint, and no ESM rows
+    with monkeypatch.context() as m:
+        m.setattr(rules, "ENGINE_VERSION", "hard_eligibility/3")
+        old_fingerprint = eligibility_engine.input_fingerprint(vacancy, await eligibility_engine.load_requirements(db_session, vacancy.id))
+    await db_session.execute(delete(EligibilityEvidence).where(EligibilityEvidence.result_id == uuid.UUID(old_id),
+                                                               EligibilityEvidence.check_name.like("ESM_%")))
+    await db_session.execute(update(EligibilityResult).where(EligibilityResult.id == uuid.UUID(old_id))
+                             .values(engine_version="hard_eligibility/3", input_fingerprint=old_fingerprint))
+    await db_session.commit()
+    assert (await api.get(f"/eligibility/{old_id}", headers=h)).json()["esm_status"] is None
+
+    gaps = (await api.get(f"/gaps?profile_version_id={version}&vacancy_id={vacancy.id}", headers=h)).json()
+    assert gaps["eligibility_result_id"] != old_id
+    fresh = (await api.get(f"/eligibility/{gaps['eligibility_result_id']}", headers=h)).json()
+    assert fresh["engine_version"] == rules.ENGINE_VERSION and fresh["esm_status"] == "FAILS"
+    assert [e["check_name"] for e in fresh["esm"]] == ["ESM_STATUS", "ESM_RELEASE", "ESM_AGE", "ESM_RESERVATION_REUSE"]
 
 @pytest.mark.asyncio
 async def test_vacancy_result_has_a_separate_esm_section_and_gaps_stay_current(api, login, db_session):

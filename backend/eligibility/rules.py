@@ -23,7 +23,9 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from govcareeros.backend.parsing.upsc_advertisement import words_to_number
 
-ENGINE_VERSION = "hard_eligibility/3"
+# Part of every input fingerprint, so a newer engine makes stored results stale (gaps, radar and digest recompute).
+# /4: ex-servicemen section (eligibility/esm.py) stored with the result; ESM service months from enrolment/release dates
+ENGINE_VERSION = "hard_eligibility/4"
 
 # ---------- plain inputs ----------
 
