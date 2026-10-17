@@ -103,7 +103,8 @@ async def test_upsc_advt_12_public_page(api, db_session):
     obc = certs["OBC (Non-Creamy Layer) certificate"]
     assert obc["citation"]["page"] == 19 and "is to be treated as crucial date" in obc["citation"]["quote"]
     assert obc["detail"] == "Kis par lagu: OBC ummeedwar; Crucial date: 16 Oct 2026; Format: prescribed format"
-    assert certs["SC certificate"]["detail"] == "Kis par lagu: SC ummeedwar; Format: prescribed proforma"  # no date stated
+    # The advertisement states no date for the SC certificate: said so (what that means for a candidate is certificate_check's)
+    assert certs["SC certificate"]["detail"] == "Kis par lagu: SC ummeedwar; Format: prescribed proforma; Validity: notice mein koi tithi nahi di gayi"
 
     fee = {it["label"]: it for it in s["fee"]}
     assert (fee["Application fee"]["detail"], fee["Application fee"]["citation"]["page"]) == ("₹25", 21)
@@ -154,14 +155,20 @@ async def test_upsc_advt_12_personalised(api, login, db_session):
     assert fee["Application fee"]["status"] == "OK" and "aapko fee ₹25 deni hai" in fee["Application fee"]["detail"]
     assert all(it["status"] is None for k in ("dates", "uploads", "photo_id", "portal") for it in s[k])
 
-    # SC woman: the advertisement states no date for the SC certificate, so its validity cannot be decided; no fee
+    # SC woman with no SC certificate recorded: the advertisement states no date for it, so certificate_check takes the
+    # closing date (Sakshi Arha para 27) and, before it, she must obtain one; the page shows that status as it is. No fee
     priya = await login("priya@example.com")
     priya_v = await _version(api, priya, {"full_name": "Priya", "date_of_birth": "1996-01-02", "gender": "female", "category": "SC",
                                           "is_pwbd": False, "nationality": "Indian"}, **LAW_GRAD)
     priya_id = uuid.UUID((await api.get("/auth/me", headers=priya)).json()["id"])
     s = _sections(await apply_ready.vacancy_page(db_session, vacancy.id, priya_id, uuid.UUID(priya_v), now=BEFORE_CLOSING))
     sc = next(it for it in s["certificates"] if it["label"] == "SC certificate")
-    assert sc["status"] == "CANNOT_DECIDE" and "validity tithi nahi" in sc["detail"]
+    assert sc["status"] == "NEEDS_DOCUMENT", sc
+    assert "no SC certificate is recorded" in sc["detail"] and "obtain one valid on 2026-10-16" in sc["detail"]
+    assert "default-cut-off-last-date-of-application" in sc["detail"]
+    # Ex-serviceman status not stated in her profile: certificate_check cannot decide, and the page gives its reason
+    esm = next(it for it in s["certificates"] if it["label"] == "Ex-Serviceman certificate")
+    assert esm["status"] == "CANNOT_DECIDE" and "Aapke liye: the profile does not say whether you claim" in esm["detail"], esm
     assert next(it for it in s["certificates"] if it["label"].startswith("OBC"))["status"] is None
     fee = next(it for it in s["fee"] if it["label"] == "Application fee")
     assert fee["status"] == "OK" and "aapko fee nahi deni (exempt as FEMALE/SC)" in fee["detail"]

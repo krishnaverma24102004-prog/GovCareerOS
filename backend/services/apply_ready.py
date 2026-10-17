@@ -13,9 +13,9 @@ Personal statuses come from the existing deterministic code, never an LLM:
   - eligibility: the hard checks of eligibility/engine (vacancy) or exam_engine (exam; post-wise notices judge each
     post's own rows, and exam-level rows as for the best post), computed in memory and not stored.
     MET -> OK, NOT_MET -> FAILS, CONDITIONAL / NEEDS_HUMAN_REVIEW -> CANNOT_DECIDE, UNKNOWN -> UNKNOWN.
-  - certificates: eligibility/certificate_check against the certificates the profile version records. A notice row
-    that states no validity (no crucial date, issue window or financial year) gives CANNOT_DECIDE for a certificate
-    the candidate needs; NOT_APPLICABLE gives no status.
+  - certificates: eligibility/certificate_check against the certificates the profile version records, its status as it
+    gives it (for a notice that states no validity date it applies the closing date under a cited rule); NOT_APPLICABLE
+    gives no status. A notice row that states no validity date says so in its detail, public or not.
   - documents and fee: application_prep's checklist. REQUIRED -> NEEDS_DOCUMENT, IF_APPLICABLE -> CANNOT_DECIDE,
     UNKNOWN -> UNKNOWN, NOT_REQUIRED -> no status; fee EXEMPT / PAY -> OK (the detail says which), UNKNOWN -> UNKNOWN.
   - dates, uploads, photo_id and portal apply to everyone: no status.
@@ -235,17 +235,15 @@ def _certificate_items(rows: Sequence[ApplicationRequirement], cite, outcomes: O
             f"Is tithi tak jaari: {_day(v.get('issued_on_or_before'))}" if v.get("issued_on_or_before") else None,
             f"Financial year (aay): {v['financial_year']}" if v.get("financial_year") else None,
             f"Format: {v['format_note']}" if v.get("format_note") else None,
+            # A fact about the notice, not a verdict: certificate_check decides what a silent notice means (closing date)
+            "Validity: notice mein koi tithi nahi di gayi" if _no_validity(v) else None,
         )
         status = None
         if outcomes is not None:
+            # certificate_check's own status, unchanged (it already applies the cited rules for a notice silent on dates)
             o = outcomes.get(r.id)
             status = _CERT.get(o.outcome) if o else None
-            if status and _no_validity(v):
-                status, why = CANNOT_DECIDE, "notice mein certificate ki validity tithi nahi di gayi; " + o.rule
-            else:
-                why = o.rule if o else None
-            if o is not None and o.outcome == certificates.NOT_APPLICABLE:
-                why = "aap par lagu nahi: " + o.rule
+            why = None if o is None else ("aap par lagu nahi: " if o.outcome == certificates.NOT_APPLICABLE else "") + o.rule
             detail = _join(detail, f"Aapke liye: {why}" if why else None)
         items.append(_item(_CERTIFICATES.get(r.code, _humanize(r.code)), detail, cite(r), status))
     return items
