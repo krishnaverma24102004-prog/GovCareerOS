@@ -50,7 +50,9 @@ Names only; the defaults and meaning of each are in `backend/config/settings.py`
 
 Compose / images
 
-- `POSTGRES_PASSWORD` (required): password of the `govcareeros` database user; compose builds `DATABASE_URL` from it
+- `POSTGRES_PASSWORD` (required): password of the `govcareeros` database user; compose passes it to the app as
+  `DATABASE_PASSWORD` beside a `DATABASE_URL` without a password, so any characters work (in `.env`, single-quote
+  a value that contains `$`: compose expands `$` in unquoted values)
 - `API_PORT`, `WEB_PORT`: host ports (bound to 127.0.0.1)
 - `NEXT_PUBLIC_API_URL`: the API address as the browser sees it; compiled into the dashboard at build time
 - `INSTALL_OCR`, `INSTALL_PLAYWRIGHT`: build arguments of the API image
@@ -59,7 +61,8 @@ Compose / images
 
 Application
 
-- `DATABASE_URL` (set by compose), `DB_ECHO`, `STORAGE_PATH` (set by compose), `TEST_DATABASE_URL` (tests only)
+- `DATABASE_URL` (set by compose), `DATABASE_PASSWORD` (set by compose: replaces the password in `DATABASE_URL`),
+  `DB_ECHO`, `STORAGE_PATH` (set by compose), `TEST_DATABASE_URL` (tests only)
 - `FRONTEND_ORIGIN`, `FRONTEND_ORIGINS`: allowed browser origins for CORS (explicit origins; `*` is refused)
 - `MAX_REQUEST_BYTES`: body limit for routes without their own (the notice check has a fixed 11 MB limit)
 - `HSTS_SECONDS`: Strict-Transport-Security on https requests (0 = off)

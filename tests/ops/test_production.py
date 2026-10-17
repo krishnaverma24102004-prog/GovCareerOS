@@ -40,6 +40,30 @@ def test_cors_origins_from_env(monkeypatch):
     with pytest.raises(ValueError, match="explicit origins"):
         Settings(_env_file=None).cors_origins
 
+def test_database_password_kept_out_of_the_url(monkeypatch):
+    """compose passes POSTGRES_PASSWORD as DATABASE_PASSWORD next to a URL without one. Pasted into the URL raw,
+    "ab@cd12" parsed as password "ab" at host "cd12@postgres", and "p%41ssword" as "pAssword"."""
+    import configparser
+    from sqlalchemy.engine import make_url
+    from govcareeros.backend.config import redaction
+
+    url = "postgresql+asyncpg://govcareeros@postgres:5432/govcareeros"
+    for password in ("ab@cd12", "p%41ssword", "x:y/z?#[]@ test-only"):
+        monkeypatch.setenv("DATABASE_URL", url)
+        monkeypatch.setenv("DATABASE_PASSWORD", password)
+        s = Settings(_env_file=None)
+        parsed = make_url(s.DATABASE_URL)
+        assert (parsed.username, parsed.password, parsed.host, parsed.port, parsed.database) ==             ("govcareeros", password, "postgres", 5432, "govcareeros")
+        # alembic/env.py hands the URL to configparser with % doubled; it reads back as the same URL
+        cp = configparser.ConfigParser()
+        cp["alembic"] = {"sqlalchemy.url": s.DATABASE_URL.replace("%", "%%")}
+        assert make_url(cp.get("alembic", "sqlalchemy.url")).password == password
+        # and the log redaction knows the real password
+        monkeypatch.setattr(settings, "DATABASE_URL", s.DATABASE_URL)
+        assert password in redaction.configured_secrets()
+    monkeypatch.delenv("DATABASE_PASSWORD")
+    assert Settings(_env_file=None).DATABASE_URL == url  # no DATABASE_PASSWORD: the URL as given
+
 # ---------- the app under production settings ----------
 
 @pytest.mark.asyncio
@@ -232,6 +256,11 @@ def test_compose_file_structure():
     for name in ("api", "scheduler"):
         assert services[name]["depends_on"]["migrate"]["condition"] == "service_completed_successfully"
     assert services["scheduler"]["command"][-1] == "govcareeros/scripts/scheduler.py"
+    # the password reaches the app on its own, never pasted into the URL (it may contain @ : / %)
+    for name in ("migrate", "api", "scheduler"):
+        env = services[name]["environment"]
+        assert "POSTGRES_PASSWORD" not in env["DATABASE_URL"] and env["DATABASE_URL"].startswith("postgresql+asyncpg://govcareeros@")
+        assert env["DATABASE_PASSWORD"].startswith("${POSTGRES_PASSWORD:?")
     # published only on loopback; the reverse proxy is the public entry
     for name in ("api", "web"):
         assert all(p.startswith("127.0.0.1:") for p in services[name]["ports"])

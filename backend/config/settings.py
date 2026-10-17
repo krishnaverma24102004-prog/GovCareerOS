@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -9,6 +10,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=PROJECT_ROOT / ".env", extra="ignore")
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/govcareeros"
+    # Optional: the database password on its own, any characters (docker-compose.yml passes POSTGRES_PASSWORD here).
+    # It replaces the password in DATABASE_URL, escaped, so "@", ":", "/" or "%41" in it cannot change the URL
+    DATABASE_PASSWORD: str = ""
     TEST_DATABASE_URL: Optional[str] = None
     DB_ECHO: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -66,6 +70,13 @@ class Settings(BaseSettings):
     # Days an in-service applicant's office may need to forward an application; 0 = off. Shown only as a labelled
     # estimate beside the official last date, never as the date (backend/services/deadline_helper.py)
     IN_SERVICE_FORWARDING_BUFFER_DAYS: int = 0
+
+    @model_validator(mode="after")
+    def _database_password(self) -> "Settings":
+        if self.DATABASE_PASSWORD:
+            from sqlalchemy.engine import make_url
+            self.DATABASE_URL = make_url(self.DATABASE_URL).set(password=self.DATABASE_PASSWORD).render_as_string(hide_password=False)
+        return self
 
     @property
     def cors_origins(self) -> List[str]:

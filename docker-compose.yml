@@ -14,8 +14,10 @@ x-app: &app
     - path: .env
       required: false
   environment: &app-env
-    # Overrides any DATABASE_URL in .env (which may point at a local development database)
-    DATABASE_URL: postgresql+asyncpg://govcareeros:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/govcareeros
+    # Overrides any DATABASE_URL in .env (which may point at a local development database). The password goes
+    # separately (any characters): settings puts it into the URL escaped, so "@", ":", "/" or "%" cannot break it
+    DATABASE_URL: postgresql+asyncpg://govcareeros@postgres:5432/govcareeros
+    DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     STORAGE_PATH: /data/storage
     LOG_FORMAT: ${LOG_FORMAT:-json}
   volumes:
