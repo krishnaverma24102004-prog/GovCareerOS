@@ -155,7 +155,16 @@ def test_upsc_advertisement_states_no_release_window_or_definition():
     assert serving["ESM_RELEASE"].outcome == "CANNOT_DECIDE" and "does not say whether serving personnel" in serving["ESM_RELEASE"].rule
     retired = {o.check: o for o in esm.check_esm(_person(esm_release_type="RETIRED_WITH_PENSION", esm_release_date=date(2020, 1, 1)),
                                                  _law_officer_rows(), closing, closing)}
-    assert retired["ESM_STATUS"].outcome == "CANNOT_DECIDE" and retired["ESM_RELEASE"].outcome == "OK"
+    assert retired["ESM_STATUS"].outcome == "CANNOT_DECIDE"
+    # No crucial date for ESM status in this notice: nothing to judge the release date against, and nothing to cite
+    release = retired["ESM_RELEASE"]
+    assert (release.outcome, release.requirement, release.source_page) == ("CANNOT_DECIDE", "-", None)
+    assert "states no date by which ex-serviceman status must be held" in release.rule
+    # Nor does it define "ex-serviceman": no claim about what a definition excludes
+    dismissed = {o.check: o for o in esm.check_esm(_person(esm_release_type="DISMISSED", esm_release_date=date(2020, 1, 1)),
+                                                   _law_officer_rows(), closing, closing)}["ESM_STATUS"]
+    assert (dismissed.outcome, dismissed.requirement, dismissed.source_page) == ("CANNOT_DECIDE", "-", None)
+    assert "does not define 'ex-serviceman'" in dismissed.rule and "definition's" not in dismissed.rule
 
 # ---------- age: the notice's own formula ----------
 

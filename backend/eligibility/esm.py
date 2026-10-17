@@ -6,8 +6,10 @@ Pure functions over the profile snapshot and the notice's rows; nothing is decid
   ESM_STATUS             the candidate's release route (PersonalInfo.esm_release_type) against the notice's definition
                          of "ex-serviceman" (ESM_RULE kind DEFINITION). Dismissal / discharge for misconduct FAILS only
                          when the notice excludes it in so many words (SSC JE 2026 para 7.6); otherwise a reviewer
-                         decides, since the definition has other routes (e.g. gallantry award winners).
-  ESM_RELEASE            released on or before the crucial date (STATUS_CRUCIAL_DATE: the closing date); a serving
+                         decides, since the definition has other routes (e.g. gallantry award winners); with no
+                         definition in the notice text, CANNOT_DECIDE.
+  ESM_RELEASE            released on or before the crucial date (STATUS_CRUCIAL_DATE: the closing date; a notice without
+                         it -> CANNOT_DECIDE, nothing to judge or cite); a serving
                          candidate only when the notice allows completing the term of engagement within one year from
                          the closing date (RELEASE_WITHIN_ONE_YEAR), and then only up to that day.
   ESM_AGE                the notice's own ESM age relaxation (AGE_RELAXATION_RULE): SSC "N years after deduction of the
@@ -81,6 +83,9 @@ def check_status(profile: rules.ProfileSnapshot, by_kind: Dict[str, rules.Requir
         if release and release.value.get("excludes_dismissal_or_misconduct"):
             return _out("ESM_STATUS", FAILS, "the notice excludes ex-serviceman status acquired by dismissal or discharge on account of "
                         "misconduct or inefficiency", release, evidence)
+        if defn is None:
+            return _out("ESM_STATUS", CANNOT_DECIDE, "the notice text used does not define 'ex-serviceman', so whether a dismissal or a "
+                        "discharge for misconduct or inefficiency leaves ex-serviceman status cannot be read from it", None, evidence)
         return _out("ESM_STATUS", NEEDS_HUMAN_REVIEW, "the definition's engagement route excludes dismissal and discharge for misconduct "
                     "or inefficiency; whether another route of the definition applies needs a reviewer", defn, evidence)
     if defn is None:
@@ -106,8 +111,8 @@ def check_release(profile: rules.ProfileSnapshot, by_kind: Dict[str, rules.Requi
         if crucial_rule:
             return _out("ESM_RELEASE", OK, f"released on {release.isoformat()}, by the crucial date for ESM status (closing date "
                         f"{closing.isoformat()})", crucial_rule, evidence)
-        return _out("ESM_RELEASE", OK, f"released on {release.isoformat()}, before the closing date {closing.isoformat()}; the notice "
-                    "text used states no separate crucial date for ESM status", None, evidence)
+        return _out("ESM_RELEASE", CANNOT_DECIDE, f"released on {release.isoformat()}; the notice text used states no date by which "
+                    "ex-serviceman status must be held, so there is no rule here to judge the release date against", None, evidence)
     if window is None:
         return _out("ESM_RELEASE", CANNOT_DECIDE, "not yet released on the closing date, and the notice text used does not say whether "
                     "serving personnel due for release may apply as ex-servicemen", crucial_rule, evidence)
