@@ -12,9 +12,10 @@ import uuid
 from datetime import date, datetime
 from typing import Any, Dict, Iterable, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import and_, exists, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from govcareeros.backend.models.consent import ConsentRecord
 from govcareeros.backend.models.user import PersonalInfo
 from govcareeros.backend.privacy import notice
 from govcareeros.backend.services.consent import active_consent
@@ -109,6 +110,40 @@ async def has_consent(session: AsyncSession, user_id: uuid.UUID, purpose: str = 
     except ConsentRequired:
         return False
     return True
+
+def adult_born_by(today: date) -> date:
+    """A person born on or before this day is 18 or over today (age_on's arithmetic; 29 Feb -> 28 Feb)."""
+    try:
+        return today.replace(year=today.year - ADULT_AGE)
+    except ValueError:
+        return date(today.year - ADULT_AGE, 2, 28)
+
+def consent_clause(user_id_col, purposes: Iterable[str], profile_version_id_col=None, today: Optional[date] = None):
+    """SQL EXISTS for listing other people's data: the user has an active consent under the current notice for one of
+    `purposes`, and when that profile version's DOB says under 18, one that names a guardian (as require_consent)."""
+    c = ConsentRecord
+    cond = [c.user_id == user_id_col, c.purpose.in_(list(purposes)), c.withdrawn_at.is_(None),
+            c.notice_version == notice.NOTICE_VERSION]
+    if profile_version_id_col is not None:
+        born_by = adult_born_by(today or date.today())
+        dob = select(PersonalInfo.date_of_birth).where(PersonalInfo.profile_version_id == profile_version_id_col).scalar_subquery()
+        cond.append(or_(dob.is_(None), dob <= datetime(born_by.year, born_by.month, born_by.day),
+                        func.coalesce(func.trim(c.guardian_name), "") != ""))
+    return exists().where(*cond)
+
+def fact_is_sensitive_clause(subject_col, predicate_col):
+    """SQL form of bool(fact_items(subject, predicate))."""
+    return or_(func.lower(func.trim(subject_col)) == _CERTIFICATE_SUBJECT,
+               func.lower(func.trim(predicate_col)).in_(sorted(_FACT_PREDICATE_ITEMS)))
+
+def reviewable_fact_clause(fact_cls, version_cls, user_cls, today: Optional[date] = None):
+    """Another person's profile claim may be shown to and decided by a reviewer only while its owner's account is open
+    (not deactivated, not awaiting erasure) and the owner has active consent for a purpose the claim serves: a claim
+    stating category/DOB/disability/certificates etc. ELIGIBILITY_CHECK; any other claim ELIGIBILITY_CHECK or RESUME."""
+    eligibility = consent_clause(user_cls.id, [notice.ELIGIBILITY_CHECK], version_cls.id, today)
+    resume = consent_clause(user_cls.id, [notice.RESUME], version_cls.id, today)
+    return and_(user_cls.is_active.is_(True), user_cls.erasure_requested_at.is_(None), user_cls.erased_at.is_(None),
+                or_(eligibility, and_(not_(fact_is_sensitive_clause(fact_cls.subject, fact_cls.predicate)), resume)))
 
 async def version_date_of_birth(session: AsyncSession, profile_version_id: uuid.UUID) -> Optional[datetime]:
     return (await session.execute(select(PersonalInfo.date_of_birth).where(

@@ -255,6 +255,60 @@ async def test_change_watch_stops_using_verdicts_after_withdrawal(api, login, db
     assert await change_log.watched_targets(db_session, user_id) == ({}, {})
     assert await change_log.change_alerts(db_session, user_id) == []
 
+@pytest.mark.asyncio
+async def test_reviewers_stop_seeing_claims_after_withdrawal_or_erasure(api, login, db_session):
+    candidate = await login("c9@test.invalid", consent=False)
+    await _consent(api, candidate)
+    reviewer = await login("rev9@test.invalid")
+    (await db_session.execute(select(User).where(User.email == "rev9@test.invalid"))).scalar_one().is_reviewer = True
+    await db_session.commit()
+    assert (await api.put("/profile", json=PROFILE, headers=candidate)).status_code == 201   # its certificate is a claim
+    degree = (await api.post("/profile/facts", json={"subject": "education", "predicate": "degree", "value": "LL.B."},
+                             headers=candidate)).json()
+
+    async def listed():
+        page = (await api.get("/review/facts", headers=reviewer)).json()
+        return {f["predicate"]: f["id"] for f in page["items"]}, page["total"]
+
+    claims, total = await listed()
+    assert set(claims) == {"certificate", "degree"} and total == 2
+    certificate = claims["certificate"]
+
+    # ELIGIBILITY_CHECK withdrawn: the certificate claim (and, with no other purpose, the degree) is out of review
+    await api.delete("/privacy/consents/ELIGIBILITY_CHECK", headers=candidate)
+    assert await listed() == ({}, 0)
+    for fact_id in (certificate, degree["id"]):
+        r = await api.post(f"/review/facts/{fact_id}/reject", json={"note": "x"}, headers=reviewer)
+        assert r.status_code == 404, r.text
+    # RESUME consent covers the degree claim again, never the certificate
+    await _consent(api, candidate, purpose="RESUME")
+    assert await listed() == ({"degree": degree["id"]}, 1)
+
+    # Erasure requested: nothing of theirs is reviewed during the grace period
+    assert (await api.post("/privacy/erase", json={"confirm": "ERASE"}, headers=candidate)).status_code == 202
+    assert await listed() == ({}, 0)
+    assert (await api.post(f"/review/facts/{degree['id']}/reject", json={"note": "x"}, headers=reviewer)).status_code == 404
+
+@pytest.mark.asyncio
+async def test_reviewers_see_a_minors_claims_only_under_guardian_consent(api, login, db_session):
+    from govcareeros.backend.services.consent import record_consent
+    minor = await login("minor9@test.invalid", consent=False)
+    await _consent(api, minor, guardian_name="Test Guardian")
+    reviewer = await login("rev10@test.invalid")
+    (await db_session.execute(select(User).where(User.email == "rev10@test.invalid"))).scalar_one().is_reviewer = True
+    await db_session.commit()
+    profile = {"personal_info": {"full_name": "Minor", "date_of_birth": _years_ago(17), "category": "SC"},
+               "reservation_certificates": [{"kind": "SC", "issue_date": "2026-04-01"}]}
+    assert (await api.put("/profile", json=profile, headers=minor)).status_code == 201
+    assert (await api.get("/review/facts", headers=reviewer)).json()["total"] == 1
+
+    # Only a consent without a guardian's name left (e.g. recorded before the DOB was entered): not reviewable
+    await api.delete("/privacy/consents/ELIGIBILITY_CHECK", headers=minor)
+    uid = (await db_session.execute(select(User.id).where(User.email == "minor9@test.invalid"))).scalar_one()
+    await record_consent(db_session, uid, "ELIGIBILITY_CHECK", notice.data_items("ELIGIBILITY_CHECK"), notice.NOTICE_VERSION)
+    await db_session.commit()
+    assert (await api.get("/review/facts", headers=reviewer)).json()["total"] == 0
+
 # ---------- age gate ----------
 
 @pytest.mark.asyncio
