@@ -241,3 +241,79 @@ def test_images_never_contain_env_files():
     assert "USER node" in web and ".next/standalone" in web and "NEXT_OUTPUT=standalone" in web
     for dockerfile in (api, web):
         assert not [l for l in dockerfile.splitlines() if l.startswith(("COPY", "ADD")) and ".env" in l]
+
+# ---------- the API image's dependency set ----------
+
+# What the images import at startup: uvicorn's app, the scheduler and the jobs it starts (with the services they load)
+_IMAGE_IMPORTS = ["govcareeros.backend.api.main", "govcareeros.backend.models", "govcareeros.scripts.scheduler",
+                  "govcareeros.scripts.daily_job", "govcareeros.scripts.send_digests", "govcareeros.scripts.triage_notices",
+                  "govcareeros.backend.services.source_discovery", "govcareeros.backend.services.document_ingestion",
+                  "govcareeros.backend.services.triage", "govcareeros.backend.services.extraction_drafts",
+                  "govcareeros.backend.services.radar", "govcareeros.backend.services.digest", "govcareeros.backend.llm.provider"]
+
+def _runtime_requirements():
+    """Requirement lines of requirements.txt above the "# dev" marker: exactly what the Dockerfile installs."""
+    from packaging.requirements import Requirement
+    lines = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+    runtime = []
+    for line in lines:
+        if line.startswith("# dev"):
+            break
+        if line.strip() and not line.lstrip().startswith("#"):
+            runtime.append(Requirement(line.strip()))
+    return runtime
+
+def _install_closure(requirements):
+    """Normalised names of every distribution pip installs for these requirements (from the installed metadata)."""
+    from importlib import metadata
+    from packaging.requirements import Requirement
+    from packaging.utils import canonicalize_name
+
+    seen, todo = set(), [(r, frozenset(r.extras)) for r in requirements]
+    while todo:
+        req, extras = todo.pop()
+        name = canonicalize_name(req.name)
+        if name in seen:
+            continue
+        seen.add(name)
+        try:
+            dist = metadata.distribution(req.name)
+        except metadata.PackageNotFoundError:
+            continue  # not installed here, so nothing of it can be imported here either
+        for line in dist.requires or []:
+            sub = Requirement(line)
+            if sub.marker is None or any(sub.marker.evaluate({"extra": e}) for e in (extras or {""})):
+                todo.append((sub, frozenset(sub.extras)))
+    return seen
+
+def test_runtime_requirements_cover_what_the_images_import(tmp_path):
+    """The API image installs only the runtime section of requirements.txt. Import the app and the scheduled jobs
+    with every module outside that section's install closure hidden: a package that is here only because it was
+    installed by hand (python-multipart for the /verify form) would otherwise crash the api container at startup."""
+    pytest.importorskip("packaging")
+    from importlib import metadata
+    from packaging.utils import canonicalize_name
+
+    closure = _install_closure(_runtime_requirements())
+    hidden = sorted(module for module, dists in metadata.packages_distributions().items()
+                    if module.isidentifier() and not any(canonicalize_name(d) in closure for d in dists))
+    code = r"""
+import importlib, json, sys
+from importlib.abc import MetaPathFinder
+hidden = set(json.loads(sys.argv[1]))
+class Hide(MetaPathFinder):
+    def find_spec(self, name, path=None, target=None):
+        if name.split(".")[0] in hidden:
+            raise ModuleNotFoundError(f"No module named {name!r} (not in the image's runtime requirements)", name=name)
+        return None
+sys.meta_path.insert(0, Hide())
+for module in json.loads(sys.argv[2]):
+    importlib.import_module(module)
+print("IMPORTED")
+"""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("FRONTEND_", "LOG_"))}
+    env.update({"PYTHONPATH": str(ROOT.parent), "PYTHONIOENCODING": "utf-8", "TEST_DATABASE_URL": "",
+                "DATABASE_URL": f"sqlite+aiosqlite:///{(tmp_path / 'img.db').as_posix()}", "STORAGE_PATH": str(tmp_path / "storage")})
+    out = subprocess.run([sys.executable, "-c", code, json.dumps(hidden), json.dumps(_IMAGE_IMPORTS)], env=env,
+                         cwd=str(tmp_path), capture_output=True, text=True, encoding="utf-8", timeout=180)
+    assert out.returncode == 0 and "IMPORTED" in out.stdout, out.stderr[-3000:]
