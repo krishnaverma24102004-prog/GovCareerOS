@@ -111,7 +111,7 @@ async def set_reuse_policy(source_id: uuid.UUID, body: ReusePolicyIn, user: User
     if source is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "source not found")
     if body.reuse_level != "UNKNOWN" and body.copyright_policy_url is None:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "a reuse level needs the copyright_policy_url it was read from")
+        raise HTTPException(422, "a reuse level needs the copyright_policy_url it was read from")
     before = {"reuse_level": source.reuse_level, "copyright_policy_url": source.copyright_policy_url}
     source.reuse_level = body.reuse_level
     source.copyright_policy_url = body.copyright_policy_url
