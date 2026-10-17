@@ -192,7 +192,10 @@ def _outcome_statuses(outcomes: Sequence[rules.RuleOutcome], reqs: Sequence[rule
     for o in outcomes:
         if o.outcome not in mapping:
             continue
-        ids = [o.requirement_id] if o.requirement_id is not None else             [r.id for r in reqs if r.req_type in _CHECK_TYPES.get(o.check, ())]
+        if o.requirement_id is not None:
+            ids = [o.requirement_id]
+        else:
+            ids = [r.id for r in reqs if r.req_type in _CHECK_TYPES.get(o.check, ())]
         for i in ids:
             out.setdefault(i, []).append(mapping[o.outcome])
     return {k: _worst(v) for k, v in out.items()}
