@@ -156,6 +156,20 @@ async def disable(session: AsyncSession, hook: Webhook, now: Optional[datetime] 
         d.status, d.next_attempt_at, d.error = "CANCELLED", None, "webhook removed"
     await session.flush()
 
+async def deactivate_org(session: AsyncSession, org: ApiOrg, now: Optional[datetime] = None) -> int:
+    """The org's keys stop working (api_keys.lookup) and its webhooks are disabled, pending deliveries CANCELLED.
+    The number of webhooks disabled."""
+    org.is_active = False
+    hooks = (await session.execute(select(Webhook).where(Webhook.org_id == org.id, Webhook.disabled_at.is_(None)))).scalars().all()
+    for hook in hooks:
+        await disable(session, hook, now)
+    await session.flush()
+    return len(hooks)
+
+def _sendable():
+    """Ids of webhooks that may be sent to: not removed, and their org active."""
+    return select(Webhook.id).join(ApiOrg, ApiOrg.id == Webhook.org_id).where(Webhook.disabled_at.is_(None), ApiOrg.is_active.is_(True))
+
 async def enqueue(session: AsyncSession, now: Optional[datetime] = None) -> int:
     """A PENDING delivery for each active webhook and each event after the last one it was given."""
     now = now or datetime.now(timezone.utc)
@@ -199,10 +213,12 @@ def _failed(d: WebhookDelivery, now: datetime, error: str, status: Optional[int]
 async def _claim(session: AsyncSession, delivery_id, due_by: datetime, at: datetime) -> bool:
     """Take one due delivery for this dispatcher and commit: attempts + 1, next attempt LEASE ahead. A dispatcher
     running at the same time then finds it not due and skips it; if this one dies mid-send, the delivery is tried
-    again once the lease is over. False when another dispatcher took it (or it was removed) first."""
+    again once the lease is over. False when another dispatcher took it first, or its webhook was removed or its
+    org deactivated."""
     taken = await session.execute(
         update(WebhookDelivery)
-        .where(WebhookDelivery.id == delivery_id, WebhookDelivery.status == "PENDING", WebhookDelivery.next_attempt_at <= due_by)
+        .where(WebhookDelivery.id == delivery_id, WebhookDelivery.status == "PENDING", WebhookDelivery.next_attempt_at <= due_by,
+               WebhookDelivery.webhook_id.in_(_sendable()))  # removed, or its org deactivated, since the batch began
         .values(attempts=WebhookDelivery.attempts + 1, last_attempt_at=at, next_attempt_at=at + LEASE)
         .execution_options(synchronize_session=False))
     await session.commit()
@@ -266,7 +282,8 @@ async def deliver_due(session: AsyncSession, client: Optional[httpx.AsyncClient]
         clock = (lambda: now) if now is not None else (lambda: datetime.now(timezone.utc))
     now = now or clock()
     due = (await session.execute(
-        select(WebhookDelivery.id).where(WebhookDelivery.status == "PENDING", WebhookDelivery.next_attempt_at <= now)
+        select(WebhookDelivery.id).where(WebhookDelivery.status == "PENDING", WebhookDelivery.next_attempt_at <= now,
+                                         WebhookDelivery.webhook_id.in_(_sendable()))
         .order_by(WebhookDelivery.next_attempt_at, WebhookDelivery.event_seq).limit(limit))).scalars().all()
     counts = {"DELIVERED": 0, "RETRY": 0, "FAILED": 0, "REFUSED": 0}
     owns = client is None

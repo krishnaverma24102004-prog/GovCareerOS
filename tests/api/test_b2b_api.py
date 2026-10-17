@@ -27,7 +27,7 @@ import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from govcareeros.backend.models import ApiKey, ApiUsage, RecruitmentNotice, ReviewAuditLog, User, Webhook, WebhookDelivery
+from govcareeros.backend.models import ApiKey, ApiOrg, ApiUsage, RecruitmentNotice, ReviewAuditLog, User, Webhook, WebhookDelivery
 from govcareeros.backend.schemas.attribution import DISCLAIMER
 from govcareeros.backend.services import api_keys, b2b_events, b2b_notices, notice_verifier, webhooks
 from govcareeros.backend.services.document_ingestion import get_or_create_source, ingest_pdf_bytes
@@ -728,6 +728,55 @@ async def test_overlapping_dispatchers_never_send_a_delivery_twice(api, new_key,
     assert first == {"DELIVERED": 1, "RETRY": 0, "FAILED": 0, "REFUSED": 0}            # skipped the two it took
     deliveries = (await db_session.execute(select(WebhookDelivery).execution_options(populate_existing=True))).scalars().all()
     assert [(d.status, d.attempts) for d in deliveries] == [("DELIVERED", 1)] * 3
+
+@pytest.mark.asyncio
+async def test_deactivated_orgs_and_disabled_webhooks_get_no_deliveries(api, admin, login, new_key, db_session):
+    key, _, org_id = await new_key(["webhooks:manage"])
+    h = {"X-API-Key": key}
+    first, second = [(await api.post("/api/v1/webhooks", json={"url": u}, headers=h)).json()
+                     for u in (HOOK_URL, "https://two.example.net/hook")]
+    await cgl_exam(db_session)
+    await b2b_events.collect(db_session)
+    assert await webhooks.enqueue(db_session) == 2
+    await db_session.commit()
+    nothing = {"DELIVERED": 0, "RETRY": 0, "FAILED": 0, "REFUSED": 0}
+
+    # An org switched off in the database: its pending deliveries are not sent (nor retried)
+    org = await db_session.get(ApiOrg, uuid.UUID(org_id))
+    org.is_active = False
+    await db_session.commit()
+    client, wire = _client(["93.184.215.14"])
+    async with client:
+        assert await webhooks.deliver_due(db_session, client) == nothing
+    assert wire.requests == []
+    org.is_active = True
+    await db_session.commit()
+
+    # Reviewers only: list an org's webhooks, disable one (e.g. registered with a leaked key), deactivate the org
+    member = await login("member@example.com")
+    assert (await api.get(f"/admin/api/orgs/{org_id}/webhooks", headers=member)).status_code == 403
+    assert (await api.post(f"/admin/api/webhooks/{first['id']}/disable", headers=member)).status_code == 403
+    assert (await api.post(f"/admin/api/orgs/{org_id}/deactivate", headers=member)).status_code == 403
+    listed = (await api.get(f"/admin/api/orgs/{org_id}/webhooks", headers=admin)).json()
+    assert [(w["url"], w["disabled_at"]) for w in listed] == [(HOOK_URL, None), ("https://two.example.net/hook", None)]
+    r = await api.post(f"/admin/api/webhooks/{first['id']}/disable", headers=admin)
+    assert r.status_code == 200 and r.json()["disabled_at"]
+    client, wire = _client(["93.184.215.14"])
+    async with client:
+        assert (await webhooks.deliver_due(db_session, client))["DELIVERED"] == 1
+    assert [r.url.host for r in wire.requests] == ["two.example.net"]
+
+    r = await api.post(f"/admin/api/orgs/{org_id}/deactivate", headers=admin)
+    assert r.status_code == 200 and r.json()["is_active"] is False
+    assert (await api.get("/api/v1/webhooks", headers=h)).status_code == 401  # its keys stop at once
+    assert all(w["disabled_at"] for w in (await api.get(f"/admin/api/orgs/{org_id}/webhooks", headers=admin)).json())
+    await load_snapshot(db_session)  # events recorded afterwards are not queued for it
+    await b2b_events.collect(db_session)
+    assert await webhooks.enqueue(db_session) == 0
+    statuses = sorted(d.status for d in (await db_session.execute(select(WebhookDelivery))).scalars())
+    assert statuses == ["CANCELLED", "DELIVERED"]
+    audit = {(a.action, a.object_type) for a in (await db_session.execute(select(ReviewAuditLog))).scalars()}
+    assert {("API_WEBHOOK_DISABLE", "API_WEBHOOK"), ("API_ORG_DEACTIVATE", "API_ORG")} <= audit
 
 @pytest.mark.asyncio
 async def test_removed_webhook_and_earlier_events_are_not_delivered(api, new_key, db_session):

@@ -175,9 +175,17 @@ curl -s -H "Authorization: Bearer $GCO_REVIEWER_TOKEN" -H "Content-Type: applica
   "$GCO/admin/api/orgs/<org id>/keys"
 curl -s -X POST -H "Authorization: Bearer $GCO_REVIEWER_TOKEN" "$GCO/admin/api/keys/<key id>/revoke"
 curl -s -H "Authorization: Bearer $GCO_REVIEWER_TOKEN" "$GCO/admin/api/orgs/<org id>/usage?since=2026-10-01"
+
+# An org's webhooks; disable one (pending deliveries are cancelled), e.g. after a webhooks:manage key leaked
+curl -s -H "Authorization: Bearer $GCO_REVIEWER_TOKEN" "$GCO/admin/api/orgs/<org id>/webhooks"
+curl -s -X POST -H "Authorization: Bearer $GCO_REVIEWER_TOKEN" "$GCO/admin/api/webhooks/<webhook id>/disable"
+# Deactivate an org: every key stops working and every webhook is disabled at once
+curl -s -X POST -H "Authorization: Bearer $GCO_REVIEWER_TOKEN" "$GCO/admin/api/orgs/<org id>/deactivate"
 ```
 
-Creating organisations and issuing or revoking keys is recorded in the reviewer audit log.
+Creating organisations, issuing or revoking keys, disabling webhooks and deactivating organisations are recorded
+in the reviewer audit log. Revoking a key does not remove the webhooks registered with it (webhooks belong to the
+organisation): disable them as well when the key may have leaked.
 
 Events and webhook deliveries (after the daily job, and every few minutes while retries are pending):
 

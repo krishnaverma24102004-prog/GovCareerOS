@@ -15,7 +15,7 @@ from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
 _SEQ = BigInteger().with_variant(Integer(), "sqlite")
 
 class ApiOrg(Base, TimestampMixin):
-    """A business customer of the API. Created by a reviewer; deactivating it stops every key at once."""
+    """A business customer of the API. Created by a reviewer; deactivating it stops every key and webhook at once."""
     __tablename__ = "api_orgs"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
