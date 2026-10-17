@@ -181,11 +181,20 @@ def _eligibility_detail(req_type: str, v: Any) -> Optional[str]:
         return ("Upyukt divyangta shreniyan: " + ", ".join(fit)) if fit else None
     return None
 
-def _outcome_statuses(outcomes: Sequence[rules.RuleOutcome], mapping: Dict[str, str]) -> Dict[Any, str]:
+# The row types each hard check judges. An outcome naming no row (AGE UNKNOWN: date of birth, category or crucial date
+# missing) is about all of them, so every row of those types it was judged on carries it
+_CHECK_TYPES = {"AGE": ("AGE_MAX",), "EDUCATION": ("EDUCATION",), "EXPERIENCE": ("EXPERIENCE",), "CITIZENSHIP": ("CITIZENSHIP",),
+                "GOVT_SERVICE": ("GOVT_SERVICE",)}
+
+def _outcome_statuses(outcomes: Sequence[rules.RuleOutcome], reqs: Sequence[rules.Requirement], mapping: Dict[str, str]) -> Dict[Any, str]:
+    """Requirement row id -> the worst status of the outcomes about it; `reqs` are the rows the outcomes were judged on."""
     out: Dict[Any, List[str]] = {}
     for o in outcomes:
-        if o.requirement_id is not None and o.outcome in mapping:
-            out.setdefault(o.requirement_id, []).append(mapping[o.outcome])
+        if o.outcome not in mapping:
+            continue
+        ids = [o.requirement_id] if o.requirement_id is not None else             [r.id for r in reqs if r.req_type in _CHECK_TYPES.get(o.check, ())]
+        for i in ids:
+            out.setdefault(i, []).append(mapping[o.outcome])
     return {k: _worst(v) for k, v in out.items()}
 
 def _eligibility_items(rows: Sequence, statuses: Dict[Any, str], urls: Dict[uuid.UUID, Optional[str]], default_url: Optional[str],
@@ -426,7 +435,8 @@ async def vacancy_page(session: AsyncSession, vacancy_id: uuid.UUID, user_id: Op
     statuses, cert_outcomes = {}, None
     if personal:
         snapshot = await engine.load_profile_snapshot(session, profile_version_id)
-        statuses = _outcome_statuses(engine.hard_outcomes(snapshot, await engine.load_requirements(session, vacancy.id), vacancy), _HARD)
+        reqs = await engine.load_requirements(session, vacancy.id)
+        statuses = _outcome_statuses(engine.hard_outcomes(snapshot, reqs, vacancy), reqs, _HARD)
         cert_outcomes = await _certificate_outcomes(session, snapshot, rows, vacancy.application_deadline, now)
     urls = await _urls(session, [r.raw_document_id for r in req_rows] + [vacancy.raw_document_id])
     eligibility = _eligibility_items(req_rows, statuses, urls, urls.get(vacancy.raw_document_id) or vacancy.notification_url, {}, personal)
@@ -459,12 +469,15 @@ async def exam_page(session: AsyncSession, exam_id: uuid.UUID, user_id: Optional
         judge = exam_engine.post_judge(session, exam, snapshot, gender)
         post_wise = await exam_engine.posts_with_own_rows(session, exam.id)
         # Exam-level rows as evaluate_exam judges them (best post for post-wise notices); each post's own rows by that post
-        overall, _ = await exam_engine.best_post(post_wise, judge) if post_wise else await judge(None)
-        statuses = _outcome_statuses(overall, _HARD)
+        overall, judged = await exam_engine.best_post(post_wise, judge) if post_wise else await judge(None)
+        statuses = _outcome_statuses(overall, judged, _HARD)
+        if post_wise:
+            post_rows = {r.id for r in req_rows if r.post_id is not None}
+            statuses = {k: v for k, v in statuses.items() if k not in post_rows}
         for p in post_wise:
             own = {r.id for r in req_rows if r.post_id == p.id}
-            outcomes, _ = await judge(p)
-            statuses.update({k: v for k, v in _outcome_statuses(outcomes, _HARD).items() if k in own})
+            outcomes, judged = await judge(p)
+            statuses.update({k: v for k, v in _outcome_statuses(outcomes, judged, _HARD).items() if k in own})
         cert_outcomes = await _certificate_outcomes(session, snapshot, rows, exam.application_end, now)
     urls = await _urls(session, [r.raw_document_id for r in req_rows] + [exam.raw_document_id])
     eligibility = _eligibility_items(req_rows, statuses, urls, urls.get(exam.raw_document_id) or exam.notification_url, posts, personal)

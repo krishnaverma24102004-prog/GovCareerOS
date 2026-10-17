@@ -173,6 +173,16 @@ async def test_upsc_advt_12_personalised(api, login, db_session):
     fee = next(it for it in s["fee"] if it["label"] == "Application fee")
     assert fee["status"] == "OK" and "aapko fee nahi deni (exempt as FEMALE/SC)" in fee["detail"]
 
+    # No date of birth in the profile: the age check names no row ("date of birth missing in profile"), so the age-limit
+    # item says the profile lacks it rather than showing no status
+    meera = await login("meera@example.com")
+    meera_v = await _version(api, meera, {"full_name": "Meera", "gender": "female", "category": "OBC", "is_pwbd": False,
+                                          "nationality": "Indian"}, **LAW_GRAD)
+    meera_id = uuid.UUID((await api.get("/auth/me", headers=meera)).json()["id"])
+    s = _sections(await apply_ready.vacancy_page(db_session, vacancy.id, meera_id, uuid.UUID(meera_v), now=BEFORE_CLOSING))
+    elig = {it["label"]: it["status"] for it in s["eligibility"]}
+    assert (elig["Aayu seema (age limit)"], elig["Shaikshik yogyata (education)"]) == ("UNKNOWN", "OK")
+
     # The same through the API: own version only, and only with a token (an error response rolls the shared session back)
     vacancy_id = vacancy.id
     url = f"/apply-ready/vacancies/{vacancy_id}?profile_version_id={asha_v}"
@@ -275,11 +285,26 @@ async def test_ssc_je_2026_page(api, login, db_session):
     user_id = uuid.UUID((await api.get("/auth/me", headers=h)).json()["id"])
     s = _sections(await apply_ready.exam_page(db_session, exam.id, user_id, uuid.UUID(v), now=datetime(2026, 9, 1, tzinfo=IST)))
     bro = {it["detail"]: it["status"] for it in s["eligibility"] if it["label"].endswith("JE(C) (Border Roads Organization)")}
+    bro_education = next(it["status"] for it in s["eligibility"] if it["label"] == "Shaikshik yogyata (education) — JE(C) (Border Roads Organization)")
     # 26 on the crucial date 01.08.2026, OBC: the OBC row decides (18-33); the other categories' rows are not his
     assert (bro["OBC: 18-33 saal"], bro["UR: 18-30 saal; EWS: 18-30 saal"]) == ("OK", None)
     assert next(it for it in s["eligibility"] if it["label"] == "Nagrikta (citizenship)")["status"] == "OK"
     obc = next(it for it in s["certificates"] if it["label"].startswith("OBC"))
     assert obc["status"] == "NEEDS_DOCUMENT" and obc["citation"]["page"] == 11
+
+    # No date of birth: every post's own age rows (judged post by post) say the profile lacks it; education is judged as for
+    # the same degree with a date of birth
+    h = await login("anil@example.com")
+    v = await _version(api, h, {"full_name": "Anil", "gender": "Male", "category": "OBC", "is_pwbd": False, "nationality": "Indian",
+                                "is_ex_serviceman": False, "is_central_govt_employee": False},
+                       education=[{"degree": "B.E. (Civil Engineering)", "institution": "MBM Engineering College",
+                                   "specialization": "Civil Engineering", "education_level": "BACHELORS", "end_date": "2022-06-30"}])
+    user_id = uuid.UUID((await api.get("/auth/me", headers=h)).json()["id"])
+    s = _sections(await apply_ready.exam_page(db_session, exam.id, user_id, uuid.UUID(v), now=datetime(2026, 9, 1, tzinfo=IST)))
+    ages = [it["status"] for it in s["eligibility"] if it["label"].startswith("Aayu seema (age limit) — ")]
+    assert ages and set(ages) == {"UNKNOWN"}, ages
+    bro = {it["label"].split(" — ")[0]: it["status"] for it in s["eligibility"] if it["label"].endswith("JE(C) (Border Roads Organization)")}
+    assert bro["Shaikshik yogyata (education)"] == bro_education and bro_education not in (None, "UNKNOWN")
 
 @pytest.mark.asyncio
 async def test_closing_date_without_a_key_date_row(api, db_session):
