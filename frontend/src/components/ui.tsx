@@ -49,10 +49,12 @@ const LINKS = [
   ["/exams", "Exams"],
   ["/gaps", "Gaps"],
   ["/applications", "Applications"],
+  ["/deputation", "Deputation"],
   ["/prep", "Study plan"],
   ["/resume", "Resume"],
   ["/profile", "Profile"],
   ["/alerts", "Alerts"],
+  ["/digest", "Digest"],
   ["/review", "Review"],
   ["/verify", "Check a notice"],
 ] as const;
@@ -90,7 +92,7 @@ export function Shell({
   }
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-slate-200 bg-white print:hidden">
         <nav className={`mx-auto flex ${wide ? "max-w-screen-2xl" : "max-w-5xl"} flex-wrap items-center gap-4 px-4 py-3`}>
           <span className="font-semibold">GovCareerOS</span>
           {links.map(([href, label]) => (
@@ -151,6 +153,17 @@ const STATUS_STYLE: Record<string, string> = {
   UNOFFICIAL: "bg-amber-100 text-amber-800",
   NOT_FOUND_ON_OFFICIAL_SOURCES: "bg-slate-200 text-slate-700",
   INVALID: "bg-slate-200 text-slate-700",
+  // Apply-ready checklist items, deputation assessments, closing dates and the change log
+  OK: "bg-green-100 text-green-800",
+  OPEN: "bg-green-100 text-green-800",
+  KNOWN: "bg-green-100 text-green-800",
+  FAILS: "bg-red-100 text-red-800",
+  CLOSED: "bg-slate-200 text-slate-700",
+  NEEDS_DOCUMENT: "bg-amber-100 text-amber-800",
+  NOT_APPLIED: "bg-amber-100 text-amber-800",
+  CANNOT_DECIDE: "bg-sky-100 text-sky-800",
+  NEEDS_HUMAN_REVIEW: "bg-sky-100 text-sky-800",
+  CLOSING_DATE_UNKNOWN: "bg-sky-100 text-sky-800",
 };
 
 export function Badge({ value }: { value: string }) {

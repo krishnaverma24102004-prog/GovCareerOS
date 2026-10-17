@@ -7,11 +7,15 @@
  * Eligibility is never computed implicitly: "Check my eligibility" calls POST /exams/{id}/eligibility for
  * the user's latest profile version (optionally one post) and shows every check with its reason. The newest
  * stored result for the same version and post is shown on load, labelled with when it was evaluated.
+ *
+ * Also: the official last date with its evidence (GET /exams/{id}/deadline), the field-level change log from
+ * corrigenda (GET /exams/{id}/changes) and a link to the printable apply-ready checklist.
  */
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { ChangeLog, DeadlinePanel } from "@/components/changes";
 import { Badge, ErrorNote, Shell, errText, fmtDate, useSession } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { Profile, Provenance } from "@/lib/types";
@@ -148,6 +152,9 @@ function ExamView({ id }: { id: string }) {
         ) : (
           <p className="mt-2 text-sm text-amber-700">No official notification URL is stored for this exam.</p>
         )}
+        <Link className="ml-3 mt-2 inline-block text-sm text-blue-700 underline" href={`/apply-ready/exam/${exam.id}`}>
+          Apply-ready checklist
+        </Link>
       </div>
 
       <section className="rounded border border-slate-200 bg-white p-4">
@@ -162,6 +169,16 @@ function ExamView({ id }: { id: string }) {
             ))}
         </dl>
         <ExamDates dates={exam.exam_dates} />
+      </section>
+
+      <section>
+        <h2 className="mb-2 font-medium">Last date</h2>
+        <DeadlinePanel base={`/exams/${exam.id}`} />
+      </section>
+
+      <section>
+        <h2 className="mb-2 font-medium">Official changes</h2>
+        <ChangeLog base={`/exams/${exam.id}`} />
       </section>
 
       <section>

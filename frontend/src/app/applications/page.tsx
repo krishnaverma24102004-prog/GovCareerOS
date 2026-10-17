@@ -1,12 +1,13 @@
 "use client";
 /**
  * Application tracker: the caller's applications (newest first, as GET /applications returns them),
- * tracked against a stored vacancy or a named exam. Each one shows its status with the full status
+ * tracked against a stored vacancy, a stored exam (exam_id) or an exam named in free text (exam_ref). Each one shows its status with the full status
  * history, the application number, dates and notes; withdrawn applications are listed separately.
  *
  * Status changes go through PATCH { status, status_note } so the backend records the history row;
  * the other fields are PATCHed only when they changed. A vacancy application links to its
- * preparation checklist (/applications/prep), personalised by the profile version it is linked to.
+ * preparation checklist (/applications/prep), personalised by the profile version it is linked to; a stored
+ * exam links to its apply-ready checklist (/apply-ready/exam/{id}).
  */
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -86,7 +87,8 @@ function ApplicationsView() {
 
   const active = useMemo(() => apps?.filter((a) => a.status !== "WITHDRAWN") ?? [], [apps]);
   const withdrawn = useMemo(() => apps?.filter((a) => a.status === "WITHDRAWN") ?? [], [apps]);
-  const tracked = useMemo(() => new Set(apps?.map((a) => a.vacancy_id).filter(Boolean) as string[]), [apps]);
+  // Vacancy and exam ids already tracked (UUIDs never collide across the two)
+  const tracked = useMemo(() => new Set(apps?.flatMap((a) => [a.vacancy_id, a.exam_id]).filter(Boolean) as string[]), [apps]);
 
   return (
     <div className="space-y-6">
@@ -154,6 +156,8 @@ function CreateForm({ profile, tracked, onCreated }: { profile: Profile | null; 
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [vacancy, setVacancy] = useState<VacancySummary | null>(null);
+  // A stored exam chosen from the search (sent as exam_id); free text alone is sent as exam_ref
+  const [exam, setExam] = useState<ExamSummary | null>(null);
   const [examRef, setExamRef] = useState("");
   const [status, setStatus] = useState<ApplicationStatus>("PLANNED");
   const [applicationNumber, setApplicationNumber] = useState("");
@@ -190,8 +194,9 @@ function CreateForm({ profile, tracked, onCreated }: { profile: Profile | null; 
       if (!vacancy) return setError("Choose a vacancy first.");
       body.vacancy_id = vacancy.id;
     } else {
-      if (!examRef.trim()) return setError("Enter or choose an exam.");
-      body.exam_ref = examRef.trim();
+      if (!exam && !examRef.trim()) return setError("Enter or choose an exam.");
+      if (exam) body.exam_id = exam.id;
+      if (examRef.trim()) body.exam_ref = examRef.trim();
     }
     setBusy(true);
     try {
@@ -266,15 +271,25 @@ function CreateForm({ profile, tracked, onCreated }: { profile: Profile | null; 
             <ul className="max-h-72 space-y-1 overflow-y-auto text-sm">
               {examResults.length === 0 && <li className="text-slate-500">No exams match. You can still type the exam name below.</li>}
               {examResults.map((x) => {
-                const ref = examLabel(x);
+                const already = tracked.has(x.id);
                 return (
                   <li key={x.id}>
-                    <label className={`flex gap-2 rounded px-2 py-1 ${examRef === ref ? "bg-blue-50" : "hover:bg-slate-50"}`}>
-                      <input type="radio" name="exam" checked={examRef === ref} onChange={() => setExamRef(ref)} />
+                    <label className={`flex gap-2 rounded px-2 py-1 ${exam?.id === x.id ? "bg-blue-50" : "hover:bg-slate-50"} ${already ? "opacity-60" : ""}`}>
+                      <input
+                        type="radio"
+                        name="exam"
+                        disabled={already}
+                        checked={exam?.id === x.id}
+                        onChange={() => {
+                          setExam(x);
+                          setExamRef(examLabel(x));
+                        }}
+                      />
                       <span>
                         <span className="font-medium">{x.name}</span>
                         <span className="block text-xs text-slate-500">
                           {x.conducting_body} · <Badge value={x.status} /> · applications close {fmtDate(x.application_end)}
+                          {already && " · already tracked"}
                         </span>
                       </span>
                     </label>
@@ -284,9 +299,23 @@ function CreateForm({ profile, tracked, onCreated }: { profile: Profile | null; 
             </ul>
           )}
           <label className="block text-sm">
-            <span className="text-slate-600">Exam</span>
+            <span className="text-slate-600">{exam ? "Label for this exam" : "Exam (not in the database)"}</span>
             <input className={input} maxLength={255} value={examRef} onChange={(e) => setExamRef(e.target.value)} placeholder="e.g. UPSC CSE 2027" />
           </label>
+          <p className="text-sm">
+            <span className="text-slate-600">Stored exam: </span>
+            {exam ? (
+              <>
+                <span className="font-medium">{exam.name}</span>{" "}
+                <button type="button" className="text-blue-700 underline" onClick={() => setExam(null)}>
+                  clear
+                </button>
+                <span className="block text-xs text-slate-500">Official changes to this exam are alerted and it gets an apply-ready checklist.</span>
+              </>
+            ) : (
+              <span className="text-slate-500">none chosen — search above, or type a name to track it as free text</span>
+            )}
+          </p>
         </>
       )}
 
@@ -379,9 +408,13 @@ function ApplicationCard({
   }
 
   const v = vacancy?.ok ? vacancy.v : null;
-  const prepHref = app.vacancy_id
-    ? `/applications/prep?vacancy_id=${app.vacancy_id}${app.profile_version_id ? `&profile_version_id=${app.profile_version_id}` : ""}`
-    : null;
+  const pv = app.profile_version_id ? `profile_version_id=${app.profile_version_id}` : "";
+  const prepHref = app.vacancy_id ? `/applications/prep?vacancy_id=${app.vacancy_id}${pv ? `&${pv}` : ""}` : null;
+  const applyReadyHref = app.vacancy_id
+    ? `/apply-ready/vacancy/${app.vacancy_id}${pv ? `?${pv}` : ""}`
+    : app.exam_id
+      ? `/apply-ready/exam/${app.exam_id}${pv ? `?${pv}` : ""}`
+      : null;
   const history = [...app.history].sort((a, b) => b.changed_at.localeCompare(a.changed_at));
   const withdrawn = app.status === "WITHDRAWN";
 
@@ -410,6 +443,13 @@ function ApplicationCard({
                 </p>
               )}
             </>
+          ) : app.exam_id ? (
+            <p>
+              <Link href={`/exams/${app.exam_id}`} className="font-medium text-blue-700 hover:underline">
+                {app.exam_ref || "Exam"}
+              </Link>{" "}
+              <span className="text-xs text-slate-500">(stored exam)</span>
+            </p>
           ) : (
             <p className="font-medium">
               {app.exam_ref} <span className="text-xs font-normal text-slate-500">(exam)</span>
@@ -462,6 +502,11 @@ function ApplicationCard({
         {prepHref && (
           <Link href={prepHref} className="text-blue-700 underline">
             Preparation checklist
+          </Link>
+        )}
+        {applyReadyHref && (
+          <Link href={applyReadyHref} className="text-blue-700 underline">
+            Apply-ready checklist
           </Link>
         )}
         <button className="text-blue-700 underline" onClick={() => setEditing((x) => !x)}>
