@@ -58,7 +58,7 @@ def _check_weights(weights: Optional[Dict[str, float]]):
     if weights is None:
         return
     if set(weights) != set(DEFAULT_WEIGHTS) or any(w < 0 for w in weights.values()) or not sum(weights.values()):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"weights must give non-negative values for exactly {sorted(DEFAULT_WEIGHTS)}")
+        raise HTTPException(422, f"weights must give non-negative values for exactly {sorted(DEFAULT_WEIGHTS)}")
 
 @router.post("/relevance", response_model=RelevanceOut, status_code=status.HTTP_201_CREATED)
 async def score(body: RelevanceIn, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
