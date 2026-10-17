@@ -44,7 +44,7 @@ $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances 
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal `
-    -Description "GovCareerOS: discover official sources, UPSC pipeline, LLM drafts, eligibility radar, digest ($Script)" -Force | Out-Null
+    -Description "GovCareerOS: discover official sources, UPSC pipeline, LLM drafts, eligibility radar, digest, due DPDP erasures ($Script)" -Force | Out-Null
 
 $task = Get-ScheduledTask -TaskName $TaskName
 $info = Get-ScheduledTaskInfo -TaskName $TaskName

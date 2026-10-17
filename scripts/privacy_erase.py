@@ -1,6 +1,7 @@
 """
-DPDP erasure, admin/cron side (backend/privacy/rights.py). Run daily: hard-erases every account whose grace period
-after POST /privacy/erase has ended, except accounts under a legal hold.
+DPDP erasure, admin side (backend/privacy/rights.py). The daily job (scripts/daily_job.py, step "erase", scheduled by
+scripts/install_schedule.ps1) hard-erases every account whose grace period after POST /privacy/erase has ended, except
+accounts under a legal hold; `run` does the same by hand.
 
     $env:PYTHONPATH="C:\\Users\\krishna"
     python govcareeros/scripts/privacy_erase.py run [--dry-run]       # erase every due account

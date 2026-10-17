@@ -89,8 +89,9 @@ If the date of birth shows the person is under 18, consent must name the parent 
 1. Request: the account is deactivated at once, every login token revoked, every consent withdrawn;
    `erasure_due_at` = now + `ERASURE_GRACE_DAYS` (default 30). The person can cancel within the grace period through
    the grievance officer (`privacy_erase.py cancel <email>`).
-2. Hard erase, run daily: `python govcareeros/scripts/privacy_erase.py run` deletes every row listed above as
-   "Deleted" and the per-user storage folders, and replaces the `users` row with an anonymised stub
+2. Hard erase, daily: the `erase` step of `scripts/daily_job.py` (registered with Task Scheduler by
+   `scripts/install_schedule.ps1`; by hand: `python govcareeros/scripts/privacy_erase.py run`) deletes every row
+   listed above as "Deleted" and the per-user storage folders, and replaces the `users` row with an anonymised stub
    (`erased-<id>@erased.invalid`, no name, unusable password, `erased_at` set).
 
 ### Retained after erasure (exceptions)

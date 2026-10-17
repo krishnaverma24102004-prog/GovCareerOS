@@ -11,6 +11,8 @@ logged, and the next step still runs:
             (LLM_PROVIDER=nvidia with NVIDIA_API_KEY, or a reachable Ollama); drafts still need review
   radar     eligibility radar for every user (services.radar.run_radar)
   digest    weekly digest, only if backend.services.digest exists (imported lazily)
+  erase     DPDP hard erase of every account whose erasure grace period has ended (privacy.rights.erase_due);
+            accounts under a legal hold are skipped. Logs counts only (scripts/privacy_erase.py for by-hand runs)
 
 A file lock in storage/ keeps two runs from overlapping (stale after 6h). Every run, including one that
 found the lock held, appends one JSON line to storage/logs/daily_job.jsonl (see services.run_log).
@@ -45,7 +47,7 @@ import httpx
 from govcareeros.backend.config.settings import settings
 from govcareeros.backend.services import run_log
 
-STEPS = ("discover", "upsc", "triage", "drafts", "radar", "digest")
+STEPS = ("discover", "upsc", "triage", "drafts", "radar", "digest", "erase")
 _DIGEST_MODULE = "govcareeros.backend.services.digest"
 # backend.services.digest.run_all writes digest files only; emailing stays an explicit send_digests.py --send
 _DIGEST_FUNCS = ("run_all", "run_weekly_digest", "generate_weekly_digests", "run_digest")
@@ -144,6 +146,11 @@ class DailyJob:
         if inspect.isawaitable(result):
             result = await result
         return {"function": func.__name__, "result": result if isinstance(result, (int, dict, list, str)) else repr(result)}
+
+    async def erase(self, session) -> Dict[str, Any]:
+        from govcareeros.backend.privacy.rights import erase_due
+        report = await erase_due(session, now=self.now)
+        return {"erased": len(report["erased"]), "held": len(report["held"])}
 
     async def run_step(self, name: str) -> Dict[str, Any]:
         step: Dict[str, Any] = {"name": name, "started_at": _now()}
