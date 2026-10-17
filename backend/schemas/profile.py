@@ -11,7 +11,7 @@ ESM_RELEASE_TYPES = ("RETIRED_WITH_PENSION", "MEDICAL_DISABILITY_PENSION", "REDU
                      "STILL_SERVING", "OTHER")
 
 # Questions about the civil post secured after release; only asked when esm_civil_post_secured is true
-CIVIL_POST_FOLLOW_UPS = ("esm_reservation_used", "esm_civil_post_group", "esm_undertaking_given")
+CIVIL_POST_FOLLOW_UPS = ("esm_civil_post_government", "esm_reservation_used", "esm_civil_post_group", "esm_undertaking_given")
 
 class _In(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -35,7 +35,9 @@ class PersonalInfoIn(_In):
     esm_release_date: Optional[date] = Field(None, description="release/discharge date; while still serving, the expected end of the term of engagement")
     esm_release_type: Optional[Literal[ESM_RELEASE_TYPES]] = None
     esm_rank: Optional[str] = Field(None, max_length=100)
-    esm_civil_post_secured: Optional[bool] = Field(None, description="after release, holds a regular civil post under the Central Government")
+    esm_civil_post_secured: Optional[bool] = Field(None, description="since release, has secured a regular civil post under a Government "
+                                                   "(Central or State), whether or not still held: the notices' 'have already secured'")
+    esm_civil_post_government: Optional[Literal["CENTRAL", "STATE"]] = Field(None, description="the Government that civil post is under")
     esm_reservation_used: Optional[bool] = Field(None, description="that civil post was secured through the ex-servicemen reservation")
     esm_civil_post_group: Optional[Literal["A", "B", "C", "D"]] = None
     esm_undertaking_given: Optional[bool] = Field(None, description="gave that employer, on joining, the self-declaration of earlier applications (DoP&T OM 14.08.2014)")

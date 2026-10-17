@@ -9,6 +9,8 @@ Kinds, each emitted only when the notice states it:
                          employer the self-declaration of earlier applications (DoP&T OM 36034/1/2014-Estt (Res),
                          14.08.2014); fee concession is lost too.
                          UPSC (Advt 12/2026, p.22 NOTE): any regular Central Govt civil post; age relaxation stays.
+                         "government": CENTRAL where the clause says "under the Central Government/Govt." (JE 2026,
+                         UPSC), ANY where it says only "under Government" (CGL, CHSLE 2026).
   RELEASE_WITHIN_ONE_YEAR  serving personnel may apply when they will complete the term of engagement within one year
                          from the closing date (SSC para 5.6 / 7.6); JE 2026 also excludes status acquired "by way of
                          dismissal or discharge on account of misconduct or inefficiency".
@@ -53,6 +55,7 @@ _ROUTES = [
     ("COMPLETED_ENGAGEMENT_GRATUITY", r"completing\s+the\s+specific\s+period\s+of\s+engagement.*?given\s+a\s+gratuity"),
     ("RECRUIT_BOARDED_OUT_MEDICAL", r"Ex-?\s*recruits\s+boarded\s+out.*?medical\s+disability\s+pension"),
 ]
+_CENTRAL_GOVT_RE = re.compile(r"under\s+the\s+Central\s+Gov(?:ernmen)?t", re.I)
 _DISMISSAL_EXCLUDED_RE = re.compile(r"status\s+of\s+" + _ESM + r"\s+otherwise\s+than\s+by\s+way\s+of\s+\W?dismissal\s+or\s+discharge\s+on\s+"
                                     r"account\s+of\s+misconduct\s+or\s+inefficiency", re.I)
 
@@ -68,13 +71,14 @@ def parse_esm_clauses(text: str, prov: Callable[[int, int, str, int], Provenance
         body = m.group(0)
         groups = re.search(r"Group\s*\W?C\W?\s*&\s*\W?D\W?\s*posts", body, re.I)
         add({"kind": "RESERVATION_REUSE_BAR", "trigger": "RESERVATION_AVAILED",
+             "government": "CENTRAL" if _CENTRAL_GOVT_RE.search(body) else "ANY",
              "civil_post_groups": ["C", "D"] if groups else None,
              "undertaking_exception": bool(re.search(r"self-?\s*declaration\s*/\s*undertaking", body, re.I)),
              "bars": ["RESERVATION", "FEE_CONCESSION"] if re.search(r"fee\s+concession", body, re.I) else ["RESERVATION"],
              "om": "36034/1/2014-Estt (Res) dated 14.08.2014"}, m, "Ex-Servicemen: civil employment already secured")
     m = _REUSE_UPSC_RE.search(text)
     if m:
-        add({"kind": "RESERVATION_REUSE_BAR", "trigger": "CIVIL_POST_SECURED", "civil_post_groups": None,
+        add({"kind": "RESERVATION_REUSE_BAR", "trigger": "CIVIL_POST_SECURED", "government": "CENTRAL", "civil_post_groups": None,
              "undertaking_exception": False, "bars": ["RESERVATION"],
              "age_relaxation_kept": bool(re.search(r"permitted\s+the\s+benefit\s+of\s+age\s+relaxation", m.group(0), re.I))},
             m, "Concessions & Relaxations: NOTE")

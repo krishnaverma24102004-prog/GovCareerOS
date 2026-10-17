@@ -62,10 +62,12 @@ class PersonalInfo(Base, TimestampMixin):
     # schemas.profile.ESM_RELEASE_TYPES, e.g. RETIRED_WITH_PENSION, COMPLETED_ENGAGEMENT_GRATUITY, STILL_SERVING
     esm_release_type: Mapped[Optional[str]] = mapped_column(String(40))
     esm_rank: Mapped[Optional[str]] = mapped_column(String(100))
-    # After release: holds a regular civil post under the Central Government; whether that post was secured through the
-    # ESM reservation, its Group (A-D), and whether the self-declaration of earlier applications (DoP&T OM 36034/1/2014,
+    # Since release: has secured a regular civil post under a Government, whether or not still held (the notices' "have
+    # already secured"); under which Government (CENTRAL / STATE); whether that post was secured through the ESM
+    # reservation, its Group (A-D), and whether the self-declaration of earlier applications (DoP&T OM 36034/1/2014,
     # 14.08.2014) was given to that employer on joining
     esm_civil_post_secured: Mapped[Optional[bool]] = mapped_column(Boolean)
+    esm_civil_post_government: Mapped[Optional[str]] = mapped_column(String(10))
     esm_reservation_used: Mapped[Optional[bool]] = mapped_column(Boolean)
     esm_civil_post_group: Mapped[Optional[str]] = mapped_column(String(1))
     esm_undertaking_given: Mapped[Optional[bool]] = mapped_column(Boolean)

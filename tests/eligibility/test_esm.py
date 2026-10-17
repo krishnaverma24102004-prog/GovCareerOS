@@ -13,6 +13,7 @@ None of these notices (nor any other captured fixture) mentions Agniveers: a for
 """
 import json
 import re
+from dataclasses import replace
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -76,12 +77,13 @@ def _section(profile, name=CHSL):
 
 # ---------- the clauses as the notices state them ----------
 
-@pytest.mark.parametrize("name,pages,dismissal_excluded", [
-    (CGL, {"RESERVATION_REUSE_BAR": 8, "RELEASE_WITHIN_ONE_YEAR": 8, "DEFINITION": 8, "STATUS_CRUCIAL_DATE": 11}, False),
-    (CHSL, {"RESERVATION_REUSE_BAR": 5, "RELEASE_WITHIN_ONE_YEAR": 5, "DEFINITION": 5, "STATUS_CRUCIAL_DATE": 7}, False),
-    (JE, {"RESERVATION_REUSE_BAR": 8, "RELEASE_WITHIN_ONE_YEAR": 9, "DEFINITION": 9, "STATUS_CRUCIAL_DATE": 11}, True),
+# CGL p.8 / CHSL p.5: "secured employment in civil side under Government"; JE p.8: "... under the Central Government"
+@pytest.mark.parametrize("name,pages,dismissal_excluded,government", [
+    (CGL, {"RESERVATION_REUSE_BAR": 8, "RELEASE_WITHIN_ONE_YEAR": 8, "DEFINITION": 8, "STATUS_CRUCIAL_DATE": 11}, False, "ANY"),
+    (CHSL, {"RESERVATION_REUSE_BAR": 5, "RELEASE_WITHIN_ONE_YEAR": 5, "DEFINITION": 5, "STATUS_CRUCIAL_DATE": 7}, False, "ANY"),
+    (JE, {"RESERVATION_REUSE_BAR": 8, "RELEASE_WITHIN_ONE_YEAR": 9, "DEFINITION": 9, "STATUS_CRUCIAL_DATE": 11}, True, "CENTRAL"),
 ])
-def test_ssc_notices_state_the_esm_clauses_verbatim(name, pages, dismissal_excluded):
+def test_ssc_notices_state_the_esm_clauses_verbatim(name, pages, dismissal_excluded, government):
     parsed = _ssc(name)
     rows = {r.value["kind"]: r for r in parsed.requirements if r.req_type == "ESM_RULE"}
     assert {k: r.provenance.page for k, r in rows.items()} == pages
@@ -92,9 +94,10 @@ def test_ssc_notices_state_the_esm_clauses_verbatim(name, pages, dismissal_exclu
                         for p in (r.provenance.page, r.provenance.page + 1))
         assert r.provenance.excerpt in _collapse(span)
     reuse = rows["RESERVATION_REUSE_BAR"].value
-    assert reuse == {"kind": "RESERVATION_REUSE_BAR", "trigger": "RESERVATION_AVAILED", "civil_post_groups": ["C", "D"],
+    assert reuse == {"kind": "RESERVATION_REUSE_BAR", "trigger": "RESERVATION_AVAILED", "government": government, "civil_post_groups": ["C", "D"],
                      "undertaking_exception": True, "bars": ["RESERVATION", "FEE_CONCESSION"], "om": "36034/1/2014-Estt (Res) dated 14.08.2014"}
     assert "OM No" in rows["RESERVATION_REUSE_BAR"].provenance.excerpt and "36034/1/2014-Estt (Res)" in rows["RESERVATION_REUSE_BAR"].provenance.excerpt
+    assert ("under the Central Government" in rows["RESERVATION_REUSE_BAR"].provenance.excerpt) == (government == "CENTRAL")
     assert rows["RELEASE_WITHIN_ONE_YEAR"].value == {"kind": "RELEASE_WITHIN_ONE_YEAR", "months_after_closing": 12,
                                                      "excludes_dismissal_or_misconduct": dismissal_excluded}
     assert rows["DEFINITION"].value["release_types"] == ["RETIRED_WITH_PENSION", "MEDICAL_DISABILITY_PENSION", "REDUCTION_IN_ESTABLISHMENT",
@@ -104,7 +107,8 @@ def test_ssc_notices_state_the_esm_clauses_verbatim(name, pages, dismissal_exclu
 def test_upsc_advertisement_note_bars_reservation_but_keeps_age_relaxation():
     rows = [r for r in _upsc12().general_requirements if r.req_type == "ESM_RULE"]
     assert [(r.value, r.provenance.page) for r in rows] == [({
-        "kind": "RESERVATION_REUSE_BAR", "trigger": "CIVIL_POST_SECURED", "civil_post_groups": None, "undertaking_exception": False,
+        "kind": "RESERVATION_REUSE_BAR", "trigger": "CIVIL_POST_SECURED", "government": "CENTRAL", "civil_post_groups": None,
+        "undertaking_exception": False,
         "bars": ["RESERVATION"], "age_relaxation_kept": True}, 22)]
     assert rows[0].provenance.excerpt == UPSC_NOTE
     assert UPSC_NOTE in _collapse(pymupdf.open(FIXTURES / "upsc" / UPSC_12)[21].get_text())
@@ -236,22 +240,36 @@ def test_upsc_age_relaxed_by_five_years_with_six_months_service():
 def test_ssc_reuse_bar_follows_the_2014_om_as_the_notice_quotes_it():
     def reuse(**kw):
         return _section(_person(esm_release_type="RETIRED_WITH_PENSION", esm_release_date=date(2015, 1, 1), **kw))["ESM_RESERVATION_REUSE"]
-    barred = reuse(esm_civil_post_secured=True, esm_reservation_used=True, esm_civil_post_group="C", esm_undertaking_given=False)
+    post = dict(esm_civil_post_secured=True, esm_civil_post_government="CENTRAL", esm_reservation_used=True)
+    barred = reuse(**post, esm_civil_post_group="C", esm_undertaking_given=False)
     assert (barred.outcome, barred.source_page) == ("FAILS", 5) and "reservation and fee concession" in barred.rule
     assert "36034/1/2014-Estt (Res)" in barred.requirement
-    assert reuse(esm_civil_post_secured=True, esm_reservation_used=True, esm_civil_post_group="D", esm_undertaking_given=True).outcome == \
-        "NEEDS_HUMAN_REVIEW"
-    assert reuse(esm_civil_post_secured=True, esm_reservation_used=True, esm_civil_post_group="C").outcome == "CANNOT_DECIDE"
-    assert reuse(esm_civil_post_secured=True, esm_reservation_used=True).outcome == "CANNOT_DECIDE"
-    assert reuse(esm_civil_post_secured=True, esm_reservation_used=True, esm_civil_post_group="B").outcome == "NEEDS_HUMAN_REVIEW"
+    assert reuse(**post, esm_civil_post_group="D", esm_undertaking_given=True).outcome == "NEEDS_HUMAN_REVIEW"
+    assert reuse(**post, esm_civil_post_group="C").outcome == "CANNOT_DECIDE"
+    assert reuse(**post).outcome == "CANNOT_DECIDE"
+    assert reuse(**post, esm_civil_post_group="B").outcome == "NEEDS_HUMAN_REVIEW"
     assert reuse(esm_civil_post_secured=True, esm_reservation_used=False).outcome == "OK"
     assert reuse(esm_civil_post_secured=False).outcome == "OK"
     assert reuse().outcome == "CANNOT_DECIDE"
 
+def test_reuse_bar_reaches_the_government_the_clause_names():
+    """CHSL p.5 bars a post "in civil side under Government"; JE p.8 one "under the Central Government"."""
+    def reuse(name, **kw):
+        person = _person(esm_release_type="RETIRED_WITH_PENSION", esm_release_date=date(2015, 1, 1), esm_civil_post_secured=True,
+                         esm_reservation_used=True, esm_civil_post_group="C", esm_undertaking_given=False, **kw)
+        return _section(person, name)["ESM_RESERVATION_REUSE"]
+    state_chsl = reuse(CHSL, esm_civil_post_government="STATE")
+    assert state_chsl.outcome == "NEEDS_HUMAN_REVIEW" and "'under Government'" in state_chsl.rule and state_chsl.source_page == 5
+    state_je = reuse(JE, esm_civil_post_government="STATE")
+    assert state_je.outcome == "OK" and "only after a post under the Central Government" in state_je.rule and state_je.source_page == 8
+    assert reuse(JE, esm_civil_post_government="CENTRAL").outcome == "FAILS"
+    unstated = reuse(CHSL)
+    assert unstated.outcome == "CANNOT_DECIDE" and "Central or a State Government is not stated" in unstated.rule
+
 def test_no_civil_post_settles_the_reuse_bar_whatever_the_follow_up_answers_say():
     """'No civil post' outranks a stale 'secured through the ESM reservation' answer, on SSC and UPSC rows alike."""
     stale = _person(esm_release_type="RETIRED_WITH_PENSION", esm_release_date=date(2015, 1, 1), esm_civil_post_secured=False,
-                    esm_reservation_used=True, esm_civil_post_group="C", esm_undertaking_given=False)
+                    esm_civil_post_government="CENTRAL", esm_reservation_used=True, esm_civil_post_group="C", esm_undertaking_given=False)
     assert _section(stale)["ESM_RESERVATION_REUSE"].outcome == "OK"
     closing = _upsc12().fields["application_deadline"].value.astimezone(IST).date()
     assert {o.check: o for o in esm.check_esm(stale, _law_officer_rows(), closing, closing)}["ESM_RESERVATION_REUSE"].outcome == "OK"
@@ -259,10 +277,16 @@ def test_no_civil_post_settles_the_reuse_bar_whatever_the_follow_up_answers_say(
 def test_upsc_reuse_bar_and_a_notice_without_one():
     parsed = _upsc12()
     closing = parsed.fields["application_deadline"].value.astimezone(IST).date()
-    held = _person(esm_release_type="RETIRED_WITH_PENSION", esm_release_date=date(2015, 1, 1), esm_civil_post_secured=True)
-    out = {o.check: o for o in esm.check_esm(held, _law_officer_rows(), closing, closing)}["ESM_RESERVATION_REUSE"]
+    def upsc_reuse(person):
+        return {o.check: o for o in esm.check_esm(person, _law_officer_rows(), closing, closing)}["ESM_RESERVATION_REUSE"]
+    held = _person(esm_release_type="RETIRED_WITH_PENSION", esm_release_date=date(2015, 1, 1), esm_civil_post_secured=True,
+                   esm_civil_post_government="CENTRAL")
+    out = upsc_reuse(held)
     assert (out.outcome, out.source_page, out.requirement) == ("FAILS", 22, UPSC_NOTE)
-    assert out.note == "the same note keeps the ex-servicemen age relaxation"
+    assert out.note == "the same note keeps the ex-servicemen age relaxation" and "already secured" in out.rule
+    # "under the Central Govt. in a Civil Post": a State Government post is outside the note
+    assert upsc_reuse(replace(held, esm_civil_post_government="STATE")).outcome == "OK"
+    assert upsc_reuse(replace(held, esm_civil_post_government=None)).outcome == "CANNOT_DECIDE"
     free = _person(esm_release_type="RETIRED_WITH_PENSION", esm_civil_post_secured=False)
     assert {o.check: o for o in esm.check_esm(free, _law_officer_rows(), closing, closing)}["ESM_RESERVATION_REUSE"].outcome == "OK"
 
@@ -289,7 +313,8 @@ def test_agniveer_cannot_be_decided_and_section_needs_a_claim():
 ESM_PERSON = {"full_name": "Hav. Ravi Singh (test user)", "date_of_birth": "1986-05-10", "gender": "Male", "category": "UR", "is_pwbd": False,
               "is_ex_serviceman": True, "is_central_govt_employee": False, "nationality": "Indian",
               "esm_service_branch": "ARMY", "esm_rank": "Havildar", "esm_enrolment_date": "2004-06-01", "esm_release_date": "2021-06-30",
-              "esm_release_type": "RETIRED_WITH_PENSION", "esm_civil_post_secured": True, "esm_reservation_used": True,
+              "esm_release_type": "RETIRED_WITH_PENSION", "esm_civil_post_secured": True, "esm_civil_post_government": "CENTRAL",
+              "esm_reservation_used": True,
               "esm_civil_post_group": "C", "esm_undertaking_given": False, "is_agniveer": False}
 TWELFTH = [{"degree": "Class XII (Senior Secondary)", "institution": "Army School, Ambala", "specialization": "Commerce", "end_date": "2003-05-31"}]
 
@@ -307,8 +332,8 @@ async def test_exam_result_has_a_separate_esm_section(api, login, db_session):
     # Answers about a civil post contradict "no civil post since release"
     r = await api.put("/profile", json={"personal_info": {**ESM_PERSON, "esm_civil_post_secured": False}, "education": TWELFTH}, headers=h)
     assert r.status_code == 422 and "esm_civil_post_secured" in r.text
-    no_post = {**ESM_PERSON, "esm_civil_post_secured": False, "esm_reservation_used": None, "esm_civil_post_group": None,
-               "esm_undertaking_given": None}
+    no_post = {**ESM_PERSON, "esm_civil_post_secured": False, "esm_civil_post_government": None, "esm_reservation_used": None,
+               "esm_civil_post_group": None, "esm_undertaking_given": None}
     assert (await api.put("/profile", json={"personal_info": no_post, "education": TWELFTH}, headers=h)).status_code == 201
     profile = (await api.put("/profile", json={"personal_info": ESM_PERSON, "education": TWELFTH}, headers=h)).json()
     info = profile["personal_info"]

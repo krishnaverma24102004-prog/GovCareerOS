@@ -17,8 +17,10 @@ Pure functions over the profile snapshot and the notice's rows; nothing is decid
                          CANNOT_DECIDE. SSC service = armed_forces_service_months, else enrolment -> release
                          (rules.military_service_months).
   ESM_RESERVATION_REUSE  the re-use bar exactly as the notice quotes it (RESERVATION_REUSE_BAR: SSC paras 5.4 / 7.4 with
-                         DoP&T OM 36034/1/2014-Estt (Res) of 14.08.2014, UPSC p.22 NOTE). A notice without it ->
-                         NEEDS_HUMAN_REVIEW: the 2014 OM itself is not a document held here.
+                         DoP&T OM 36034/1/2014-Estt (Res) of 14.08.2014, UPSC p.22 NOTE), for a civil post secured since
+                         release whether or not still held. A State Government post: OK where the clause names the Central
+                         Government, NEEDS_HUMAN_REVIEW where it says only "under Government". A notice without the
+                         clause -> NEEDS_HUMAN_REVIEW: the 2014 OM itself is not a document held here.
   ESM_AGNIVEER           no captured notice states an Agniveer reservation or relaxation: CANNOT_DECIDE for a former
                          Agniveer, or NEEDS_HUMAN_REVIEW quoting a requirement row that mentions Agniveers.
 
@@ -178,36 +180,56 @@ def check_age(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Requirement],
 
 # ---------- reservation already used for a civil post ----------
 
+def _government_outcome(bar: rules.Requirement, government: Optional[str], evidence: str) -> Optional[rules.RuleOutcome]:
+    """Whether the bar's own words reach a civil post under this Government; None = they do."""
+    central_only = bar.value.get("government") == "CENTRAL"
+    if government is None:
+        return _out("ESM_RESERVATION_REUSE", CANNOT_DECIDE, "whether that civil post is under the Central or a State Government is not "
+                    "stated" + ("; the bar is for posts under the Central Government" if central_only else ""), bar, evidence)
+    if government == "STATE" and central_only:
+        return _out("ESM_RESERVATION_REUSE", OK, "your civil post is under a State Government; the notice bars the ESM reservation only "
+                    "after a post under the Central Government", bar, evidence)
+    if government == "STATE":
+        return _out("ESM_RESERVATION_REUSE", NEEDS_HUMAN_REVIEW, "the notice says 'under Government' without naming the Central or a "
+                    "State Government; whether your State Government post counts needs a reviewer", bar, evidence)
+    return None
+
 def check_reuse(profile: rules.ProfileSnapshot, by_kind: Dict[str, rules.Requirement]) -> rules.RuleOutcome:
+    """`esm_civil_post_secured` is past tense, as the notices word it ("have already secured"): a post since left counts."""
     bar = by_kind.get("RESERVATION_REUSE_BAR")
-    secured, used = profile.esm_civil_post_secured, profile.esm_reservation_used
+    secured, government, used = profile.esm_civil_post_secured, profile.esm_civil_post_government, profile.esm_reservation_used
     group, undertaking = profile.esm_civil_post_group, profile.esm_undertaking_given
     evidence = "; ".join(f"{k}: {'not stated' if x is None else x}" for k, x in (
-        ("civil post held", secured), ("secured through ESM reservation", used), ("group", group), ("self-declaration given", undertaking)))
+        ("civil post secured since release", secured), ("government", government), ("secured through ESM reservation", used),
+        ("group", group), ("self-declaration given", undertaking)))
     if bar is None:
         if secured is False:
-            return _out("ESM_RESERVATION_REUSE", NOT_APPLICABLE, "no civil post held after release", None, evidence)
+            return _out("ESM_RESERVATION_REUSE", NOT_APPLICABLE, "no civil post secured since release", None, evidence)
         return _out("ESM_RESERVATION_REUSE", NEEDS_HUMAN_REVIEW, "the notice text used does not state the rule on using the ESM reservation "
                     "again after a civil post (DoP&T OM 36034/1/2014-Estt (Res) is not a document held here)", None, evidence)
     v = bar.value
+    # "No civil post" settles it before any follow-up answer about that post is read
+    if secured is False:
+        return _out("ESM_RESERVATION_REUSE", OK, "no regular civil post under a Government secured since release", bar, evidence)
     if v.get("trigger") == "CIVIL_POST_SECURED":
         if secured is None:
-            return _out("ESM_RESERVATION_REUSE", CANNOT_DECIDE, "whether you hold a regular civil post under the Central Government is not stated",
+            return _out("ESM_RESERVATION_REUSE", CANNOT_DECIDE, "whether you have secured a regular civil post since release is not stated",
                         bar, evidence)
-        if not secured:
-            return _out("ESM_RESERVATION_REUSE", OK, "no regular civil post under the Central Government held", bar, evidence)
-        return _out("ESM_RESERVATION_REUSE", FAILS, "you hold a regular civil post under the Central Government: no ESM reservation for "
-                    "this post", bar, evidence, "the same note keeps the ex-servicemen age relaxation" if v.get("age_relaxation_kept") else None)
+        return _government_outcome(bar, government, evidence) or _out(
+            "ESM_RESERVATION_REUSE", FAILS, "you have already secured a regular civil post under the Central Government: no ESM "
+            "reservation for this post", bar, evidence, "the same note keeps the ex-servicemen age relaxation" if v.get("age_relaxation_kept") else None)
     # RESERVATION_AVAILED: only a civil post secured through the ESM reservation counts
     lost = " and ".join(b.lower().replace("_", " ") for b in v.get("bars", ["RESERVATION"]))
-    # "No civil post" settles it before any follow-up answer about that post is read
-    if secured is False or used is False:
+    if used is False:
         return _out("ESM_RESERVATION_REUSE", OK, "no civil post secured through the ESM reservation", bar, evidence)
     if used is None:
         return _out("ESM_RESERVATION_REUSE", CANNOT_DECIDE, "whether a civil post was secured through the ESM reservation is not stated", bar, evidence)
+    beyond = _government_outcome(bar, government, evidence)
+    if beyond:
+        return beyond
     groups = set(v.get("civil_post_groups") or [])
     if groups and group is None:
-        return _out("ESM_RESERVATION_REUSE", CANNOT_DECIDE, "the Group of the civil post held is not stated; the bar is for Group "
+        return _out("ESM_RESERVATION_REUSE", CANNOT_DECIDE, "the Group of the civil post is not stated; the bar is for Group "
                     f"{' & '.join(sorted(groups))} posts", bar, evidence)
     if groups and group not in groups:
         return _out("ESM_RESERVATION_REUSE", NEEDS_HUMAN_REVIEW, f"the notice states the bar for Group {' & '.join(sorted(groups))} posts; "

@@ -37,6 +37,7 @@ export interface PersonalInfoFull {
   esm_release_type?: EsmReleaseType | null;
   esm_rank?: string | null;
   esm_civil_post_secured?: boolean | null;
+  esm_civil_post_government?: "CENTRAL" | "STATE" | null;
   esm_reservation_used?: boolean | null;
   esm_civil_post_group?: "A" | "B" | "C" | "D" | null;
   esm_undertaking_given?: boolean | null;

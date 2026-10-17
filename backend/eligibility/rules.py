@@ -74,6 +74,7 @@ class ProfileSnapshot:
     esm_release_type: Optional[str] = None
     esm_rank: Optional[str] = None
     esm_civil_post_secured: Optional[bool] = None
+    esm_civil_post_government: Optional[str] = None
     esm_reservation_used: Optional[bool] = None
     esm_civil_post_group: Optional[str] = None
     esm_undertaking_given: Optional[bool] = None

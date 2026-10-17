@@ -63,6 +63,7 @@ async def load_profile_snapshot(session: AsyncSession, profile_version_id: uuid.
         esm_release_type=info.esm_release_type if info else None,
         esm_rank=info.esm_rank if info else None,
         esm_civil_post_secured=info.esm_civil_post_secured if info else None,
+        esm_civil_post_government=info.esm_civil_post_government if info else None,
         esm_reservation_used=info.esm_reservation_used if info else None,
         esm_civil_post_group=info.esm_civil_post_group if info else None,
         esm_undertaking_given=info.esm_undertaking_given if info else None,

@@ -40,6 +40,7 @@ const RELEASE_TYPES: [EsmReleaseType, string][] = [
 ];
 
 const CIVIL_POST_CLEARED: Partial<PersonalInfoFull> = {
+  esm_civil_post_government: null,
   esm_reservation_used: null,
   esm_civil_post_group: null,
   esm_undertaking_given: null,
@@ -64,7 +65,7 @@ type BoolKey =
   | "esm_reservation_used"
   | "esm_undertaking_given"
   | "is_agniveer";
-type ChoiceKey = "esm_service_branch" | "esm_release_type" | "esm_civil_post_group";
+type ChoiceKey = "esm_service_branch" | "esm_release_type" | "esm_civil_post_government" | "esm_civil_post_group";
 
 export function PersonalEditor({
   value,
@@ -177,9 +178,10 @@ export function PersonalEditor({
             {text("esm_enrolment_date", "Enrolled on", "date")}
             {text("esm_release_date", "Released on (or expected end of engagement if still serving)", "date")}
             {choice("esm_release_type", "How you left the Armed Forces", RELEASE_TYPES)}
-            {question("esm_civil_post_secured", "Since release, hold a regular civil post under the Central Govt?")}
+            {question("esm_civil_post_secured", "Since release, have you secured a regular civil post under a Government (Central or State), even one you have since left?")}
             {value.esm_civil_post_secured === true && (
               <>
+                {choice("esm_civil_post_government", "Under which Government?", [["CENTRAL", "Central Government"], ["STATE", "State Government"]])}
                 {question("esm_reservation_used", "Was that post secured through the ex-servicemen reservation?")}
                 {choice("esm_civil_post_group", "Group of that civil post", [["A", "Group A"], ["B", "Group B"], ["C", "Group C"], ["D", "Group D"]])}
                 {question("esm_undertaking_given", "On joining, gave the employer a self-declaration of earlier applications (DoP&T OM 14.08.2014)?")}
