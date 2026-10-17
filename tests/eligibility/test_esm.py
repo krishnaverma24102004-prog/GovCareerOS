@@ -14,22 +14,22 @@ None of these notices (nor any other captured fixture) mentions Agniveers: a for
 import json
 import re
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import List
 
 import pymupdf
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from govcareeros.backend.documents.pdf_text import extract_pages
 from govcareeros.backend.eligibility import esm, exam_engine, rules
-from govcareeros.backend.models import Exam, Vacancy
+from govcareeros.backend.models import Exam, ExamRequirement, Vacancy, VacancyRequirement
 from govcareeros.backend.parsing.ssc_exam_notice import parse_exam_notice
 from govcareeros.backend.parsing.upsc_advertisement import IST, parse_advertisement
 from govcareeros.backend.services.document_ingestion import get_or_create_source, ingest_pdf_bytes
-from govcareeros.backend.services.exam_ingestion import ingest_exam_pdf
+from govcareeros.backend.services.exam_ingestion import ingest_exam_pdf, parsed_by_older_parser, reparse_stale_exams
 from govcareeros.backend.sources import ssc, upsc
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
@@ -383,3 +383,55 @@ async def test_vacancy_result_has_a_separate_esm_section_and_gaps_stay_current(a
     assert res["esm_status"] == "FAILS" and all(not e["check_name"].startswith("ESM_") for e in res["evidence"])
     gaps = (await api.get(f"/gaps?profile_version_id={version}&vacancy_id={vacancy.id}", headers=h)).json()
     assert gaps["eligibility_result_id"] == res["id"]
+
+# ---------- notices stored before the ESM clauses were parsed ----------
+
+@pytest.mark.asyncio
+async def test_exam_stored_by_the_previous_parser_is_reparsed_with_its_esm_clauses(db_session):
+    source = await get_or_create_source(db_session, ssc.SSC_SOURCE)
+    sources = json.loads((FIXTURES / "ssc" / "sources.json").read_text(encoding="utf-8"))
+    exam_id = (await ingest_exam_pdf(db_session, source, sources[CHSL]["url"], (FIXTURES / "ssc" / CHSL).read_bytes())).exam_id
+    exam = await db_session.get(Exam, exam_id)
+    assert exam.parser_version == "ssc_exam_notice/2"  # CHSL 2026 has no post-wise tables (parsing/ssc_tables.py)
+    # The exam as the parser before ESM_RULE rows stored it (that version; no such rows)
+    exam.parser_version = "ssc_exam_notice/1"
+    await db_session.execute(update(ExamRequirement).where(ExamRequirement.exam_id == exam_id, ExamRequirement.req_type == "ESM_RULE")
+                             .values(superseded_at=datetime.now(timezone.utc)))
+    await db_session.commit()
+
+    async def active_esm_rows():
+        rows = (await db_session.execute(select(ExamRequirement).where(
+            ExamRequirement.exam_id == exam_id, ExamRequirement.req_type == "ESM_RULE", ExamRequirement.superseded_at.is_(None)))).scalars()
+        return {json.loads(r.value)["kind"]: r.source_page for r in rows}
+
+    assert await active_esm_rows() == {}
+    errors = []
+    reparsed = await reparse_stale_exams(db_session, source, errors)
+    assert errors == [] and [(r.exam_id, r.reparsed) for r in reparsed] == [(exam_id, True)]
+    assert await active_esm_rows() == {"RESERVATION_REUSE_BAR": 5, "RELEASE_WITHIN_ONE_YEAR": 5, "DEFINITION": 5, "STATUS_CRUCIAL_DATE": 7}
+    await db_session.refresh(exam)
+    assert exam.parser_version == "ssc_exam_notice/2"
+    # Current now: nothing to re-parse. An exam approved from an LLM draft is a reviewer's decision and is never re-parsed
+    assert await reparse_stale_exams(db_session, source, errors) == []
+    exam.parser_version = "llm:exam_draft/1:test-model"
+    await db_session.commit()
+    assert await reparse_stale_exams(db_session, source, errors) == [] and errors == []
+    assert parsed_by_older_parser("ssc_exam_notice/2+ssc_tables/0") and not parsed_by_older_parser("ssc_exam_notice/2+ssc_tables/1")
+
+@pytest.mark.asyncio
+async def test_vacancy_stored_by_the_previous_parser_gets_the_esm_note_when_the_advertisement_is_read_again(db_session):
+    source = await get_or_create_source(db_session, upsc.UPSC_SOURCE)
+    url, body = f"https://www.upsc.gov.in/sites/default/files/{UPSC_12}", (FIXTURES / "upsc" / UPSC_12).read_bytes()
+    await ingest_pdf_bytes(db_session, source, url, body)
+    vacancy = (await db_session.execute(select(Vacancy).where(Vacancy.external_ref == "26091203226"))).scalar_one()
+    # As stored by upsc_advertisement/4, which had no ESM_RULE row
+    vacancy.parser_version = "upsc_advertisement/4"
+    await db_session.execute(update(VacancyRequirement).where(VacancyRequirement.vacancy_id == vacancy.id, VacancyRequirement.req_type == "ESM_RULE")
+                             .values(superseded_at=datetime.now(timezone.utc)))
+    await db_session.commit()
+    # The UPSC pipeline downloads every listed advertisement on each run; the same bytes are parsed again
+    again = await ingest_pdf_bytes(db_session, source, url, body)
+    assert again.reparsed_vacancy_ids == [vacancy.id]
+    rows = (await db_session.execute(select(VacancyRequirement).where(
+        VacancyRequirement.vacancy_id == vacancy.id, VacancyRequirement.req_type == "ESM_RULE", VacancyRequirement.superseded_at.is_(None)))).scalars().all()
+    assert [(json.loads(r.value)["kind"], r.source_page, r.source_excerpt) for r in rows] == [("RESERVATION_REUSE_BAR", 22, UPSC_NOTE)]

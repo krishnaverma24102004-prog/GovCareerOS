@@ -26,7 +26,7 @@ from govcareeros.backend.documents.pdf_text import PageText
 from govcareeros.backend.parsing.esm_clauses import parse_esm_clauses
 from govcareeros.backend.parsing.upsc_advertisement import IST, ParsedField, ParsedRequirement, Provenance
 
-PARSER_VERSION = "ssc_exam_notice/1"
+PARSER_VERSION = "ssc_exam_notice/2"  # /2: ESM_RULE rows (parsing/esm_clauses.py)
 CONDUCTING_BODY = "Staff Selection Commission"
 
 # Conventional SSC short codes; a label for display and matching, not a fact taken from the notice

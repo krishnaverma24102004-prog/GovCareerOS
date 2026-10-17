@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from govcareeros.backend.documents.pdf_text import PageText
 from govcareeros.backend.parsing.recruitment_mode import detect_recruitment_mode, govt_service_requirement
 
-PARSER_VERSION = "upsc_advertisement/4"
+PARSER_VERSION = "upsc_advertisement/5"  # /5: ESM_RULE row for the p.22 NOTE (parsing/esm_clauses.py)
 IST = timezone(timedelta(hours=5, minutes=30))
 
 _UNITS = {

@@ -35,6 +35,8 @@ async def main(args) -> int:
     for r in run["exams"]:
         print(f"  exam {r.exam_id or '-'}  created={r.created} reparsed={r.reparsed} {r.skipped_reason or ''}"
               + (f"  warnings: {'; '.join(r.warnings)}" if r.warnings else ""))
+    for r in run["reparsed"]:
+        print(f"  re-parsed exam {r.exam_id or '-'}  {r.skipped_reason or ''}")
     for d in run["drafts"]:
         print(f"  draft {d.id} {d.status} accepted {d.fields_accepted}/{d.fields_offered}")
     for e in run["errors"]:
