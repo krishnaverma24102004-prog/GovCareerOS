@@ -18,7 +18,7 @@ async def main(send: bool) -> int:
     if send and not mailer.is_configured():
         print("--send given but EMAIL_USERNAME / EMAIL_PASSWORD are not set; writing files only")
         send = False
-    failures = 0
+    failures = skipped = 0
     async with AsyncSessionLocal() as session:
         runs = await digest.run_all(session)
         await session.commit()
@@ -26,8 +26,11 @@ async def main(send: bool) -> int:
         summary = [(run.id, run.user_id, f"{run.user_id}: {run.item_count} item(s) {run.item_counts}, "
                     f"{run.omitted_count} left out -> {digest.run_file(run)}") for run in runs]
         for run_id, user_id, line in summary:
-            if send:
-                email = (await session.get(digest.User, user_id)).email
+            email = (await session.get(digest.User, user_id)).email if send else None
+            if send and not email:
+                skipped += 1
+                line += "; not emailed (operator-managed client without an email)"
+            elif send:
                 try:
                     await digest.send_run(session, await session.get(digest.DigestRun, run_id), email)
                     await session.commit()
@@ -37,7 +40,7 @@ async def main(send: bool) -> int:
                     failures += 1
                     line += f"; email FAILED: {type(e).__name__}: {e}"
             print(line)
-        print(f"{len(summary)} digest(s) written" + (f", {len(summary) - failures} emailed" if send else ""))
+        print(f"{len(summary)} digest(s) written" + (f", {len(summary) - failures - skipped} emailed" if send else ""))
     await engine.dispose()
     return 1 if failures else 0
 

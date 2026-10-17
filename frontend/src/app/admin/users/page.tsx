@@ -45,6 +45,16 @@ function Users({ me }: { me: User }) {
     load();
   }, [load]);
 
+  async function setOperator(u: AdminUser, value: boolean) {
+    setError(null);
+    try {
+      await api(`/admin/users/${u.id}/operator`, { method: "POST", body: { is_operator: value } });
+      await load();
+    } catch (e) {
+      setError(errText(e));
+    }
+  }
+
   async function setReviewer(u: AdminUser, value: boolean) {
     setError(null);
     if (u.id === me.id && !value && !window.confirm("Remove your own reviewer role? You will lose access to this page.")) return;
@@ -67,6 +77,7 @@ function Users({ me }: { me: User }) {
             <th className="px-3 py-1">Name</th>
             <th className="px-3 py-1">Active</th>
             <th className="px-3 py-1">Reviewer</th>
+            <th className="px-3 py-1">Operator</th>
             <th className="px-3 py-1" />
           </tr>
         </thead>
@@ -74,13 +85,19 @@ function Users({ me }: { me: User }) {
           {users?.map((u) => (
             <tr key={u.id} className="border-t border-slate-100">
               <td className="px-3 py-1">
-                {u.email}
+                {u.email ?? <span className="text-slate-500">operator client (unclaimed)</span>}
                 {u.id === me.id && <span className="ml-1 text-xs text-slate-500">(you)</span>}
               </td>
               <td className="px-3 py-1">{u.full_name || "—"}</td>
               <td className="px-3 py-1">{u.is_active ? "yes" : "no"}</td>
               <td className="px-3 py-1">{u.is_reviewer ? <Badge value="REVIEWER" /> : "—"}</td>
-              <td className="px-3 py-1 text-right">
+              <td className="px-3 py-1">{u.is_operator ? <Badge value="OPERATOR" /> : u.managed_by_id ? "client" : "—"}</td>
+              <td className="space-x-1 whitespace-nowrap px-3 py-1 text-right">
+                {!u.managed_by_id && (
+                  <button className="rounded border border-slate-300 px-2 py-0.5 text-xs" onClick={() => setOperator(u, !u.is_operator)}>
+                    {u.is_operator ? "Remove operator" : "Make operator"}
+                  </button>
+                )}
                 <button className="rounded border border-slate-300 px-2 py-0.5 text-xs" onClick={() => setReviewer(u, !u.is_reviewer)}>
                   {u.is_reviewer ? "Remove reviewer" : "Make reviewer"}
                 </button>

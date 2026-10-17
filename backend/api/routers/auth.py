@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +9,8 @@ from govcareeros.backend.api.deps import current_user, get_session
 from govcareeros.backend.api.security import hash_password, new_token, token_hash, verify_password
 from govcareeros.backend.models.auth_token import AuthToken
 from govcareeros.backend.models.user import User
-from govcareeros.backend.schemas.api import LoginIn, RegisterIn, TokenOut, UserOut
+from govcareeros.backend.schemas.api import ClaimIn, LoginIn, RegisterIn, TokenOut, UserOut
+from govcareeros.backend.services import operator_console
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -21,6 +22,22 @@ async def register(body: RegisterIn, session: AsyncSession = Depends(get_session
     session.add(user)
     await session.flush()
     return user
+
+@router.post("/claim", response_model=UserOut)
+async def claim(body: ClaimIn, session: AsyncSession = Depends(get_session)):
+    """Set email and password on an operator-created client account with the one-time code; then log in as usual."""
+    try:
+        return await operator_console.claim_account(session, body.token, body.email, body.password)
+    except operator_console.OperatorError as e:
+        raise HTTPException(e.status, str(e))
+
+@router.post("/operator-consent/withdraw", status_code=status.HTTP_204_NO_CONTENT)
+async def withdraw_operator_consent(user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    """A client who claimed an operator-created account withdraws the operator's consent: the operator loses access."""
+    if user.managed_by_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "this account was not created by an operator")
+    await operator_console.withdraw_consent(session, user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.post("/login", response_model=TokenOut)
 async def login(body: LoginIn, session: AsyncSession = Depends(get_session)):

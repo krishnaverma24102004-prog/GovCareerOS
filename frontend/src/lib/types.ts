@@ -2,9 +2,11 @@
 
 export interface User {
   id: string;
-  email: string;
+  /** null only for an operator's client who has not claimed the account (such a user cannot log in) */
+  email: string | null;
   full_name: string | null;
   is_reviewer: boolean;
+  is_operator?: boolean;
 }
 
 export interface Token {
@@ -352,10 +354,12 @@ export interface FactView {
 
 export interface AdminUser {
   id: string;
-  email: string;
+  email: string | null;
   full_name: string | null;
   is_active: boolean;
   is_reviewer: boolean;
+  is_operator: boolean;
+  managed_by_id: string | null;
 }
 
 export interface AuditRow {

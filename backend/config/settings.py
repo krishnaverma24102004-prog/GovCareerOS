@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # estimate beside the official last date, never as the date (backend/services/deadline_helper.py)
     IN_SERVICE_FORWARDING_BUFFER_DAYS: int = 0
 
+    # Operator console billing is TEST MODE only (backend/services/billing.py): the default price of one per-application
+    # report, in paise, when no billing_prices row applies. No real gateway exists; nothing is ever collected.
+    OPERATOR_REPORT_PRICE_PAISE: int = 2000
+    # Hours a client account claim token stays usable
+    CLAIM_TOKEN_TTL_HOURS: int = 72
+
     @property
     def storage_dir(self) -> Path:
         path = Path(self.STORAGE_PATH)

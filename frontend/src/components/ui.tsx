@@ -68,6 +68,9 @@ const REVIEWER_LINKS = [
   ["/admin/users", "Users"],
 ] as const;
 
+// Cyber-cafe / CSC operator console; the backend refuses it to non-operators anyway
+const OPERATOR_LINKS = [["/operator", "Operator"]] as const;
+
 export function Shell({
   user,
   children,
@@ -81,7 +84,8 @@ export function Shell({
   publicPage?: boolean;
 }) {
   const path = usePathname();
-  const links = user?.is_reviewer ? [...LINKS, ...REVIEWER_LINKS] : user ? LINKS : LINKS.filter(([href]) => PUBLIC_LINKS.has(href));
+  const base = user?.is_reviewer ? [...LINKS, ...REVIEWER_LINKS] : user ? LINKS : LINKS.filter(([href]) => PUBLIC_LINKS.has(href));
+  const links: ReadonlyArray<readonly [string, string]> = user?.is_operator ? [...base, ...OPERATOR_LINKS] : base;
   // The most specific link wins, so /review/facts does not also light up /review
   const active = links.map(([href]) => href).filter((href) => path === href || path?.startsWith(href + "/")).sort((a, b) => b.length - a.length)[0];
   const router = useRouter();
@@ -142,6 +146,8 @@ const STATUS_STYLE: Record<string, string> = {
   NOT_REQUIRED: "bg-slate-200 text-slate-700",
   NOT_STATED: "bg-slate-100 text-slate-500",
   REVIEWER: "bg-green-100 text-green-800",
+  OPERATOR: "bg-blue-100 text-blue-800",
+  TEST_MODE: "bg-amber-100 text-amber-800",
   // Notice check (POST /verify): verdicts, link checks, a matched vacancy's status
   FOUND_ON_OFFICIAL_SOURCE: "bg-green-100 text-green-800",
   OFFICIAL: "bg-green-100 text-green-800",

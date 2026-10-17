@@ -3,17 +3,25 @@ from datetime import datetime
 from typing import List, Optional
 from sqlalchemy import String, Text, Boolean, ForeignKey, DateTime, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from govcareeros.backend.models.base import Base, TimestampMixin
+from govcareeros.backend.models.base import Base, TimestampMixin, UTCDateTime
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    # None only for an operator-managed client who has not claimed the account yet (cannot log in)
+    email: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True)
+    # "" = no password set (unclaimed operator-managed client); verify_password never accepts it
     hashed_password: Mapped[str] = mapped_column(String(255))
     full_name: Mapped[Optional[str]] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # May approve LLM extraction drafts into vacancies
     is_reviewer: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Cyber-cafe / CSC operator: may create and serve client accounts (granted by a reviewer only)
+    is_operator: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Set on a client account an operator created; the operator sees only clients with their own id here
+    managed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", name="fk_users_managed_by_id"), index=True)
+    # When a managed client set their own email and password with a claim token
+    claimed_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
     profile_versions: Mapped[List["ProfileVersion"]] = relationship(back_populates="user")
 
 class ProfileVersion(Base, TimestampMixin):
