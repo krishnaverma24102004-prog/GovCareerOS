@@ -12,6 +12,16 @@ export interface DomainCheck {
   /** the official domain it is on, or the one it imitates */
   official_domain: string | null;
   reasons: string[];
+  /** the official document that lists an associated domain (router DocumentCitationOut) */
+  citation: DocumentCitation | null;
+}
+
+/** Where an official document prints a domain as the organisation's own. */
+export interface DocumentCitation {
+  document: string;
+  url: string;
+  page: number;
+  quote: string;
 }
 
 /** A stored official notice or vacancy the input matches (router NoticeMatchOut). */

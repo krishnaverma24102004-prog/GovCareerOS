@@ -214,6 +214,18 @@ function LinkCheck({ c }: { c: DomainCheck }) {
           ))}
         </ul>
       )}
+      {c.citation && (
+        <>
+          <blockquote className="mt-1 border-l-2 border-slate-300 pl-2 text-slate-700">
+            &ldquo;{c.citation.quote}&rdquo;<span className="text-slate-500"> (page {c.citation.page})</span>
+          </blockquote>
+          {/^https?:\/\//i.test(c.citation.url) && (
+            <a className="mt-1 inline-block break-all text-blue-700 underline" href={pageLink(c.citation.url, c.citation.page)} target="_blank" rel="noreferrer">
+              {c.citation.document}
+            </a>
+          )}
+        </>
+      )}
     </div>
   );
 }

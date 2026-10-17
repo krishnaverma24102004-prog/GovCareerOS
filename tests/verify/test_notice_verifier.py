@@ -8,11 +8,13 @@ Public notice check (POST /verify) on real data only:
 """
 import asyncio
 import json
+import re
 import time
 from datetime import datetime
 from pathlib import Path
 
 import httpx
+import pymupdf
 import pytest
 from sqlalchemy import event, select
 
@@ -25,6 +27,7 @@ from govcareeros.backend.services.notice_verifier import (
 )
 from govcareeros.backend.services.source_discovery import sync_registry, url_hash
 from govcareeros.backend.sources import upsc
+from govcareeros.backend.sources.associated_domains import associated_domains
 from govcareeros.backend.sources.registry import SOURCES
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
@@ -236,6 +239,19 @@ async def test_api_rejects_bad_uploads(api, db_session, monkeypatch):
     r = await api.post("/verify", files={"file": (ADVT_12, body, "application/pdf")})
     assert r.status_code == 413
 
+@pytest.mark.asyncio
+async def test_api_password_protected_pdf_gets_a_clear_message(api, db_session):
+    # No password-protected notice has been captured: the real UPSC advertisement is locked here with a test-only
+    # password, to exercise the upload path
+    with pymupdf.open(stream=(UPSC_DIR / ADVT_12).read_bytes(), filetype="pdf") as doc:
+        locked = doc.tobytes(encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="test-only-user-pw",
+                             owner_pw="test-only-owner-pw")
+    assert pymupdf.open(stream=locked, filetype="pdf").needs_pass
+    r = await api.post("/verify", files={"file": (ADVT_12, locked, "application/pdf")})
+    assert r.status_code == 422
+    assert r.json()["detail"] == ("this PDF is password-protected, so it cannot be read; upload a copy without a "
+                                  "password, or paste the notice's text or link")
+
 # ------------------------------------------------------------------ evasions built from the fixture's real values
 
 def test_backslash_before_userinfo_is_read_as_a_browser_reads_it():
@@ -261,6 +277,70 @@ def test_links_printed_in_genuine_upsc_advertisements_are_official(name):
     text = notice_verifier.pdf_text((UPSC_DIR / name).read_bytes())
     checks = [check_domain(u) for u in notice_verifier.urls_in(text)]
     assert checks and all(c.status == "OFFICIAL" for c in checks), [(c.input, c.status) for c in checks]
+
+# ------------------------------------------------------------------ associated domains (SSC's regional websites)
+
+SSC_SOURCES = json.loads((FIXTURES / "ssc" / "sources.json").read_text(encoding="utf-8"))
+ASSOCIATED = associated_domains()
+
+def _page_text(fixture: str, page: int) -> str:
+    with pymupdf.open(FIXTURES / fixture) as doc:
+        return re.sub(r"\s+", " ", doc[page - 1].get_text())
+
+@pytest.mark.parametrize("domain", sorted(ASSOCIATED))
+def test_every_associated_domain_is_quoted_from_the_official_document(domain):
+    # Each citation: the captured document is the one at its URL, and the quote (with the domain) is on its page
+    for c in ASSOCIATED[domain].citations:
+        assert SSC_SOURCES[Path(c.fixture).name]["url"] == c.url
+        assert SSC_SOURCES[Path(c.fixture).name]["title"] == c.document
+        assert domain in c.quote
+        assert c.quote in _page_text(c.fixture, c.page), (c.fixture, c.page)
+    assert not any(domain.endswith("." + s) for s in ("gov.in", "nic.in")), "official through the suffix already"
+
+@pytest.mark.parametrize("name", ["Notice_of_adv_cgl_2026.pdf", "Notice_of_adv_chsle_2026.pdf", "Notice_of_adv_je_2026.pdf"])
+def test_links_printed_in_genuine_ssc_notices_are_official(name):
+    # Para 12.1 lists each regional office's website: www.ssc-cr.org came out LOOKALIKE (it has SSC's name) and
+    # www.sscer.org, www.sscwr.net ... UNOFFICIAL before the associated domains
+    text = notice_verifier.pdf_text((FIXTURES / "ssc" / name).read_bytes())
+    checks = [check_domain(u) for u in notice_verifier.urls_in(text)]
+    assert checks and all(c.status == "OFFICIAL" for c in checks), [(c.input, c.status) for c in checks]
+    regional = [c for c in checks if c.citation]
+    assert len(regional) >= 4
+    for c in regional:
+        assert c.reasons == [f"{c.host} is listed in {c.citation.document} p.{c.citation.page}"]
+        assert c.official_domain in ASSOCIATED
+
+def test_ssc_central_region_site_is_official_with_its_citation():
+    check = check_domain("http://www.ssc-cr.org")
+    assert check.status == "OFFICIAL" and check.official_domain == "ssc-cr.org"
+    assert check.reasons == ["www.ssc-cr.org is listed in Notice of Combined Graduate Level Examination, 2026 p.21"]
+    assert check.citation.page == 21 and "(http://www.ssc-cr.org)" in check.citation.quote
+
+@pytest.mark.parametrize("domain", sorted(ASSOCIATED))
+def test_associated_domains_keep_lookalike_detection(domain):
+    # Built from the real domain: followed by another suffix, its name under another TLD, and SSC's own name
+    assert check_domain(f"{domain}.com").status == "LOOKALIKE"
+    assert check_domain(f"{domain}.com").official_domain == domain
+    name = domain.split(".")[0]
+    other = check_domain(f"{name}.com" if not domain.endswith(".org") else f"{name}.org.in")
+    assert other.status == "LOOKALIKE" and other.official_domain in {domain, "ssc.gov.in"}, other
+    # Look-alike letters in an associated domain are not official
+    assert check_domain(domain.replace("s", "ѕ", 1)).status == "LOOKALIKE"
+
+def test_a_name_shared_with_the_registry_domain_is_reported_as_the_registrys():
+    # 'ssc' is in ssc.gov.in (registry) and ssc-cr.org (associated): the fake below imitates SSC, whatever the set order
+    check = check_domain(ITEMS["indiapostgds-online"]["value"].replace("indiapostgds", "ssc-gds"))
+    assert check.status == "LOOKALIKE" and check.official_domain == "ssc.gov.in"
+
+@pytest.mark.asyncio
+async def test_associated_domain_link_is_found_with_its_citation(api, db_session):
+    await load_official(db_session)
+    r = await api.post("/verify", data={"url": "www.sscwr.net"})
+    out = r.json()
+    assert r.status_code == 200 and out["verdict"] == FOUND and out["matches"] == []
+    assert "listed in Notice of Combined Graduate Level Examination, 2026 p.23" in out["message"]
+    assert out["url"]["citation"]["page"] == 23 and out["url"]["citation"]["url"].endswith("Notice_of_adv_cgl_2026.pdf")
+    assert "(www.sscwr.net)" in out["url"]["citation"]["quote"]
 
 # ------------------------------------------------------------------ bare domains
 
