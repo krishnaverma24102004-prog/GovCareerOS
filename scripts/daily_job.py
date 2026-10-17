@@ -13,7 +13,9 @@ logged, and the next step still runs:
   digest    weekly digest, only if backend.services.digest exists (imported lazily)
 
 A file lock in storage/ keeps two runs from overlapping (stale after 6h). Every run, including one that
-found the lock held, appends one JSON line to storage/logs/daily_job.jsonl (see services.run_log).
+found the lock held, appends one JSON line to storage/logs/daily_job.jsonl (see services.run_log). SIGTERM (docker
+stop, passed on by scripts/scheduler.py) stops a run like Ctrl+C: it is logged as CRASHED, the open step's transaction
+is rolled back, the lock is released, and the exit code is 143.
 
     $env:PYTHONPATH="C:\\Users\\krishna"
     python govcareeros/scripts/daily_job.py
@@ -27,6 +29,7 @@ import asyncio
 import importlib
 import importlib.util
 import inspect
+import signal
 import sys
 import time
 import traceback
@@ -220,5 +223,14 @@ async def main(argv: Optional[List[str]] = None, *, session_factory=None, log_pa
             await engine.dispose()
     return 1 if failed else 0
 
+def _stop(signum, frame):
+    # Unwinds whatever is running (a step, or the event loop waiting on I/O, whose tasks asyncio.run then cancels),
+    # so main()'s finally logs the run and releases the lock. Without a handler SIGTERM kills the process outright
+    raise SystemExit(128 + signum)
+
+def install_signal_handlers() -> None:
+    signal.signal(signal.SIGTERM, _stop)
+
 if __name__ == "__main__":
+    install_signal_handlers()
     raise SystemExit(asyncio.run(main(sys.argv[1:])))

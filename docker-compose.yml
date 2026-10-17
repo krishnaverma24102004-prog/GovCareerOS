@@ -75,6 +75,10 @@ services:
   scheduler:
     <<: *app
     command: ["python", "govcareeros/scripts/scheduler.py"]
+    # tini as PID 1: passes docker stop's SIGTERM to scheduler.py, which stops the running job (the daily job then
+    # logs the run and releases its lock) and exits; it also reaps orphaned browser processes
+    init: true
+    stop_grace_period: 60s
     healthcheck:
       disable: true
     depends_on:

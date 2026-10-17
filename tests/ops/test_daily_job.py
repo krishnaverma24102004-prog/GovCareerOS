@@ -122,6 +122,44 @@ async def test_scheduled_monday_digest_keeps_the_weeks_matches(api, login, db_se
     assert len(runs) == 1 and json.loads(runs[0].item_counts)["matches"] >= 1
     assert len((await db_session.execute(select(digest.DigestRun))).scalars().all()) == 1
 
+_STOPPED_RUN = r"""
+import asyncio, signal, sys
+from pathlib import Path
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from govcareeros.scripts import daily_job
+
+where, tmp = sys.argv[1], Path(sys.argv[2])
+async def radar(self, session):
+    # SIGTERM in the middle of a step: raised in the step itself, or while the event loop waits on I/O
+    if where == "step":
+        signal.raise_signal(signal.SIGTERM)
+    else:
+        asyncio.get_running_loop().call_later(0.2, signal.raise_signal, signal.SIGTERM)
+    await asyncio.sleep(30)
+    return {}
+daily_job.DailyJob.radar = radar
+daily_job.install_signal_handlers()
+factory = async_sessionmaker(create_async_engine(f"sqlite+aiosqlite:///{(tmp / 'stop.db').as_posix()}"))
+asyncio.run(daily_job.main(["--only", "radar"], session_factory=factory, log_path=tmp / "runs.jsonl", lock_path=tmp / "job.lock"))
+"""
+
+@pytest.mark.parametrize("where", ["step", "event_loop"])
+def test_stopped_daily_job_logs_the_run_and_releases_its_lock(tmp_path, where):
+    """docker stop sends SIGTERM (scripts/scheduler.py passes it on to the running job). Killed outright, the job left
+    its lock behind and the next run was refused for 6 hours; stopped, it unwinds like Ctrl+C."""
+    import subprocess
+    import sys
+    env = {**os.environ, "PYTHONPATH": str(Path(__file__).parents[3]), "PYTHONIOENCODING": "utf-8", "TEST_DATABASE_URL": "",
+           "STORAGE_PATH": str(tmp_path / "storage")}
+    started = time.monotonic()
+    out = subprocess.run([sys.executable, "-c", _STOPPED_RUN, where, str(tmp_path)], env=env, cwd=str(tmp_path),
+                         capture_output=True, text=True, encoding="utf-8", timeout=120)
+    assert time.monotonic() - started < 25, "the job slept on instead of stopping"
+    assert out.returncode == 143, out.stderr[-2000:]  # 128 + SIGTERM, as a shell reports a job ended by it
+    assert not (tmp_path / "job.lock").exists()
+    [record] = run_log.read_runs(path=tmp_path / "runs.jsonl")
+    assert record["status"] == "CRASHED" and record["finished_at"]
+
 @pytest.mark.asyncio
 async def test_admin_runs_is_reviewer_only(api, login, db_session, monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "STORAGE_PATH", str(tmp_path / "storage"))

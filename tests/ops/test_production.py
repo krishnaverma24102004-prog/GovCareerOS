@@ -243,6 +243,43 @@ def test_scheduler_jobs_from_settings(monkeypatch):
     with pytest.raises(ValueError):
         scheduler.configured_jobs()
 
+_SCHEDULER_STOP = r"""
+import signal, sys, threading, time
+from datetime import datetime, timedelta
+from govcareeros.scripts import scheduler
+
+mode = sys.argv[1]
+tz = scheduler.parse_offset("+05:30")
+scheduler.install_signal_handlers()
+threading.Timer(1.0, signal.raise_signal, (signal.SIGTERM,)).start()  # what docker stop delivers
+started = time.monotonic()
+sleeper = [sys.executable, "-c", "import time; time.sleep(60)"]
+if mode == "running_job":
+    code = scheduler.run_job(scheduler.Job("sleeper", "07:00", sleeper))
+    print(f"JOB {code} {time.monotonic() - started:.1f}")
+    # stopping: the loop starts no further job, even one that is due
+    due_now = (datetime.now(tz) - timedelta(minutes=1)).strftime("%H:%M")
+    scheduler.loop([scheduler.Job("sleeper", due_now, sleeper)], tz)
+else:  # waiting for a job due in an hour
+    scheduler.loop([scheduler.Job("sleeper", (datetime.now(tz) + timedelta(hours=1)).strftime("%H:%M"), sleeper)], tz)
+print(f"STOPPED {time.monotonic() - started:.1f}")
+"""
+
+@pytest.mark.parametrize("mode", ["running_job", "idle"])
+def test_scheduler_stops_on_sigterm_and_stops_its_job(tmp_path, mode):
+    """docker stop sends SIGTERM to the scheduler. Python installs no SIGTERM handler, and as PID 1 an unhandled
+    SIGTERM is ignored, so every stop waited out the grace period and then SIGKILLed a running job."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("LOG_", "SCHEDULE_"))}
+    env.update({"PYTHONPATH": str(ROOT.parent), "PYTHONIOENCODING": "utf-8", "TEST_DATABASE_URL": "", "STORAGE_PATH": str(tmp_path)})
+    out = subprocess.run([sys.executable, "-c", _SCHEDULER_STOP, mode], env=env, cwd=str(tmp_path), capture_output=True,
+                         text=True, encoding="utf-8", timeout=120)
+    assert out.returncode == 0, out.stderr[-2000:]
+    lines = dict(l.split(" ", 1) for l in out.stdout.splitlines() if l.startswith(("JOB ", "STOPPED ")))
+    assert float(lines["STOPPED"]) < 15, out.stdout  # the 60 s job and the hour-long wait were both cut short
+    if mode == "running_job":
+        code, _ = lines["JOB"].split()
+        assert int(code) != 0  # the job was stopped, not left to finish
+
 # ---------- Docker / compose files (static; Docker is not needed) ----------
 
 def test_compose_file_structure():
@@ -256,6 +293,8 @@ def test_compose_file_structure():
     for name in ("api", "scheduler"):
         assert services[name]["depends_on"]["migrate"]["condition"] == "service_completed_successfully"
     assert services["scheduler"]["command"][-1] == "govcareeros/scripts/scheduler.py"
+    # tini as PID 1 passes docker stop's SIGTERM to scheduler.py and reaps orphaned browser processes
+    assert services["scheduler"]["init"] is True and services["scheduler"]["stop_grace_period"]
     # the password reaches the app on its own, never pasted into the URL (it may contain @ : / %)
     for name in ("migrate", "api", "scheduler"):
         env = services[name]["environment"]

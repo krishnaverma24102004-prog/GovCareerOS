@@ -100,6 +100,9 @@ A value is `HH:MM` (daily) or `mon HH:MM` (weekly); empty turns the job off. A d
 the user's previous digest, so only one job writes digests: `send_digests` once a week while it is scheduled (the
 scheduler then runs the daily job with `--skip digest`), otherwise the daily job's digest step. Runs missed while the container was
 down are not caught up. The daily job keeps its own lock and its run log in `storage/logs/daily_job.jsonl`.
+`docker compose stop` / `down` / an `up -d` recreate stop a running job cleanly: the scheduler (under `init: true`)
+passes SIGTERM on, the daily job logs the run as `CRASHED`, rolls back its open step and releases its lock
+(`stop_grace_period: 60s`).
 
 Without the scheduler container, host cron works the same way:
 

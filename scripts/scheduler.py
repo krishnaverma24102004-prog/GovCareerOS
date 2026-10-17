@@ -13,6 +13,9 @@ DST, so a fixed offset is exact and the slim image needs no tz database). Jobs r
 overlap; a job still running when another is due delays it. A run missed while the container was down is not
 caught up (the daily job is idempotent and runs again the next day).
 
+SIGTERM (docker stop; tini, compose "init: true", passes it on) or Ctrl+C: the running job gets SIGTERM and is waited
+for (the daily job then logs the run and releases its lock), no further job starts, and the scheduler exits 0.
+
 A digest reports what changed since the user's previous digest. So the digest is written by one job only: by
 send_digests when it is scheduled (one digest a week, covering the week), otherwise by the daily job's digest step. If
 both wrote one, the Monday digest would cover the hour since the 07:00 run and never show the week's new matches.
@@ -24,6 +27,7 @@ both wrote one, the Monday digest would cover the hour since the 07:00 run and n
 import argparse
 import logging
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -79,10 +83,43 @@ def configured_jobs() -> List[Job]:
         next_run(j.spec, datetime.now(timezone.utc))  # a bad spec fails at startup, not at 7 a.m.
     return jobs
 
+# Set by SIGTERM / SIGINT: no job starts after it, and the running one is asked to stop. A plain flag, not a
+# threading.Event: the handler runs between two bytecodes of the main thread, which may hold the Event's lock
+_stop_requested = False
+_running: Optional[subprocess.Popen] = None
+
+def request_stop() -> None:
+    global _stop_requested
+    _stop_requested = True
+    child = _running
+    if child is not None and child.poll() is None:
+        child.send_signal(signal.SIGTERM)
+
+def _on_signal(signum, frame) -> None:
+    log.info("signal %s: stopping", signum)
+    request_stop()
+
+def install_signal_handlers() -> None:
+    # Python installs none for SIGTERM, and PID 1 ignores a signal it has no handler for
+    signal.signal(signal.SIGTERM, _on_signal)
+    signal.signal(signal.SIGINT, _on_signal)
+
 def run_job(job: Job) -> int:
+    global _running
     log.info("job %s starting", job.name)
     started = time.monotonic()
-    code = subprocess.call(list(job.argv))
+    _running = proc = subprocess.Popen(list(job.argv))
+    try:
+        if _stop_requested:  # a stop that came in while the job was starting
+            request_stop()
+        while True:
+            try:
+                code = proc.wait(timeout=1)  # short waits: the signal handler runs between them on every platform
+                break
+            except subprocess.TimeoutExpired:
+                continue
+    finally:
+        _running = None
     log.info("job %s finished with exit code %s after %.0fs", job.name, code, time.monotonic() - started)
     return code
 
@@ -91,11 +128,12 @@ def loop(jobs: List[Job], tz: timezone) -> None:
     due = {j.name: next_run(j.spec, now) for j in jobs}
     for j in jobs:
         log.info("job %s scheduled %r, next run %s", j.name, j.spec, due[j.name].isoformat())
-    while True:
+    while not _stop_requested:
         job = min(jobs, key=lambda j: due[j.name])
         wait = (due[job.name] - datetime.now(tz)).total_seconds()
         if wait > 0:
-            time.sleep(min(wait, 60))  # re-check each minute so a clock change cannot strand a job for hours
+            # short sleeps: a stop is noticed within a second, a clock change cannot strand a job for hours
+            time.sleep(min(wait, 1))
             continue
         run_job(job)
         due[job.name] = next_run(job.spec, datetime.now(tz))
@@ -110,6 +148,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         logging.basicConfig(level=settings.LOG_LEVEL.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
     tz = parse_offset(settings.SCHEDULE_UTC_OFFSET)
     jobs = configured_jobs()
+    install_signal_handlers()
     if args.run_now:
         job = next((j for j in jobs if j.name == args.run_now), None)
         if job is None:
@@ -124,6 +163,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         log.warning("no jobs enabled; nothing to do")
         return 0
     loop(jobs, tz)
+    log.info("stopped")
     return 0
 
 if __name__ == "__main__":
