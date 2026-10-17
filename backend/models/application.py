@@ -14,9 +14,12 @@ class ApplicationRequirement(Base, TimestampMixin):
 
     Stored per notice document; a vacancy or exam gets the rows of the document it was parsed from.
     CERTIFICATE rows hold eligibility/certificate_types.CertificateRequirement as JSON (parsing/application_rules.py).
+    A deterministic parse and a reviewer-approved LLM row may both state the same (req_type, code) of a document;
+    both are kept (unique per parser_version) and the checklist warns where they differ (services/application_prep.py).
     """
     __tablename__ = "application_requirements"
-    __table_args__ = (UniqueConstraint("raw_document_id", "req_type", "code", name="uq_application_requirements_doc_type_code"),)
+    __table_args__ = (UniqueConstraint("raw_document_id", "req_type", "code", "parser_version",
+                                       name="uq_application_requirements_doc_type_code_parser"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("government_sources.id", name="fk_application_requirements_source_id"), index=True)

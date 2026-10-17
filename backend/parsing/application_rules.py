@@ -242,6 +242,32 @@ def rupee_amounts(text: str) -> List[int]:
 def exemption_groups(text: str) -> List[str]:
     return sorted(code for code, rx in EXEMPTION_GROUPS if rx.search(text))
 
+# A fee clause ends at a sentence stop (not the one in "Rs."), a semicolon or ", "; a clause that exempts or excepts
+# anyone ("Candidates (Except Female/SC/ST/...) are required to pay a fee of Rs. 25/-") charges no category it names
+_FEE_CLAUSE_SPLIT_RE = re.compile(r"(?<![Rr][Ss])\.\s+|;|,\s+|\n")
+_FEE_EXCLUDES_RE = re.compile(r"exempt|no\s+fee|not\s+required\s+to\s+pay|\bexcept\b|\bnil\b", re.I)
+
+def fee_ties(text: str) -> Dict[str, List[int]]:
+    """Category -> the rupee amounts the text charges it, within one clause. The clause's own order sets the
+    direction: categories first ("UR/OBC: Rs. 100/- and SC/ST: Rs. 50/-") tie each to the first amount after it; an
+    amount first ("Rs. 100/- for UR/OBC and Rs. 50/- for SC/ST") ties each to the last amount before it. A category
+    with no amount on that side is tied to none; naming a category and an amount somewhere in the same quote is not enough."""
+    ties: Dict[str, List[int]] = {}
+    for clause in _FEE_CLAUSE_SPLIT_RE.split(text):
+        if _FEE_EXCLUDES_RE.search(clause):
+            continue
+        amounts = [(m.start(), int(m.group(1).replace(",", ""))) for m in _RUPEES_RE.finditer(clause) if m.group(1).replace(",", "")]
+        named = [(m, code) for code, rx in CATEGORY_WORDS.items() for m in rx.finditer(clause)]
+        if not amounts or not named:
+            continue
+        amount_first = amounts[0][0] < min(m.start() for m, _ in named)
+        for m, code in named:
+            side = [a for pos, a in amounts if pos < m.start()][-1:] if amount_first else [a for pos, a in amounts if pos >= m.end()][:1]
+            for amount in side:
+                if amount not in ties.setdefault(code, []):
+                    ties[code].append(amount)
+    return ties
+
 # ---------- document list items ----------
 
 # (code, applies_when, keyword regex): first match wins, checked against the item's own text

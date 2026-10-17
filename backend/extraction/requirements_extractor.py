@@ -6,6 +6,7 @@ Same contract as llm_extractor: the model returns req_type + code + value + verb
 by chunk, and extraction/validator.verify_requirement decides: the quote must be on the cited page and the stored
 value is re-derived from it by fixed rules. The result is a draft for human review (services/requirement_drafts.py).
 """
+import json
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
@@ -59,25 +60,39 @@ class RequirementsExtractionResult:
 
 def verify_all(raw_items: List[Dict[str, Any]], pages: List[PageText]) -> List[RequirementVerdict]:
     """Key dates first: a verified closing date is what "the closing date" in a certificate clause means.
-    One verdict per (req_type, code); the first accepted one wins, a rejected one stays visible to the reviewer."""
+    The first accepted verdict per (req_type, code) comes first; a later accepted one with the same key follows it
+    marked duplicate_of (never dropped: its value may differ, and the reviewer picks one), and a rejected one stays
+    visible to the reviewer."""
     dates = [verify_requirement(r, pages) for r in raw_items if isinstance(r, dict) and str(r.get("req_type")).upper() == "KEY_DATE"]
     end = next((v for v in dates if v.accepted and v.code == "APPLICATION_END"), None)
     closing: Optional[date] = datetime.fromisoformat(end.value["at"]).date() if end else None
     rest = [verify_requirement(r, pages, closing) for r in raw_items if not (isinstance(r, dict) and str(r.get("req_type")).upper() == "KEY_DATE")]
     kept: Dict[tuple, RequirementVerdict] = {}
+    duplicates: List[RequirementVerdict] = []
     rejected: List[RequirementVerdict] = []
+    seen = set()
     for v in dates + rest:
         if not v.accepted:
             rejected.append(v)
             continue
+        # The same quote located twice (e.g. by two chunks) is one item
+        same = (v.req_type, v.code, v.page, v.quote, json.dumps(v.value, sort_keys=True, default=str))
+        if same in seen:
+            continue
+        seen.add(same)
         key = (v.req_type, v.code)
         if v.req_type == "DOCUMENT" and key in kept and kept[key].quote != v.quote:
             # Two different documents of the same kind (or unclassified): both stay, numbered
             n = sum(1 for k in kept if k[0] == "DOCUMENT" and k[1].startswith(v.code))
             v.code = f"{v.code}_{n + 1}"
             key = (v.req_type, v.code)
-        kept.setdefault(key, v)
-    return list(kept.values()) + rejected
+        first = kept.setdefault(key, v)
+        if first is not v:
+            # Another quote for an item already kept: shown to the reviewer, not dropped
+            note = "same value" if first.value == v.value else f"different value: {first.value!r} there"
+            v.duplicate_of = f"{v.req_type} {v.code} on page {first.page} ({note})"
+            duplicates.append(v)
+    return list(kept.values()) + duplicates + rejected
 
 async def extract_requirements(pages: List[PageText], provider) -> RequirementsExtractionResult:
     raw_items: List[Dict[str, Any]] = []

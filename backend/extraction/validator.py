@@ -305,6 +305,9 @@ class RequirementVerdict:
     value: Any = None                 # JSON-ready value derived from the quote by fixed rules
     match: Optional[str] = None
     applies_when: Optional[str] = None
+    # Set by requirements_extractor.verify_all on a second verified item of the same (req_type, code): the reviewer
+    # sees both and approves at most one; the text names the item it duplicates
+    duplicate_of: Optional[str] = None
 
 def find_quote_on_page(quote: str, pages: List[PageText], page: Optional[int]) -> Optional[Tuple[int, str, str]]:
     """Like find_quote, but only on the page the quote is cited from."""
@@ -387,6 +390,12 @@ def verify_requirement(item: Any, pages: List[PageText], closing: Optional[date]
             v.reason = f"category {category!r} is not named in the quote"
         elif not digits or int(digits) not in ar.rupee_amounts(text):
             v.reason = f"{value!r} is not a rupee amount in the quote"
+        elif category and int(digits) not in ar.fee_ties(text).get(category, []):
+            # e.g. UPSC's "Candidates (Except Female/SC/ST/...) are required to pay a fee of Rs. 25/-" names SC and
+            # Rs. 25, but charges SC nothing
+            v.reason = f"the quote does not charge {category} candidates Rs. {int(digits)}"
+        elif not category and (charged := sorted(c for c, a in ar.fee_ties(text).items() if int(digits) in a)):
+            v.reason = f"Rs. {int(digits)} is the fee the quote states for {'/'.join(charged)}, not a fee for every candidate"
         else:
             v.code = f"APPLICATION_FEE_{category}" if category else "APPLICATION_FEE"
             v.accepted, v.value, v.applies_when = True, {"amount": int(digits), "currency": "INR", "category": category}, ar.ALWAYS

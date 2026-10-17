@@ -220,13 +220,31 @@ export interface DraftVacancy {
   decision?: { status: string; [k: string]: unknown };
 }
 
+/** One located application requirement as the validator judged it (backend/extraction/validator.RequirementVerdict). */
+export interface DraftRequirement {
+  req_type: string;
+  code: string;
+  accepted: boolean;
+  reason: string;
+  llm_value: unknown;
+  quote: string | null;
+  page: number | null;
+  value: unknown;
+  match: string | null;
+  applies_when: string | null;
+  /** Set on a second verified item of the same req_type + code: approve at most one of them. */
+  duplicate_of?: string | null;
+  decision?: { status: string; [k: string]: unknown };
+}
+
 export interface DraftDetail extends DraftSummary {
   raw_document_id: string;
   notice_url: string | null;
   error: string | null;
   review_note: string | null;
   created_vacancy_ids: string[];
-  payload: { vacancies: DraftVacancy[]; chunks?: unknown[] };
+  /** kind "requirements": a requirements draft (services/requirement_drafts.py); vacancies is then empty. */
+  payload: { kind?: string; vacancies: DraftVacancy[]; requirements?: DraftRequirement[]; chunks?: unknown[] };
 }
 
 /** Reviewer console (backend/api/routers/review_console.py, admin_console.py). */
@@ -274,9 +292,10 @@ export interface QueueFacets {
   statuses: string[];
 }
 
-/** Where a field's quote sits in the page text (offsets into DraftPage.text). */
+/** Where a field's (or a requirement item's) quote sits in the page text (offsets into DraftPage.text). */
 export interface QuoteSpan {
-  vacancy_index: number;
+  vacancy_index: number | null;
+  requirement_index: number | null;
   field: string;
   accepted: boolean;
   reason: string | null;
