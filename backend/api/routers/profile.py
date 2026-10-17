@@ -1,6 +1,7 @@
 """
 Master profile API. Every PUT/PATCH creates a new immutable ProfileVersion; nothing is edited in place.
-Storing eligibility data (category, date of birth, disability, certificates, service details) needs consent (DPDP).
+Storing eligibility data (category, date of birth, gender, citizenship, disability, certificates, service details) needs
+consent (DPDP).
 All lookups are scoped to the authenticated user; other users' records are reported as 404.
 """
 import uuid
@@ -40,8 +41,8 @@ async def get_profile(user: User = Depends(current_user), session: AsyncSession 
     return await _profile_out(repo, latest)
 
 async def _require_consent_for(session: AsyncSession, user: User, sections: dict, carry_over: bool) -> None:
-    """The version about to be written holds category/caste, date of birth, disability, certificates or service details
-    (sent now, or carried over by PATCH): that needs active ELIGIBILITY_CHECK consent, and guardian consent if the
+    """The version about to be written holds category/caste, date of birth, gender, citizenship, disability, certificates
+    or service details (sent now, or carried over by PATCH): that needs active ELIGIBILITY_CHECK consent, and guardian consent if the
     date of birth is under 18. Clearing those fields never needs consent, so a person can always remove them."""
     personal, has_certs = sections.get("personal_info"), bool(sections.get("reservation_certificates"))
     latest = await ProfileRepository(session).latest_version(user.id) if carry_over else None

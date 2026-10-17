@@ -1,6 +1,6 @@
 """
 Consent enforcement (DPDP Act 2023 s.6, s.9). Personal data that eligibility needs (category/caste, date of birth,
-disability, certificates, service details) is stored and processed only under an active ELIGIBILITY_CHECK consent;
+gender, citizenship/nationality, disability, certificates, ex-serviceman and service details) is stored and processed only under an active ELIGIBILITY_CHECK consent;
 for a person under 18 that consent must carry the name of the parent / lawful guardian who gave it.
 
 Withdrawal stops processing: profile saves that would store those items and every eligibility run refuse with a
@@ -24,6 +24,8 @@ ADULT_AGE = 18
 # Profile column -> notice data item it belongs to
 SENSITIVE_PERSONAL_FIELDS: Dict[str, str] = {
     "date_of_birth": "date_of_birth",
+    "gender": "gender",
+    "citizenship_status": "citizenship_status", "nationality": "citizenship_status",
     "category": "category",
     "is_pwbd": "disability", "disability_percentage": "disability", "disability_types": "disability",
     "is_ex_serviceman": "ex_serviceman", "armed_forces_service_months": "ex_serviceman",

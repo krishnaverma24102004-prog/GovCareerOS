@@ -116,6 +116,12 @@ async def test_profile_refuses_eligibility_data_without_consent(api, login):
     for field, value in (("organisation_cadre", "Test Cadre"), ("current_pay_level", 7), ("is_ex_serviceman", False)):
         r = await api.put("/profile", json={"personal_info": {"full_name": "T", field: value}}, headers=h)
         assert r.status_code == 403 and r.json()["detail"]["data_items"] in (["service_details"], ["ex_serviceman"])
+    # Gender and citizenship / nationality are ELIGIBILITY_CHECK items of the notice too
+    for field, value, item in (("gender", "FEMALE", "gender"), ("citizenship_status", "INDIAN_CITIZEN", "citizenship_status"),
+                               ("nationality", "Indian", "citizenship_status")):
+        assert item in notice.data_items("ELIGIBILITY_CHECK")
+        r = await api.put("/profile", json={"personal_info": {"full_name": "T", field: value}}, headers=h)
+        assert r.status_code == 403 and r.json()["detail"]["data_items"] == [item], (field, r.text)
 
     # Data outside the purpose needs no ELIGIBILITY_CHECK consent
     ok = await api.put("/profile", json={"personal_info": {"full_name": "T"}, "skills": [{"skill_name": "Typing", "skill_type": "TECHNICAL"}]}, headers=h)

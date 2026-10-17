@@ -46,9 +46,9 @@ until erasure so earlier eligibility results remain reproducible. Clearing a fie
 ## Withdrawal (`DELETE /privacy/consents/{purpose}`)
 
 ELIGIBILITY_CHECK withdrawal is enforced in `backend/privacy/enforcement.py`: profile saves that would store (or
-carry over) category, DOB, disability, certificates or service details return 403 `CONSENT_REQUIRED`; every
-eligibility computation (`engine.load_profile_snapshot`, so API runs, radar, digest, gaps, relevance, resume
-builder) refuses; the radar and digest skip the person; the application checklist refuses. Stored data and past
+carry over) category, DOB, gender, citizenship/nationality, disability, certificates or service details return 403
+`CONSENT_REQUIRED`; every eligibility computation (`engine.load_profile_snapshot`, so API runs, radar, digest, gaps,
+relevance, resume builder) refuses; the radar and digest skip the person; the application checklist refuses. Stored data and past
 results are kept and remain visible and exportable to the person; nothing is deleted silently. To delete, the person
 clears the fields or erases the account.
 
