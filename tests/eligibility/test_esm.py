@@ -201,13 +201,35 @@ def test_upsc_age_relaxed_by_five_years_with_six_months_service():
     reqs = _law_officer_rows()
     closing = _upsc12().fields["application_deadline"].value.astimezone(IST).date()
     dob = date(1992, 10, 1)  # 34 on 16.10.2026; Law Officer UR limit 30
-    ok = _person(date_of_birth=dob, esm_release_type="RETIRED_WITH_PENSION", esm_enrolment_date=date(2012, 1, 2), esm_release_date=date(2024, 1, 31))
-    age = {o.check: o for o in esm.check_esm(ok, reqs, closing, closing)}["ESM_AGE"]
+
+    def judged(person):
+        return {o.check: o for o in esm.check_esm(person, reqs, closing, closing)}["ESM_AGE"], rules.check_age(person, reqs, closing)[0]
+
+    ok = _person(date_of_birth=dob, esm_release_type="RETIRED_WITH_PENSION", armed_forces_service_months=144,
+                 esm_enrolment_date=date(2012, 1, 2), esm_release_date=date(2024, 1, 31))
+    age, hard = judged(ok)
     assert (age.outcome, age.source_page) == ("OK", 21) and "30 + 5 = 35" in age.rule
-    assert rules.check_age(ok, reqs, closing)[0].outcome == "CONDITIONAL"
+    assert hard.outcome == "CONDITIONAL"
     brief = _person(date_of_birth=dob, esm_release_type="MEDICAL_DISABILITY_PENSION", armed_forces_service_months=4)
-    assert {o.check: o for o in esm.check_esm(brief, reqs, closing, closing)}["ESM_AGE"].outcome == "FAILS"
-    assert rules.check_age(brief, reqs, closing)[0].outcome == "NOT_MET"
+    age, hard = judged(brief)
+    assert age.outcome == "FAILS" and hard.outcome == "NOT_MET"
+
+    # p.21 counts service "after attestation", which follows recruit training: months from the enrolment date overstate it.
+    # Enrolled 01.12.2025, boarded out 15.07.2026: 7 months from enrolment, but after attestation possibly fewer than 6
+    recruit = _person(date_of_birth=dob, esm_release_type="MEDICAL_DISABILITY_PENSION", esm_enrolment_date=date(2025, 12, 1),
+                      esm_release_date=date(2026, 7, 15))
+    assert rules.military_service_months(recruit, closing) == 7
+    age, hard = judged(recruit)
+    assert age.outcome == "CANNOT_DECIDE" and "after attestation not stated" in age.rule
+    assert hard.outcome == "UNKNOWN" and "after attestation not stated" in hard.profile_evidence
+    # Long service from the dates alone is not stated service after attestation either
+    age, hard = judged(_person(date_of_birth=dob, esm_release_type="RETIRED_WITH_PENSION", esm_enrolment_date=date(2012, 1, 2),
+                               esm_release_date=date(2024, 1, 31)))
+    assert (age.outcome, hard.outcome) == ("CANNOT_DECIDE", "UNKNOWN")
+    # Fewer than six months even from enrolment: service after attestation is shorter still
+    age, hard = judged(_person(date_of_birth=dob, esm_release_type="MEDICAL_DISABILITY_PENSION", esm_enrolment_date=date(2026, 3, 1),
+                               esm_release_date=date(2026, 7, 15)))
+    assert age.outcome == "FAILS" and "4 months from enrolment < 6" in age.rule and hard.outcome == "NOT_MET"
 
 # ---------- reservation already used for a civil post ----------
 
@@ -298,7 +320,9 @@ async def test_vacancy_result_has_a_separate_esm_section_and_gaps_stay_current(a
     await db_session.commit()
     vacancy = (await db_session.execute(select(Vacancy).where(Vacancy.external_ref == "26091203226"))).scalar_one()
     h = await login("esm-law@example.com")
-    person = {**ESM_PERSON, "date_of_birth": "1992-10-01", "esm_enrolment_date": "2012-01-02", "esm_release_date": "2024-01-31"}
+    # UPSC p.21 counts service after attestation, which only the stated months give (not the enrolment date)
+    person = {**ESM_PERSON, "date_of_birth": "1992-10-01", "esm_enrolment_date": "2012-01-02", "esm_release_date": "2024-01-31",
+              "armed_forces_service_months": 144}
     law = {"personal_info": person,
            "education": [{"degree": "LL.B.", "institution": "Faculty of Law, University of Delhi", "education_level": "BACHELORS", "end_date": "2011-06-30"}],
            "experience": [{"organization": "Judge Advocate General's Branch", "designation": "Legal Assistant", "domain": "Legal",

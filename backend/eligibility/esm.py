@@ -12,8 +12,10 @@ Pure functions over the profile snapshot and the notice's rows; nothing is decid
                          the closing date (RELEASE_WITHIN_ONE_YEAR), and then only up to that day.
   ESM_AGE                the notice's own ESM age relaxation (AGE_RELAXATION_RULE): SSC "N years after deduction of the
                          military service rendered from the actual age" -> actual age - service <= limit + N; UPSC
-                         "relaxed by N years" with at least M months' service. No such row -> CANNOT_DECIDE.
-                         Service = armed_forces_service_months, else enrolment -> release (rules.military_service_months).
+                         "relaxed by N years" with at least M months' service after attestation (rules.attested_service:
+                         the stated service months; enrolment dates can only show it is too short). No such row ->
+                         CANNOT_DECIDE. SSC service = armed_forces_service_months, else enrolment -> release
+                         (rules.military_service_months).
   ESM_RESERVATION_REUSE  the re-use bar exactly as the notice quotes it (RESERVATION_REUSE_BAR: SSC paras 5.4 / 7.4 with
                          DoP&T OM 36034/1/2014-Estt (Res) of 14.08.2014, UPSC p.22 NOTE). A notice without it ->
                          NEEDS_HUMAN_REVIEW: the 2014 OM itself is not a document held here.
@@ -148,15 +150,21 @@ def check_age(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Requirement],
     if age <= caps[0]:
         return _out("ESM_AGE", NOT_APPLICABLE, f"age {age} is within the limit {caps[0]} without the ex-servicemen relaxation", rule, evidence)
     v = rule.value
-    if months is None:
-        return _out("ESM_AGE", CANNOT_DECIDE, "length of military service not stated (service months, or enrolment and release dates)", rule, evidence)
     if v["basis"] == "EX_SERVICEMEN_SERVICE_DEDUCTED":
+        if months is None:
+            return _out("ESM_AGE", CANNOT_DECIDE, "length of military service not stated (service months, or enrolment and release dates)",
+                        rule, evidence)
         effective = age - months / 12
         how = f"actual age {age} minus {_months(months)} military service = {effective:.1f}"
     else:
         need = v.get("min_service_months_after_attestation")
-        if need and months < need:
-            return _out("ESM_AGE", FAILS, f"{_months(months)} service is less than the {need} months the relaxation requires", rule, evidence)
+        served, served_text = rules.attested_service(profile, on, need) if need else ("OK", None)
+        if served == "NO":
+            return _out("ESM_AGE", FAILS, f"{served_text}: the relaxation requires {need} months' continuous service after attestation",
+                        rule, evidence)
+        if served == "UNKNOWN":
+            return _out("ESM_AGE", CANNOT_DECIDE, f"{served_text}; the relaxation requires {need} months' continuous service after "
+                        "attestation (state the service months)", rule, evidence)
         effective = age
         how = f"age {age}"
     fits = [c for c in caps if effective <= c + v["years"]]

@@ -216,6 +216,18 @@ def military_service_months(profile: ProfileSnapshot, until: Optional[date]) -> 
         end = until
     return max(0, (end.year - start.year) * 12 + end.month - start.month - (end.day < start.day))
 
+def attested_service(profile: ProfileSnapshot, until: Optional[date], need: int) -> Tuple[str, str]:
+    """`need` months' continuous service after attestation (UPSC Advt 12/2026 p.21) -> (OK | NO | UNKNOWN, evidence).
+    Attestation follows recruit training, so months counted from the enrolment date only bound that service from
+    above: below `need` they settle NO, otherwise only the service months the profile states do."""
+    stated = profile.armed_forces_service_months
+    if stated is not None:
+        return ("OK", f"{stated} months service") if stated >= need else ("NO", f"{stated} months service < {need}")
+    bound = military_service_months(profile, until)
+    if bound is not None and bound < need:
+        return "NO", f"{bound} months from enrolment < {need}, so service after attestation is less too"
+    return "UNKNOWN", "armed forces service after attestation not stated" +         (f" ({bound} months from enrolment include recruit training before attestation)" if bound is not None else "")
+
 def _service_years(start: Optional[date], until: date) -> Optional[float]:
     return None if start is None else (until - start).days / 365.25
 
@@ -262,21 +274,20 @@ def relaxation_options(profile: ProfileSnapshot, reqs: Sequence[Requirement], ca
     exsm = general.get("EX_SERVICEMEN")
     if exsm:
         need = exsm.value.get("min_service_months_after_attestation")
-        served_months = military_service_months(profile, crucial)
+        served, served_text = attested_service(profile, crucial, need) if need else ("OK", None)
         if profile.is_ex_serviceman is False:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO", "profile: not an ex-serviceman", exsm.source_page))
         elif profile.is_ex_serviceman is None:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "ex-serviceman status not stated", exsm.source_page,
                                             missing="is_ex_serviceman"))
-        elif need and served_months is None:
-            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "armed forces service months not stated", exsm.source_page,
+        elif served == "UNKNOWN":
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", served_text, exsm.source_page,
                                             missing="armed_forces_service_months"))
-        elif need and served_months < need:
-            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO",
-                                            f"{served_months} months service < {need}", exsm.source_page))
+        elif served == "NO":
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO", served_text, exsm.source_page))
         else:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "OK",
-                                            f"ex-serviceman, {served_months} months service", exsm.source_page,
+                                            "ex-serviceman" + (f", {served_text}" if served_text else ""), exsm.source_page,
                                             "needs a release certificate from the Defence Forces"))
 
     cgs = general.get("CENTRAL_GOVT_SERVANT")
