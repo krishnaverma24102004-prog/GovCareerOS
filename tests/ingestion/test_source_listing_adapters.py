@@ -4,12 +4,16 @@ Listing adapters for sources re-verified live on 2026-10-01, on the pages captur
 NHAI and NVS are read from the JSON endpoints their single-page apps call (LISTING_REQUEST); those
 captures are the endpoint responses.
 """
+import json
 from datetime import date
 from pathlib import Path
 
 import httpx
 import pytest
+from sqlalchemy import select
 
+from govcareeros.backend.models import GovernmentSource
+from govcareeros.backend.services.source_discovery import discover_all
 from govcareeros.backend.sources.adapters import adapter_for
 from govcareeros.backend.sources.adapters.base import ListingRequest
 from govcareeros.backend.sources.generic_notices import PageFetcher, extract_notices
@@ -52,7 +56,9 @@ def test_employment_news_reads_the_all_jobs_table():
     assert first.post_names == ["ACCOUNTANT & OTHERS"]
     assert (first.published_on, first.last_date) == (date(2026, 9, 12), date(2026, 10, 11))
     assert first.evidence == {"title": "MINERAL EXPLORATION AND CONSULTANCY LIMITED", "post_names": "ACCOUNTANT & OTHERS",
-                              "published_on": "12/09/2026", "last_date": "11/10/2026"}
+                              "published_on": "12/09/2026", "last_date": "11/10/2026", "kind_hint": "All JOBS"}
+    # The "All JOBS" table's columns are organisation, post, method of appointment and last date: a list of jobs
+    assert {r.kind_hint for r in rows} == {"VACANCY"} and {r.evidence["kind_hint"] for r in rows} == {"All JOBS"}
     ndma = next(r for r in rows if r.evidence["title"] == "NATIONAL DISASTER MANAGEMENT AUTHORITY")
     assert ndma.post_names == ["YOUNG CONSULTANT (FOREST FIRE RISK MANAGEMENT)"]
     # Issued date read day first despite the "(MM/DD/YYYY)" header: "31/08/2026" is the 31st of August
@@ -160,7 +166,7 @@ def test_nvs_reads_the_recruitment_media_feed():
 
 def test_nta_pairs_board_titles_with_their_read_more_pdfs():
     rows = _rows("NTA", "nta/nta_home.html")
-    assert len(rows) == 60 and len({r.url for r in rows}) == 60
+    assert len(rows) == 58 and len({r.url for r in rows}) == 58
     assert all(r.url.startswith("https://nta.ac.in/Download/Notice/") and _policy("NTA").allows(r.url) for r in rows)
     deputation, typist = rows[0], rows[1]
     assert deputation.title == ("Extension of last date for inviting application for various posts in National Testing "
@@ -170,6 +176,12 @@ def test_nta_pairs_board_titles_with_their_read_more_pdfs():
     assert typist.evidence == {"title": typist.title, "url": "/Download/Notice/Notice_20260902173831.pdf"}
     # Admission-exam notices on the same board are left out
     assert not any(r.url.endswith("/Notice_20260925215817.pdf") for r in rows)  # CSIR-UGC NET certificates
+    # Notices that use recruitment wording but fill no post: a tender, and a JEE (Main) guideline
+    assert not any(r.url.endswith("/Notice_20250910160720.pdf") for r in rows)  # "Invitation for Bids for Appointment of CA Firm ..."
+    assert not any(r.url.endswith("/Notice_20241025182422.pdf") for r in rows)  # "... guidelines notification ... JEE (Main) ..."
+    assert not any("bids" in r.title.lower() or "JEE" in r.title for r in rows)
+    # Job notices that sit next to them stay
+    assert any(r.title == "INVITATION OF APPLICATIONS FOR VARIOUS POSTS ON CONTRACTUAL BASIS" for r in rows)
     assert rows[-1].title == "Inviting Online Applications for IGNOU Recruitment of Junior Assistant-cum-Typist (JAT) 2023"
 
 def test_nta_board_gives_the_generic_extractor_nothing():
@@ -226,3 +238,32 @@ async def test_fetch_listing_refuses_an_endpoint_outside_the_source_policy():
                                                    _policy("NHAI"))
     assert refused.error.status == "URL_REFUSED" and wrong_method.error.status == "URL_REFUSED"
     assert seen == []
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source, path, rows", [("NHAI", "nhai/vacancies-current-en.json", 307), ("NVS", "nvs/api_jobs.json", 21)])
+async def test_a_source_carried_by_its_listing_request_is_healthy(db_session, source, path, rows):
+    """The configured pages are single-page apps that list nothing over HTTP (here: 404, as for every URL but the
+    feed). In the live run of 06-10-2026 NHAI and NVS were reported NO_NOTICES / HTTP_ERROR although their
+    official feeds gave rows: the source is OK, its detail names the feed, and the configured page's own result
+    stays in the configuration."""
+    listing = adapter_for(source).LISTING_REQUEST.url
+    async with _endpoint(source, path, []) as fetcher:
+        [summary] = await discover_all(db_session, fetcher, [SPECS[source]])
+    row = (await db_session.execute(select(GovernmentSource))).scalar_one()
+    config = json.loads(row.configuration)
+    assert config["page_status"] == "HTTP_ERROR" and config["listing_pages"] == {listing: "OK"}
+    assert summary.status == "OK" and row.health_status == "HEALTHY" and config["last_probe_status"] == "OK"
+    assert summary.detail == f"{rows} rows from listing {listing}; configured page HTTP_ERROR"
+    assert config["detail"] == summary.detail and summary.notices_seen > 0
+    # The page that did not load is not remembered as the source's page
+    assert "resolved_url" not in config
+
+@pytest.mark.asyncio
+async def test_a_source_whose_feed_also_fails_keeps_the_page_status(db_session):
+    def nothing(request):
+        return httpx.Response(404, text="Not Found")
+    async with PageFetcher(allow_browser=False, client=httpx.AsyncClient(transport=httpx.MockTransport(nothing))) as fetcher:
+        [summary] = await discover_all(db_session, fetcher, [SPECS["NVS"]])
+    row = (await db_session.execute(select(GovernmentSource))).scalar_one()
+    assert summary.status == "HTTP_ERROR" and row.health_status == "HTTP_ERROR"
+    assert json.loads(row.configuration)["page_status"] == "HTTP_ERROR"

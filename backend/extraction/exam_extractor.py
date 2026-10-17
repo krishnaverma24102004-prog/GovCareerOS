@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
 from govcareeros.backend.documents.pdf_text import PageText
-from govcareeros.backend.extraction.llm_extractor import ChunkRun, _render, chunk_pages, merge
+from govcareeros.backend.extraction.llm_extractor import ChunkRun, _render, chunk_pages, models_used, merge
 from govcareeros.backend.extraction.validator import FieldVerdict, VacancyVerdict, find_quote, verify_field
 from govcareeros.backend.llm.provider import LLMResponse
 
@@ -104,7 +104,7 @@ async def extract_exam(pages: List[PageText], provider) -> ExamExtractionResult:
         except Exception as e:  # a failed chunk is recorded, the rest continue
             runs.append(ChunkRun(numbers, 0.0, None, None, {}, f"{type(e).__name__}: {e}"))
             continue
-        runs.append(ChunkRun(numbers, resp.seconds, resp.prompt_tokens, resp.output_tokens, resp.data))
+        runs.append(ChunkRun(numbers, resp.seconds, resp.prompt_tokens, resp.output_tokens, resp.data, model=resp.model))
         for name in EXAM_FIELDS:
             verdict = verify_exam_field(name, (resp.data.get("exam") or {}).get(name), pages)
             # First accepted verdict wins; a rejected one is kept only until something is accepted
@@ -112,4 +112,4 @@ async def extract_exam(pages: List[PageText], provider) -> ExamExtractionResult:
                 exam[name] = verdict
         for raw in resp.data.get("posts") or []:
             posts.append(VacancyVerdict({n: verify_exam_field(n, raw.get(n), pages) for n in POST_FIELDS}))
-    return ExamExtractionResult(provider.model, getattr(provider, "prompt_version", PROMPT_VERSION), exam, merge(posts), runs)
+    return ExamExtractionResult(models_used(runs, provider), getattr(provider, "prompt_version", PROMPT_VERSION), exam, merge(posts), runs)

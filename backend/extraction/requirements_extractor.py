@@ -11,7 +11,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from govcareeros.backend.documents.pdf_text import PageText
-from govcareeros.backend.extraction.llm_extractor import ChunkRun, _render, chunk_pages
+from govcareeros.backend.extraction.llm_extractor import ChunkRun, _render, chunk_pages, models_used
 from govcareeros.backend.extraction.validator import KEY_DATE_CODES, REQUIREMENT_TYPES, RequirementVerdict, verify_requirement
 from govcareeros.backend.llm.provider import LLMResponse
 
@@ -89,7 +89,7 @@ async def extract_requirements(pages: List[PageText], provider) -> RequirementsE
         except Exception as e:  # a failed chunk is recorded, the rest continue
             runs.append(ChunkRun(numbers, 0.0, None, None, {}, f"{type(e).__name__}: {e}"))
             continue
-        runs.append(ChunkRun(numbers, resp.seconds, resp.prompt_tokens, resp.output_tokens, resp.data))
+        runs.append(ChunkRun(numbers, resp.seconds, resp.prompt_tokens, resp.output_tokens, resp.data, model=resp.model))
         raw_items.extend(resp.data.get("requirements") or [])
     # A replayed recording reports the prompt version it was actually produced with
-    return RequirementsExtractionResult(provider.model, getattr(provider, "prompt_version", PROMPT_VERSION), verify_all(raw_items, pages), runs)
+    return RequirementsExtractionResult(models_used(runs, provider), getattr(provider, "prompt_version", PROMPT_VERSION), verify_all(raw_items, pages), runs)

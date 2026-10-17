@@ -55,6 +55,12 @@ class ChunkRun:
     output_tokens: Optional[int]
     raw: Dict[str, Any]
     error: Optional[str] = None
+    model: Optional[str] = None  # the model that answered this chunk (the chain may move mid-document)
+
+def models_used(runs: List[ChunkRun], provider) -> str:
+    """The models that answered, in order ('a,b' when the chain moved mid-document); the provider's when none did."""
+    used = list(dict.fromkeys(r.model for r in runs if r.model))
+    return ",".join(used) if used else provider.model
 
 @dataclass
 class ExtractionResult:
@@ -132,9 +138,9 @@ async def extract(pages: List[PageText], provider) -> ExtractionResult:
         except Exception as e:  # a failed chunk is recorded, the rest continue
             runs.append(ChunkRun(page_numbers, 0.0, None, None, {}, f"{type(e).__name__}: {e}"))
             continue
-        runs.append(ChunkRun(page_numbers, resp.seconds, resp.prompt_tokens, resp.output_tokens, resp.data))
+        runs.append(ChunkRun(page_numbers, resp.seconds, resp.prompt_tokens, resp.output_tokens, resp.data, model=resp.model))
         for raw in resp.data.get("vacancies", []) or []:
             # Verify against the whole document: a quote may sit on a neighbouring page
             verdicts.append(verify_vacancy(raw, pages))
     # A replayed recording reports the prompt version it was actually produced with
-    return ExtractionResult(provider.model, getattr(provider, "prompt_version", PROMPT_VERSION), merge(verdicts), runs)
+    return ExtractionResult(models_used(runs, provider), getattr(provider, "prompt_version", PROMPT_VERSION), merge(verdicts), runs)

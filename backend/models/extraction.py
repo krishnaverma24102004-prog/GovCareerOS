@@ -28,3 +28,9 @@ class ExtractionDraft(Base, TimestampMixin):
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime())
     review_note: Mapped[Optional[str]] = mapped_column(Text)
     created_vacancy_ids: Mapped[Optional[str]] = mapped_column(Text)  # JSON list
+
+    @property
+    def parser_version(self) -> str:
+        """parser_version for the rows an approval creates (String(100) columns). `model` reads "a,b" when the
+        NVIDIA chain moved mid-document, so a long chain is cut to fit; the draft itself keeps every model."""
+        return f"llm:{self.prompt_version}:{self.model}"[:100]

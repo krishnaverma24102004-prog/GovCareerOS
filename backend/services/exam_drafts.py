@@ -35,7 +35,7 @@ def serialize(result: ExamExtractionResult) -> Dict[str, Any]:
         "kind": "exam", "vacancies": [], "exam": _verdicts(result.exam),
         "posts": [{"fields": _verdicts(p.fields)} for p in result.posts],
         "chunks": [{"pages": c.pages, "seconds": c.seconds, "prompt_tokens": c.prompt_tokens,
-                    "output_tokens": c.output_tokens, "error": c.error} for c in result.chunks],
+                    "output_tokens": c.output_tokens, "error": c.error, "model": c.model} for c in result.chunks],
     }
 
 async def create_exam_draft(session: AsyncSession, source: GovernmentSource, url: str, body: bytes, provider,
@@ -85,7 +85,7 @@ async def approve_exam_draft(session: AsyncSession, draft: ExtractionDraft, revi
     exam = Exam(
         id=uuid.uuid4(), source_id=source.id, conducting_body=source.organization, name=name["value"][:500],
         exam_code=exam_code_for(name["value"]), external_ref=f"draft:{draft.id}", notification_url=notice.url if notice else None,
-        notice_id=draft.notice_id, raw_document_id=draft.raw_document_id, parser_version=f"llm:{draft.prompt_version}:{draft.model}",
+        notice_id=draft.notice_id, raw_document_id=draft.raw_document_id, parser_version=draft.parser_version,
         application_start=_dt(_ok(fields, "application_start")), application_end=_dt(last),
         age_crucial_date=_dt(_ok(fields, "age_crucial_date")), fee_amount=fee["value"] if fee else None,
         exam_dates=json.dumps([{"stage": "as stated", "schedule": schedule["value"]}], ensure_ascii=False) if schedule else None,

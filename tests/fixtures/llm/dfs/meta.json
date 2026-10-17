@@ -1,0 +1,16 @@
+{
+  "source": "DFS",
+  "files": {
+    "Image_962.pdf": {
+      "url": "https://financialservices.gov.in/sites/default/files/vacancy/2026-10/Image_962.pdf",
+      "fetched_on": "2026-10-06",
+      "how": "stored copy from the live drafting run of 06-10-2026 (storage/raw_documents/dfs/<sha256>.pdf), fetched by PageFetcher (url_guard policy financialservices.gov.in + robots.txt); copied byte for byte",
+      "sha256": "bc30410320094acdb8db0f1c1796186140a34be2f72ac21b6e875262784f210e",
+      "bytes": 2104279,
+      "note": "Vacancy Circular No. 07/08/2026-DRT dated 1st October, 2026 (Chairperson, DRAT). Scanned: 8 page images, each with the scanner's invisible OCR text layer (render mode 3) and no visible text. The closing date on page 2 is handwritten; the OCR layer reads it as '.o,t.J.rr.).ana6'."
+    },
+    "Image_962.nemotron-3-ultra-550b-a55b.llm.json": {
+      "what": "the answer nvidia/nemotron-3-ultra-550b-a55b gave for Image_962.pdf in that run (prompt vacancy_locate/2), as kept in the draft payload: per field the model's value and quote verbatim. The draft stores the page where the validator found a quote, so 'page' is that page for quotes the validator found then and 0 for the rest (the model's own page number for those was not kept). The draft had 9 fields offered, 0 accepted."
+    }
+  }
+}

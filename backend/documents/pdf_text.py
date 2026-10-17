@@ -16,7 +16,8 @@ _DEFAULT_TESSDATA = r"C:\Program Files\Tesseract-OCR\tessdata"
 class PageText:
     page_number: int  # 1-based, as printed in provenance
     text: str
-    ocr: bool = False  # True when the text came from OCR, not the PDF's text layer
+    # True when the text came from OCR: ours (Tesseract), or the invisible OCR layer a scanner put under the page image
+    ocr: bool = False
 
 def tessdata_dir() -> Optional[str]:
     for candidate in (settings.TESSDATA_DIR, os.environ.get("TESSDATA_PREFIX"), _DEFAULT_TESSDATA):
@@ -35,6 +36,15 @@ _OCR_DPI = 300
 # inches a side, which renders to 3.6 billion pixels (gigabytes) before Tesseract sees it
 MAX_OCR_PIXELS = 40_000_000
 
+def scanner_ocr_layer(page: "pymupdf.Page") -> bool:
+    """True for a scanned page whose text layer is the scanner's own OCR: every character is drawn invisibly
+    (render mode 3) over an image, so what the reader sees is the image and the text is a machine reading of it,
+    with OCR's errors ("Government of lndia" for "Government of India" on the DFS circular Image_962.pdf)."""
+    if not page.get_images(full=False):
+        return False
+    spans = page.get_texttrace()
+    return bool(spans) and all(span["type"] == 3 for span in spans)
+
 def _ocr_text(page: "pymupdf.Page", tessdata: str) -> str:
     textpage = page.get_textpage_ocr(language="eng", dpi=_OCR_DPI, full=True, tessdata=tessdata)
     return page.get_text(textpage=textpage)
@@ -45,7 +55,7 @@ def _extract_cached(pdf_bytes: bytes, tessdata: Optional[str]) -> Tuple[PageText
     with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
         for page in doc:
             text = page.get_text()
-            used_ocr = False
+            used_ocr = scanner_ocr_layer(page)
             if tessdata and len(text.strip()) < _MIN_NATIVE_CHARS:
                 text = _ocr_text(page, tessdata)
                 used_ocr = True
@@ -71,7 +81,7 @@ def extract_pages_limited(pdf_bytes: bytes, max_pages: int, max_chars: int, seco
     start = time.monotonic()
     tessdata = tessdata_dir() if ocr_pages > 0 else None
     out = LimitedExtraction([], 0)
-    chars = 0
+    chars = ocr_done = 0  # ocr_done: pages Tesseract read (a scanner's own OCR layer costs nothing)
     with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
         if doc.needs_pass:
             raise PdfPasswordProtected("the PDF is password-protected")
@@ -89,12 +99,13 @@ def extract_pages_limited(pdf_bytes: bytes, max_pages: int, max_chars: int, seco
                 out.stopped = "time"
                 break
             page = doc.load_page(index)
-            text, used_ocr = page.get_text(), False
+            text = page.get_text()
+            used_ocr = len(text.strip()) >= _MIN_NATIVE_CHARS and scanner_ocr_layer(page)
             if len(text.strip()) < _MIN_NATIVE_CHARS:
-                ocr_done = sum(p.ocr for p in out.pages)
                 pixels = page.rect.width * page.rect.height * (_OCR_DPI / 72) ** 2
                 if tessdata and ocr_done < ocr_pages and time.monotonic() - start <= ocr_seconds and                         pixels <= MAX_OCR_PIXELS:
                     text, used_ocr = _ocr_text(page, tessdata), True
+                    ocr_done += 1
                 else:
                     out.scanned_unread.append(index + 1)
                     if tessdata and pixels > MAX_OCR_PIXELS:

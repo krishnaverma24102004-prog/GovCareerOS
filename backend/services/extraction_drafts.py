@@ -8,6 +8,7 @@ quotes, else from the notice's own text layer, and stored with the deciding sent
 """
 import json
 import os
+import re
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -18,7 +19,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.documents.pdf_text import PageText, extract_pages
-from govcareeros.backend.extraction.llm_extractor import ExtractionResult, extract
+from govcareeros.backend.extraction.llm_extractor import PROMPT_VERSION, ExtractionResult, extract
 from govcareeros.backend.extraction.validator import ALL_FIELDS, FieldVerdict
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.extraction import ExtractionDraft
@@ -43,7 +44,7 @@ def serialize(result: ExtractionResult) -> Dict[str, Any]:
     return {
         "vacancies": [{"fields": {k: {**asdict(f), "value": _jsonable(f.value)} for k, f in v.fields.items()}} for v in result.vacancies],
         "chunks": [{"pages": c.pages, "seconds": c.seconds, "prompt_tokens": c.prompt_tokens,
-                    "output_tokens": c.output_tokens, "error": c.error} for c in result.chunks],
+                    "output_tokens": c.output_tokens, "error": c.error, "model": c.model} for c in result.chunks],
     }
 
 async def create_draft(session: AsyncSession, source: GovernmentSource, url: str, body: bytes, provider,
@@ -150,7 +151,7 @@ async def approve(session: AsyncSession, draft: ExtractionDraft, reviewer: User,
             external_ref=f"draft:{draft.id}:{i}", pay_scale=pay["value"] if pay else None,
             application_mode="SEE_NOTICE", application_deadline=datetime.fromisoformat(last["value"]) if last else None,
             eligibility_crucial_date=None, notification_url=raw_url, source_url=source.recruitment_url, source_id=source.id,
-            raw_document_id=draft.raw_document_id, parser_version=f"llm:{draft.prompt_version}:{draft.model}",
+            raw_document_id=draft.raw_document_id, parser_version=draft.parser_version,
             confidence=round(n_accepted / len(ALL_FIELDS), 2),
         )
         session.add(vacancy)
@@ -216,12 +217,50 @@ async def reject(session: AsyncSession, draft: ExtractionDraft, reviewer: User, 
     await session.flush()
     return draft
 
+# A chunk error the provider caused and that may clear on its own: 5xx / 429 that outlasted the retries, a network
+# failure or timeout. A 400, invalid JSON or an empty answer is not retried blindly, and validator rejections are
+# not errors at all (they leave the draft PENDING_REVIEW).
+_TRANSIENT_RE = re.compile(r"HTTP (?:429|5\d\d)\b|Service temporarily overloaded|Timeout|ConnectError|ReadError|"
+                           r"RemoteProtocolError|not reachable", re.I)
+_VACANCY_PROMPT = PROMPT_VERSION.split("/")[0] + "/"  # any version of the vacancy prompt (not exam / requirements)
+
+def provider_failure(draft: ExtractionDraft) -> bool:
+    """A FAILED draft where every chunk failed at the provider with a transient error (no chunk was answered)."""
+    if draft.status != "FAILED":
+        return False
+    chunks = json.loads(draft.payload).get("chunks") or []
+    return bool(chunks) and all(c.get("error") and _TRANSIENT_RE.search(c["error"]) for c in chunks)
+
+async def requeue_failed_drafts(session: AsyncSession, source_names: Optional[List[str]] = None) -> List[RecruitmentNotice]:
+    """DRAFT_FAILED notices whose latest vacancy draft failed at the provider go back to MANUAL_REVIEW.
+
+    Only DRAFT_FAILED is ever changed (never REJECTED, PARSED or anything a reviewer set); the failed draft stays
+    as the record of what happened."""
+    stmt = (select(RecruitmentNotice).join(GovernmentSource, GovernmentSource.id == RecruitmentNotice.source_id)
+            .where(RecruitmentNotice.review_status == "DRAFT_FAILED", GovernmentSource.adapter_name.is_(None)))
+    if source_names:
+        stmt = stmt.where(GovernmentSource.name.in_(source_names))
+    requeued = []
+    for notice in (await session.execute(stmt)).scalars().all():
+        # Vacancy drafts only: a requirements draft made from the same stored copy does not decide DRAFT_FAILED
+        drafts = [d for d in (await session.execute(
+            select(ExtractionDraft).where(ExtractionDraft.notice_id == notice.id)
+            .order_by(ExtractionDraft.created_at.desc()))).scalars() if d.prompt_version.startswith(_VACANCY_PROMPT)]
+        # created_at is the transaction time: drafts made in one transaction tie, and then every one must qualify
+        latest = [d for d in drafts if d.created_at == drafts[0].created_at] if drafts else []
+        if latest and all(provider_failure(d) for d in latest):
+            notice.review_status = "MANUAL_REVIEW"
+            requeued.append(notice)
+    await session.flush()
+    return requeued
+
 async def draft_pending_notices(session: AsyncSession, fetcher, provider, limit: int = 5,
-                                source_names: Optional[List[str]] = None, commit_each: bool = False) -> List[ExtractionDraft]:
+                                source_names: Optional[List[str]] = None, commit_each: bool = False,
+                                notice_ids: Optional[List[uuid.UUID]] = None) -> List[ExtractionDraft]:
     """Create drafts for VACANCY PDF notices of sources without a deterministic parser.
 
     Triaged notices go highest priority first and STALE / NOT_REQUIRED ones are skipped (services/triage.py);
-    notices not triaged yet follow, newest first."""
+    notices not triaged yet follow, newest first. `notice_ids` limits the run to those notices."""
     stmt = (select(RecruitmentNotice, GovernmentSource).join(GovernmentSource, GovernmentSource.id == RecruitmentNotice.source_id)
             .outerjoin(NoticeTriage, NoticeTriage.notice_id == RecruitmentNotice.id)
             .where(RecruitmentNotice.notice_kind == "VACANCY", RecruitmentNotice.document_type == "PDF",
@@ -231,6 +270,8 @@ async def draft_pending_notices(session: AsyncSession, fetcher, provider, limit:
                       RecruitmentNotice.url_hash).limit(limit))
     if source_names:
         stmt = stmt.where(GovernmentSource.name.in_(source_names))
+    if notice_ids is not None:
+        stmt = stmt.where(RecruitmentNotice.id.in_(notice_ids))
     drafts = []
     for notice, source in (await session.execute(stmt)).all():
         policy = source_policy(source)
