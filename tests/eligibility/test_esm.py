@@ -176,6 +176,27 @@ def test_ssc_age_is_actual_age_minus_military_service_plus_three_years():
     assert _section(_person(esm_release_type="RETIRED_WITH_PENSION"))["ESM_AGE"].outcome == "CANNOT_DECIDE"
     assert _section(_person(esm_release_type="RETIRED_WITH_PENSION", date_of_birth=date(2003, 1, 1)))["ESM_AGE"].outcome == "NOT_APPLICABLE"
 
+def test_missing_release_date_is_not_counted_up_to_the_crucial_date():
+    """Only a candidate still serving has service running on to the crucial date; a retired candidate who leaves the
+    release date empty has an unknown length of service, so neither the hard AGE check nor ESM_AGE may decide on it."""
+    parsed = _ssc(CHSL)
+    reqs, on, closing = _ssc_rows(CHSL), _day(parsed, "age_crucial_date"), _day(parsed, "application_end")
+    retired = _person(esm_release_type="RETIRED_WITH_PENSION", esm_enrolment_date=date(2004, 6, 1))
+    assert rules.military_service_months(retired, on) is None
+    hard = exam_engine.check_exam_age(retired, reqs, on, closing)[0]
+    assert hard.outcome == "UNKNOWN" and "EX_SERVICEMEN_SERVICE_DEDUCTED" in hard.profile_evidence
+    section = _section(retired)
+    assert section["ESM_AGE"].outcome == "CANNOT_DECIDE" and "length of military service not stated" in section["ESM_AGE"].rule
+    assert section["ESM_RELEASE"].outcome == "CANNOT_DECIDE"
+    for release_type in (None, "MEDICAL_DISABILITY_PENSION", "OTHER"):
+        assert rules.military_service_months(_person(esm_release_type=release_type, esm_enrolment_date=date(2004, 6, 1)), on) is None
+    # Still serving: 01.06.2004 to the crucial date 01.08.2026 = 22 years 2 months
+    serving = _person(esm_release_type="STILL_SERVING", esm_enrolment_date=date(2004, 6, 1))
+    assert rules.military_service_months(serving, on) == 266
+    # A release after the crucial date counts only up to it
+    assert rules.military_service_months(_person(esm_release_type="STILL_SERVING", esm_enrolment_date=date(2004, 6, 1),
+                                                 esm_release_date=date(2027, 3, 31)), on) == 266
+
 def test_upsc_age_relaxed_by_five_years_with_six_months_service():
     reqs = _law_officer_rows()
     closing = _upsc12().fields["application_deadline"].value.astimezone(IST).date()

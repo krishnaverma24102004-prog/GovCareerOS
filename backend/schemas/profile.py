@@ -26,7 +26,7 @@ class PersonalInfoIn(_In):
     disability_types: Optional[str] = Field(None, description="notification sub-category codes, e.g. 'OL' or 'LV,HH'")
     citizenship_status: Optional[Literal["INDIAN_CITIZEN", "NEPAL_SUBJECT", "BHUTAN_SUBJECT", "TIBETAN_REFUGEE_PRE_1962", "PIO_MIGRANT", "OTHER"]] = None
     is_ex_serviceman: Optional[bool] = None
-    armed_forces_service_months: Optional[int] = Field(None, ge=0, description="years of service, in months; derived from enrolment/release dates when null")
+    armed_forces_service_months: Optional[int] = Field(None, ge=0, description="years of service, in months; when null, derived from the enrolment and release dates (to the crucial date only while STILL_SERVING)")
     esm_service_branch: Optional[Literal["ARMY", "NAVY", "AIR_FORCE", "TERRITORIAL_ARMY"]] = None
     esm_enrolment_date: Optional[date] = None
     esm_release_date: Optional[date] = Field(None, description="release/discharge date; while still serving, the expected end of the term of engagement")

@@ -161,7 +161,7 @@ export function PersonalEditor({
           text("disability_types", "Disability sub-category codes (e.g. OL or LV,HH)")}
         {question("is_ex_serviceman", "Ex-serviceman?")}
         {(value.is_ex_serviceman || value.armed_forces_service_months != null || err("armed_forces_service_months")) &&
-          text("armed_forces_service_months", "Armed forces service (months; leave empty to count from the dates below)", "number")}
+          text("armed_forces_service_months", "Armed forces service (months; if empty, counted from the enrolment and release dates below)", "number")}
         {esmShown && (
           <>
             {choice("esm_service_branch", "Service branch", BRANCHES)}

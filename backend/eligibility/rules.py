@@ -202,14 +202,18 @@ class RelaxationOption:
     missing: Optional[str] = None  # profile field that would settle an UNKNOWN option
 
 def military_service_months(profile: ProfileSnapshot, until: Optional[date]) -> Optional[int]:
-    """Armed Forces service as the profile states it, else completed months from enrolment to release (or to `until`
-    while the candidate is still serving or the release lies after `until`); None when neither is recorded."""
+    """Armed Forces service as the profile states it, else completed months from enrolment to release, counted no
+    further than `until`. Without a release date the service runs on to `until` only for a candidate STILL_SERVING;
+    for anyone else it is unknown (None), never assumed to have lasted up to the crucial date."""
     if profile.armed_forces_service_months is not None:
         return profile.armed_forces_service_months
     start, end = profile.esm_enrolment_date, profile.esm_release_date
-    if start is None or (end is None and until is None):
+    if end is None and profile.esm_release_type == "STILL_SERVING":
+        end = until
+    if start is None or end is None:
         return None
-    end = min(d for d in (end, until) if d is not None)
+    if until is not None and end > until:
+        end = until
     return max(0, (end.year - start.year) * 12 + end.month - start.month - (end.day < start.day))
 
 def _service_years(start: Optional[date], until: date) -> Optional[float]:
