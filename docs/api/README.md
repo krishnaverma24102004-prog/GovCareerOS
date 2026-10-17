@@ -144,8 +144,9 @@ curl -s -X DELETE -H "X-API-Key: $GCO_API_KEY" "$GCO/api/v1/webhooks/<webhook id
 - Body: `{"id": <delivery id>, "type": "notice.changed", "seq": 42, "cursor": "...", "created_at": "...", "data": {...}}`;
   `data` is the same as the change feed's. Headers: `X-GovCareerOS-Event`, `X-GovCareerOS-Delivery`,
   `X-GovCareerOS-Signature`.
-- Answer with any 2xx within 10 seconds. Anything else is retried after 1 min, 5 min, 30 min, 2 h and 6 h, then
-  the delivery is marked `FAILED`. Retries can reorder deliveries; use `seq` to order them.
+- Answer with any 2xx within 10 seconds (from connecting to your status line and headers; the body of your answer
+  is not read). Anything else is retried after 1 min, 5 min, 30 min, 2 h and 6 h, then the delivery is marked
+  `FAILED`. Retries can reorder deliveries; use `seq` to order them.
 
 ### Checking the signature
 

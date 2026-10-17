@@ -9,10 +9,13 @@ Notice data is real only:
 Organisations, keys, webhook URLs and secrets are test-only values made inside each test; example.com /
 example.net are reserved names (RFC 2606) and nothing is ever sent over the network (a fake wire answers).
 """
+import asyncio
 import hashlib
 import hmac
+import inspect
 import json
 import re
+import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -22,6 +25,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from govcareeros.backend.models import ApiKey, ApiUsage, RecruitmentNotice, ReviewAuditLog, User, Webhook, WebhookDelivery
 from govcareeros.backend.schemas.attribution import DISCLAIMER
@@ -377,7 +381,7 @@ async def test_v1_verify_is_the_public_check_behind_a_key(api, new_key, db_sessi
 
 class _Wire(httpx.AsyncHTTPTransport):
     """Stands in for the network under GuardedTransport: records requests, answers from a script (or from
-    `route(request)`, which may return a response or raise)."""
+    `route(request)`, plain or async, which may return a response or raise)."""
     def __init__(self, *args, answers=(), route=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.answers, self.route, self.requests = list(answers), route, []
@@ -386,7 +390,8 @@ class _Wire(httpx.AsyncHTTPTransport):
         await request.aread()
         self.requests.append(request)
         if self.route:
-            return self.route(request)
+            answer = self.route(request)
+            return await answer if inspect.isawaitable(answer) else answer
         return self.answers.pop(0) if self.answers else httpx.Response(200)
 
 class _Net(GuardedTransport, _Wire):
@@ -610,6 +615,72 @@ async def test_one_bad_webhook_does_not_stop_delivery_to_the_others(api, new_key
     assert broken.error == "unexpected error (RuntimeError)"
     assert by_hook[ids[2]].status == "REFUSED" and by_hook[ids[2]].next_attempt_at is None
     assert sorted(r.url.host for r in wire.requests) == ["broken.example.net", "hooks.example.com"]  # each once
+
+async def _three_hooks(api, new_key, db_session, urls):
+    key, _, _ = await new_key(["webhooks:manage"])
+    ids = [(await api.post("/api/v1/webhooks", json={"url": u}, headers={"X-API-Key": key})).json()["id"] for u in urls]
+    await cgl_exam(db_session)
+    await b2b_events.collect(db_session)
+    assert await webhooks.enqueue(db_session) == len(urls)
+    await db_session.commit()
+    return ids
+
+@pytest.mark.asyncio
+async def test_slow_or_endless_receivers_do_not_hold_up_delivery(api, new_key, db_session, monkeypatch):
+    monkeypatch.setattr(webhooks, "TIMEOUT_SECONDS", 0.5)
+    ids = await _three_hooks(api, new_key, db_session, ("https://slow.example.net/hook", "https://endless.example.net/hook", HOOK_URL))
+    chunks = []
+
+    async def endless():  # a 200 whose body keeps coming (bounded here only so the test cannot hang)
+        for _ in range(100):
+            chunks.append(1)
+            yield b"x" * 65536
+            await asyncio.sleep(0.01)
+
+    async def route(request):
+        if request.url.host == "slow.example.net":
+            await asyncio.sleep(3)  # answers long after the deadline
+        if request.url.host == "endless.example.net":
+            return httpx.Response(200, content=endless())
+        return httpx.Response(200)
+    client, wire = _client(["93.184.215.14"], route=route)
+    now = datetime.now(timezone.utc)
+    started = time.monotonic()
+    async with client:
+        assert await webhooks.deliver_due(db_session, client, now=now) == {"DELIVERED": 2, "RETRY": 1, "FAILED": 0, "REFUSED": 0}
+    assert time.monotonic() - started < 2.5
+    assert chunks == []  # the answer's status was enough: its body was never read
+    by_hook = {str(d.webhook_id): d for d in (await db_session.execute(select(WebhookDelivery))).scalars()}
+    slow = by_hook[ids[0]]
+    assert (slow.status, slow.attempts, slow.next_attempt_at, slow.error) == (
+        "PENDING", 1, now + timedelta(minutes=1), "no answer within 0.5 seconds")
+    assert by_hook[ids[1]].status == by_hook[ids[2]].status == "DELIVERED"
+
+@pytest.mark.asyncio
+async def test_overlapping_dispatchers_never_send_a_delivery_twice(api, new_key, db_session):
+    await _three_hooks(api, new_key, db_session, (HOOK_URL, "https://two.example.net/hook", "https://three.example.net/hook"))
+    other = async_sessionmaker(db_session.bind, expire_on_commit=False, class_=AsyncSession)()
+    now = datetime.now(timezone.utc)
+    inner = {}
+
+    async def route(request):
+        # While the first dispatcher waits on its first receiver, a second dispatcher runs to the end
+        if "counts" not in inner:
+            inner["counts"] = None
+            second, _ = _client(["93.184.215.14"], route=route)
+            async with second:
+                inner["counts"] = await webhooks.deliver_due(other, second, now=now)
+        return httpx.Response(200)
+    client, wire = _client(["93.184.215.14"], route=route)
+    try:
+        async with client:
+            first = await webhooks.deliver_due(db_session, client, now=now)
+    finally:
+        await other.close()
+    assert inner["counts"] == {"DELIVERED": 2, "RETRY": 0, "FAILED": 0, "REFUSED": 0}  # skipped the one being sent
+    assert first == {"DELIVERED": 1, "RETRY": 0, "FAILED": 0, "REFUSED": 0}            # skipped the two it took
+    deliveries = (await db_session.execute(select(WebhookDelivery).execution_options(populate_existing=True))).scalars().all()
+    assert [(d.status, d.attempts) for d in deliveries] == [("DELIVERED", 1)] * 3
 
 @pytest.mark.asyncio
 async def test_removed_webhook_and_earlier_events_are_not_delivered(api, new_key, db_session):

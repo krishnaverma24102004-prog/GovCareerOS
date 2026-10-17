@@ -12,10 +12,12 @@ Signature: every delivery carries
     X-GovCareerOS-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>." + raw body)>
 `verify_signature` is the receiver-side check (also documented in docs/api/README.md).
 
-Retries: a delivery that gets no 2xx answer is tried again after 1 min, 5 min, 30 min, 2 h and 6 h, then marked
-FAILED. Every attempt is in webhook_deliveries (status, attempts, HTTP status, error). Deliveries of one webhook may
-arrive out of order when one is retried; each body carries the event's `seq`.
+Retries: a delivery that gets no 2xx answer within TIMEOUT_SECONDS is tried again after 1 min, 5 min, 30 min, 2 h and
+6 h, then marked FAILED. Every attempt is in webhook_deliveries (status, attempts, HTTP status, error). Deliveries of
+one webhook may arrive out of order when one is retried; each body carries the event's `seq`. A dispatcher claims each
+delivery before sending it (see _claim), so dispatchers that overlap never send the same delivery twice.
 """
+import asyncio
 import hashlib
 import hmac
 import ipaddress
@@ -29,7 +31,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.models.b2b import ApiEvent, ApiOrg, Webhook, WebhookDelivery
@@ -42,7 +44,8 @@ DELIVERY_HEADER = "X-GovCareerOS-Delivery"
 USER_AGENT = "GovCareerOS-Webhooks/1.0"
 BACKOFF = (timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=30), timedelta(hours=2), timedelta(hours=6))
 MAX_ATTEMPTS = len(BACKOFF) + 1
-TIMEOUT_SECONDS = 10
+TIMEOUT_SECONDS = 10  # one attempt in all: connecting, sending, the answer's status and headers
+LEASE = timedelta(minutes=5)  # a claimed delivery is left to its dispatcher this long (well over one attempt)
 MAX_WEBHOOKS_PER_ORG = 10
 _PRIVATE_SUFFIXES = (".local", ".internal", ".intranet", ".lan", ".home", ".corp", ".home.arpa", ".localhost")
 _LABEL = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)")  # one DNS label as sent (letters, digits, hyphens; IDNs as xn--)
@@ -192,50 +195,77 @@ def _failed(d: WebhookDelivery, now: datetime, error: str, status: Optional[int]
     else:
         d.next_attempt_at = now + BACKOFF[d.attempts - 1]
 
+async def _claim(session: AsyncSession, delivery_id, due_by: datetime, at: datetime) -> bool:
+    """Take one due delivery for this dispatcher and commit: attempts + 1, next attempt LEASE ahead. A dispatcher
+    running at the same time then finds it not due and skips it; if this one dies mid-send, the delivery is tried
+    again once the lease is over. False when another dispatcher took it (or it was removed) first."""
+    taken = await session.execute(
+        update(WebhookDelivery)
+        .where(WebhookDelivery.id == delivery_id, WebhookDelivery.status == "PENDING", WebhookDelivery.next_attempt_at <= due_by)
+        .values(attempts=WebhookDelivery.attempts + 1, last_attempt_at=at, next_attempt_at=at + LEASE)
+        .execution_options(synchronize_session=False))
+    await session.commit()
+    return taken.rowcount == 1
+
+async def _post(client: httpx.AsyncClient, url: str, body: bytes, headers: Dict[str, str]) -> httpx.Response:
+    """The answer's status and headers. Its body is never read: a receiver may send it slowly or without end."""
+    async with client.stream("POST", url, content=body, headers=headers) as resp:
+        return resp
+
+async def _attempt(client: httpx.AsyncClient, d: WebhookDelivery, hook: Webhook, event: ApiEvent, now: datetime) -> str:
+    """Send one claimed delivery and record its outcome on `d`; the count it falls under."""
+    reason = url_refusal(hook.url)
+    if reason:
+        d.status, d.next_attempt_at, d.error = "REFUSED", None, reason
+        return "REFUSED"
+    try:
+        body = body_of(d, event)
+        headers = {"Content-Type": "application/json", EVENT_HEADER: event.event_type, DELIVERY_HEADER: str(d.id),
+                   SIGNATURE_HEADER: signature_header(hook.secret, int(now.timestamp()), body)}
+        # TIMEOUT_SECONDS in all, connection to answer (httpx's own timeout is per read, so a trickle never ends it)
+        resp = await asyncio.wait_for(_post(client, hook.url, body, headers), TIMEOUT_SECONDS)
+    except (UrlRefused, httpx.InvalidURL) as e:  # resolved to a non-public address / unusable URL: never retried
+        d.status, d.next_attempt_at, d.error = "REFUSED", None, str(e)[:1000]
+        return "REFUSED"
+    except httpx.HTTPError as e:
+        _failed(d, now, f"{type(e).__name__}: {e}")
+    except TimeoutError:
+        _failed(d, now, f"no answer within {TIMEOUT_SECONDS} seconds")
+    except Exception as e:  # anything else is this delivery's failure, never the whole batch's
+        log.exception("webhook delivery %s to webhook %s failed unexpectedly", d.id, hook.id)
+        _failed(d, now, f"unexpected error ({type(e).__name__})")
+    else:
+        if 200 <= resp.status_code < 300:
+            d.status, d.next_attempt_at, d.response_status, d.error, d.delivered_at = "DELIVERED", None, resp.status_code, None, now
+            return "DELIVERED"
+        _failed(d, now, f"HTTP {resp.status_code}" + (" (redirects are not followed)" if resp.is_redirect else ""), resp.status_code)
+    return "FAILED" if d.status == "FAILED" else "RETRY"
+
 async def deliver_due(session: AsyncSession, client: Optional[httpx.AsyncClient] = None, now: Optional[datetime] = None,
                       limit: int = 200) -> Dict[str, int]:
-    """Send every PENDING delivery whose time has come. Counts by outcome."""
+    """Send the PENDING deliveries whose time has come, one at a time. Counts by outcome.
+
+    Each delivery is claimed (committed) before it is sent and its outcome committed right after, so dispatchers
+    running at the same time never send one delivery twice, and nothing sent is sent again because a later one
+    failed. Each attempt has TIMEOUT_SECONDS in all; the answer's body is not read."""
     now = now or datetime.now(timezone.utc)
-    rows = (await session.execute(
-        select(WebhookDelivery, Webhook, ApiEvent).join(Webhook, Webhook.id == WebhookDelivery.webhook_id)
-        .join(ApiEvent, ApiEvent.seq == WebhookDelivery.event_seq)
-        .where(WebhookDelivery.status == "PENDING", WebhookDelivery.next_attempt_at <= now)
-        .order_by(WebhookDelivery.next_attempt_at, WebhookDelivery.event_seq).limit(limit))).all()
+    due = (await session.execute(
+        select(WebhookDelivery.id).where(WebhookDelivery.status == "PENDING", WebhookDelivery.next_attempt_at <= now)
+        .order_by(WebhookDelivery.next_attempt_at, WebhookDelivery.event_seq).limit(limit))).scalars().all()
     counts = {"DELIVERED": 0, "RETRY": 0, "FAILED": 0, "REFUSED": 0}
     owns = client is None
     client = client or make_client()
     try:
-        for d, hook, event in rows:
-            d.attempts += 1
-            d.last_attempt_at = now
-            reason = url_refusal(hook.url)
-            if reason:
-                d.status, d.next_attempt_at, d.error = "REFUSED", None, reason
-                counts["REFUSED"] += 1
+        for delivery_id in due:
+            if not await _claim(session, delivery_id, now, now):
                 continue
-            try:
-                body = body_of(d, event)
-                headers = {"Content-Type": "application/json", EVENT_HEADER: event.event_type, DELIVERY_HEADER: str(d.id),
-                           SIGNATURE_HEADER: signature_header(hook.secret, int(now.timestamp()), body)}
-                resp = await client.post(hook.url, content=body, headers=headers)
-            except (UrlRefused, httpx.InvalidURL) as e:  # resolved to a non-public address / unusable URL: never retried
-                d.status, d.next_attempt_at, d.error = "REFUSED", None, str(e)[:1000]
-                counts["REFUSED"] += 1
-                continue
-            except httpx.HTTPError as e:
-                _failed(d, now, f"{type(e).__name__}: {e}")
-            except Exception as e:  # anything else is this delivery's failure, never the whole batch's
-                log.exception("webhook delivery %s to webhook %s failed unexpectedly", d.id, hook.id)
-                _failed(d, now, f"unexpected error ({type(e).__name__})")
-            else:
-                if 200 <= resp.status_code < 300:
-                    d.status, d.next_attempt_at, d.response_status, d.error, d.delivered_at = "DELIVERED", None, resp.status_code, None, now
-                    counts["DELIVERED"] += 1
-                    continue
-                _failed(d, now, f"HTTP {resp.status_code}" + (" (redirects are not followed)" if resp.is_redirect else ""), resp.status_code)
-            counts["FAILED" if d.status == "FAILED" else "RETRY"] += 1
+            d, hook, event = (await session.execute(
+                select(WebhookDelivery, Webhook, ApiEvent).join(Webhook, Webhook.id == WebhookDelivery.webhook_id)
+                .join(ApiEvent, ApiEvent.seq == WebhookDelivery.event_seq).where(WebhookDelivery.id == delivery_id)
+                .execution_options(populate_existing=True))).one()
+            counts[await _attempt(client, d, hook, event, now)] += 1
+            await session.commit()
     finally:
         if owns:
             await client.aclose()
-    await session.flush()
     return counts
