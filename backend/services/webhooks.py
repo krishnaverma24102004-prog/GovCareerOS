@@ -19,6 +19,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import logging
 import re
 import secrets
 import time
@@ -43,6 +44,9 @@ MAX_ATTEMPTS = len(BACKOFF) + 1
 TIMEOUT_SECONDS = 10
 MAX_WEBHOOKS_PER_ORG = 10
 _PRIVATE_SUFFIXES = (".local", ".internal", ".intranet", ".lan", ".home", ".corp", ".home.arpa", ".localhost")
+_LABEL = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)")  # one DNS label as sent (letters, digits, hyphens; IDNs as xn--)
+
+log = logging.getLogger(__name__)
 
 class WebhookUrlRefused(ValueError):
     pass
@@ -54,6 +58,16 @@ def _is_ip(host: str) -> bool:
     except ValueError:
         return False
 
+def _wire_host(url: str) -> Optional[str]:
+    """The host as httpx sends it to DNS and TLS (an IDN IDNA-encoded), or None when httpx cannot build or read a
+    request for this URL (a host that is not valid IDNA: a symbol, or an xn-- label that does not decode)."""
+    try:
+        parsed = httpx.URL(url)
+        parsed.host  # decodes every xn-- label; an invalid one raises here as it would at delivery
+        return parsed.raw_host.decode("ascii").rstrip(".").lower()
+    except (httpx.InvalidURL, ValueError):  # idna.IDNAError and UnicodeError are ValueErrors
+        return None
+
 def url_refusal(url: str) -> Optional[str]:
     """Why this URL may not receive webhooks, or None. Names are resolved and checked again at every delivery."""
     if len(url) > 2000:
@@ -63,6 +77,7 @@ def url_refusal(url: str) -> Optional[str]:
         parts.port  # raises on a malformed port
     except ValueError:
         return "not a valid URL"
+    wire = _wire_host(url)
     if parts.scheme != "https":
         return "only https URLs are allowed"
     if parts.username is not None or parts.password is not None or "@" in parts.netloc:
@@ -76,6 +91,11 @@ def url_refusal(url: str) -> Optional[str]:
         return f"{host} is not a public host name"                            # that ipaddress does not read
     if "." not in host or host.endswith(_PRIVATE_SUFFIXES):
         return f"{host} is not a public host name"
+    # The checks above read the URL as urllib does; the request is built by httpx, so its host must pass too
+    if wire is None or not (_is_ip(wire) or (len(wire) <= 253 and all(_LABEL.fullmatch(l) for l in wire.split(".")))):
+        return f"{host} is not a valid host name"
+    if _is_ip(wire) and literal_non_public(f"https://[{wire}]/" if ":" in wire else f"https://{wire}/"):
+        return f"{host} is not a public address"
     return None
 
 def check_url(url: str) -> None:
@@ -191,17 +211,20 @@ async def deliver_due(session: AsyncSession, client: Optional[httpx.AsyncClient]
                 d.status, d.next_attempt_at, d.error = "REFUSED", None, reason
                 counts["REFUSED"] += 1
                 continue
-            body = body_of(d, event)
-            headers = {"Content-Type": "application/json", EVENT_HEADER: event.event_type, DELIVERY_HEADER: str(d.id),
-                       SIGNATURE_HEADER: signature_header(hook.secret, int(now.timestamp()), body)}
             try:
+                body = body_of(d, event)
+                headers = {"Content-Type": "application/json", EVENT_HEADER: event.event_type, DELIVERY_HEADER: str(d.id),
+                           SIGNATURE_HEADER: signature_header(hook.secret, int(now.timestamp()), body)}
                 resp = await client.post(hook.url, content=body, headers=headers)
-            except UrlRefused as e:  # resolved to a non-public address: never retried
+            except (UrlRefused, httpx.InvalidURL) as e:  # resolved to a non-public address / unusable URL: never retried
                 d.status, d.next_attempt_at, d.error = "REFUSED", None, str(e)[:1000]
                 counts["REFUSED"] += 1
                 continue
             except httpx.HTTPError as e:
                 _failed(d, now, f"{type(e).__name__}: {e}")
+            except Exception as e:  # anything else is this delivery's failure, never the whole batch's
+                log.exception("webhook delivery %s to webhook %s failed unexpectedly", d.id, hook.id)
+                _failed(d, now, f"unexpected error ({type(e).__name__})")
             else:
                 if 200 <= resp.status_code < 300:
                     d.status, d.next_attempt_at, d.response_status, d.error, d.delivered_at = "DELIVERED", None, resp.status_code, None, now

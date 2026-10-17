@@ -375,23 +375,26 @@ async def test_v1_verify_is_the_public_check_behind_a_key(api, new_key, db_sessi
 # ---------- webhooks ----------
 
 class _Wire(httpx.AsyncHTTPTransport):
-    """Stands in for the network under GuardedTransport: records requests, answers from a script."""
-    def __init__(self, *args, answers=(), **kwargs):
+    """Stands in for the network under GuardedTransport: records requests, answers from a script (or from
+    `route(request)`, which may return a response or raise)."""
+    def __init__(self, *args, answers=(), route=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.answers, self.requests = list(answers), []
+        self.answers, self.route, self.requests = list(answers), route, []
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         await request.aread()
         self.requests.append(request)
+        if self.route:
+            return self.route(request)
         return self.answers.pop(0) if self.answers else httpx.Response(200)
 
 class _Net(GuardedTransport, _Wire):
     pass
 
-def _client(addresses, answers=()):
+def _client(addresses, answers=(), route=None):
     async def resolve(host, port):
         return list(addresses)
-    transport = _Net(resolve=resolve, answers=answers)
+    transport = _Net(resolve=resolve, answers=answers, route=route)
     return httpx.AsyncClient(transport=transport, follow_redirects=False), transport
 
 @pytest.mark.parametrize("url", [
@@ -400,6 +403,10 @@ def _client(addresses, answers=()):
     "https://api.localhost/x", "https://intranet/x", "https://printer.local/x", "https://svc.internal/x",
     "https://user:pw@hooks.example.com/x", "https://127.1/x", "https://2130706433/x", "https://0x7f000001/x",
     "https://0.0.0.0/x", "ftp://hooks.example.com/x", "https:///x",
+    # Hosts httpx cannot encode (IDNA) or that are no host name at all: refused at registration, not at delivery
+    "https://☃.example.com/x", "https://xn--zz.example.com/x", "https://ＥＸＡＭＰＬＥ.com/x",
+    "https://１２７.０.０.１/x", "https://exa mple.com/x", "https://ex%41mple.com/x",
+    "https://a..b.example.com/x", "https://-a.example.com/x",
 ])
 def test_webhook_url_guard_refuses_non_public_targets(url):
     assert webhooks.url_refusal(url) is not None
@@ -407,6 +414,7 @@ def test_webhook_url_guard_refuses_non_public_targets(url):
 def test_webhook_url_guard_accepts_public_https():
     assert webhooks.url_refusal(HOOK_URL) is None
     assert webhooks.url_refusal("https://8.8.8.8/hook") is None  # a public address literal
+    assert webhooks.url_refusal("https://bücher.example/hook") is None  # a valid IDN (sent as xn--bcher-kva)
 
 def test_signature_is_hmac_sha256_of_timestamp_and_body():
     body, secret, ts = b'{"type":"notice.new"}', "whsec_test-only", 1_790_000_000
@@ -535,6 +543,38 @@ async def test_never_delivers_to_a_private_address(api, new_key, db_session):
     real = webhooks.make_client()
     assert isinstance(real._transport, GuardedTransport) and real.follow_redirects is False
     await real.aclose()
+
+@pytest.mark.asyncio
+async def test_one_bad_webhook_does_not_stop_delivery_to_the_others(api, new_key, db_session):
+    key, _, _ = await new_key(["webhooks:manage"])
+    h = {"X-API-Key": key}
+    urls = (HOOK_URL, "https://broken.example.net/hook", "https://idna.example.net/hook")
+    ids = [(await api.post("/api/v1/webhooks", json={"url": u}, headers=h)).json()["id"] for u in urls]
+    # A row stored before registration refused hosts httpx cannot encode
+    (await db_session.get(Webhook, uuid.UUID(ids[2]))).url = "https://xn--zz.example.com/hook"
+    await cgl_exam(db_session)
+    await b2b_events.collect(db_session)
+    assert await webhooks.enqueue(db_session) == 3
+    await db_session.commit()
+
+    def route(request):
+        if request.url.host == "broken.example.net":
+            raise RuntimeError("test-only failure inside the transport")
+        return httpx.Response(200)
+    client, wire = _client(["93.184.215.14"], route=route)
+    now = datetime.now(timezone.utc)
+    async with client:
+        assert await webhooks.deliver_due(db_session, client, now=now) == {"DELIVERED": 1, "RETRY": 1, "FAILED": 0, "REFUSED": 1}
+        # Nothing is sent again: every outcome was recorded
+        assert await webhooks.deliver_due(db_session, client, now=now) == {"DELIVERED": 0, "RETRY": 0, "FAILED": 0, "REFUSED": 0}
+    await db_session.commit()
+    by_hook = {str(d.webhook_id): d for d in (await db_session.execute(select(WebhookDelivery))).scalars()}
+    assert by_hook[ids[0]].status == "DELIVERED"
+    broken = by_hook[ids[1]]
+    assert (broken.status, broken.attempts, broken.next_attempt_at) == ("PENDING", 1, now + timedelta(minutes=1))
+    assert broken.error == "unexpected error (RuntimeError)"
+    assert by_hook[ids[2]].status == "REFUSED" and by_hook[ids[2]].next_attempt_at is None
+    assert sorted(r.url.host for r in wire.requests) == ["broken.example.net", "hooks.example.com"]  # each once
 
 @pytest.mark.asyncio
 async def test_removed_webhook_and_earlier_events_are_not_delivered(api, new_key, db_session):
