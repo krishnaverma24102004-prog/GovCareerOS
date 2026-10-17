@@ -183,7 +183,7 @@ async def test_withdrawal_stops_processing_without_deleting_history(api, login, 
 @pytest.mark.asyncio
 async def test_consent_under_an_older_notice_version_is_not_carried_over(api, login, db_session, monkeypatch):
     vacancy_id = await _law_officer(db_session)
-    h = await login("c5@test.invalid")
+    h = await login("c5@test.invalid", consent=["ELIGIBILITY_CHECK"])
     v1 = (await api.put("/profile", json=PROFILE, headers=h)).json()["version"]["id"]
     user_id = (await db_session.execute(select(User.id).where(User.email == "c5@test.invalid"))).scalar_one()
 

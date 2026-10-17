@@ -1,7 +1,8 @@
 """
 Consent enforcement (DPDP Act 2023 s.6, s.9). Personal data that eligibility needs (category/caste, date of birth,
-gender, citizenship/nationality, disability, certificates, ex-serviceman and service details) is stored and processed only under an active ELIGIBILITY_CHECK consent;
-for a person under 18 that consent must carry the name of the parent / lawful guardian who gave it.
+gender, citizenship/nationality, disability, certificates, ex-serviceman and service details) is stored and processed
+only under an active ELIGIBILITY_CHECK consent; for a person under 18 that consent must carry the name of the parent /
+lawful guardian who gave it. Alerts / digests need ALERTS consent and resumes RESUME consent, checked the same way.
 
 Withdrawal stops processing: profile saves that would store those items and every eligibility run refuse with a
 ConsentRequired (HTTP 403 via the handler in api/main.py) that says what to do. Nothing already stored is deleted.
@@ -90,11 +91,13 @@ async def require_consent(session: AsyncSession, user_id: uuid.UUID, purpose: st
             "or leave these fields empty.", items)
     # A consent covers the notice version it was given under and the data items listed in it; a changed notice (new
     # version, or items it did not list) needs consent again (notice.py: never silently carried over)
-    if consent.notice_version != notice.NOTICE_VERSION or not set(items) <= _granted_items(consent):
+    uncovered = set(items) - _granted_items(consent)
+    if consent.notice_version != notice.NOTICE_VERSION or uncovered:
+        why = (f"the consent notice has changed since you gave it (version {consent.notice_version}; now {notice.NOTICE_VERSION})"
+               if consent.notice_version != notice.NOTICE_VERSION else f"your consent does not cover {', '.join(sorted(uncovered))}")
         raise ConsentRequired(
             "CONSENT_OUTDATED", purpose,
-            f"The consent notice has changed since you gave consent for {purpose} (version {consent.notice_version}; "
-            f"now {notice.NOTICE_VERSION}), so this data cannot be stored or used for that purpose until you consent again.",
+            f"Consent for {purpose}: {why}, so this data cannot be stored or used for that purpose until you consent again.",
             f"Read the notice again (GET /privacy/notice) and give consent for {purpose} (POST /privacy/consents).", items)
     if is_minor(date_of_birth, today) and not (consent.guardian_name or "").strip():
         raise ConsentRequired(
