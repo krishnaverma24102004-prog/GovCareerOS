@@ -17,6 +17,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import httpcore
 import httpx
 import pytest
 import pytest_asyncio
@@ -543,6 +544,40 @@ async def test_never_delivers_to_a_private_address(api, new_key, db_session):
     real = webhooks.make_client()
     assert isinstance(real._transport, GuardedTransport) and real.follow_redirects is False
     await real.aclose()
+
+@pytest.mark.asyncio
+async def test_delivery_connects_only_to_the_address_that_was_checked(api, new_key, db_session):
+    """DNS rebinding: the name answers a public address to the guard's lookup and loopback to any later one. The
+    production client connects to the checked address (TLS and Host still name the host), never to the name."""
+    key, _, _ = await new_key(["webhooks:manage"])
+    await api.post("/api/v1/webhooks", json={"url": HOOK_URL}, headers={"X-API-Key": key})
+    await cgl_exam(db_session)
+    await b2b_events.collect(db_session)
+    await webhooks.enqueue(db_session)
+    await db_session.commit()
+
+    lookups = []
+    async def resolve(host, port):  # hand-built rebinding DNS
+        lookups.append(host)
+        return ["93.184.215.14"] if len(lookups) == 1 else ["127.0.0.1"]
+    connects, tls_names = [], []
+
+    class Net(httpcore.AsyncNetworkBackend):  # the network below the guard: records, answers 204, sends nothing
+        async def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+            connects.append((host, port))
+
+            class Stream(httpcore.AsyncMockStream):
+                async def start_tls(self, ssl_context, server_hostname=None, timeout=None):
+                    tls_names.append(server_hostname)
+                    return self
+            return Stream([b"HTTP/1.1 204 No Content\r\n\r\n"])
+
+        async def sleep(self, seconds):
+            pass
+
+    async with webhooks.make_client(resolve=resolve, network_backend=Net()) as client:
+        assert (await webhooks.deliver_due(db_session, client))["DELIVERED"] == 1
+    assert lookups == ["hooks.example.com"] and connects == [("93.184.215.14", 443)] and tls_names == ["hooks.example.com"]
 
 @pytest.mark.asyncio
 async def test_one_bad_webhook_does_not_stop_delivery_to_the_others(api, new_key, db_session):

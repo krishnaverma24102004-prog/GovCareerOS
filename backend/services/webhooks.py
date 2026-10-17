@@ -4,8 +4,9 @@ Webhooks: an org's https endpoints, told about notice.new / notice.changed event
 Never to a private address. A URL is refused at registration unless it is https, names a public host (no IP
 literal or name that is loopback, private, link-local, ...; no single-label or .local/.internal names) and carries no
 user:password. At delivery the host name is resolved and the connection refused when any address it resolves to is
-non-public (url_guard.GuardedTransport, the guard every outbound fetch of the project uses), and redirects are not
-followed, so a public URL cannot bounce a delivery inside. Refused deliveries are marked REFUSED and never retried.
+non-public (url_guard.GuardedTransport, the guard every outbound fetch of the project uses); the connection is then
+opened to one of the addresses checked, never to the name again (DNS rebinding). Redirects are not followed, so a
+public URL cannot bounce a delivery inside. Refused deliveries are marked REFUSED and never retried.
 
 Signature: every delivery carries
     X-GovCareerOS-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>." + raw body)>
@@ -172,9 +173,10 @@ async def enqueue(session: AsyncSession, now: Optional[datetime] = None) -> int:
             await session.flush()
     return added
 
-def make_client(resolve=None) -> httpx.AsyncClient:
-    """Resolves every host and refuses non-public addresses; never follows redirects."""
-    transport = GuardedTransport(resolve=resolve) if resolve else GuardedTransport()
+def make_client(resolve=None, network_backend=None) -> httpx.AsyncClient:
+    """Resolves every host, refuses non-public addresses and connects only to an address it checked (so a second DNS
+    answer cannot rebind the delivery inside); never follows redirects. Both arguments are for tests."""
+    transport = GuardedTransport(**({"resolve": resolve} if resolve else {}), network_backend=network_backend)
     return httpx.AsyncClient(transport=transport, follow_redirects=False, timeout=TIMEOUT_SECONDS,
                              headers={"User-Agent": USER_AGENT})
 

@@ -138,7 +138,8 @@ curl -s -X DELETE -H "X-API-Key: $GCO_API_KEY" "$GCO/api/v1/webhooks/<webhook id
 - Only `https` URLs on public host names or public addresses are accepted. Loopback, private, link-local and
   other non-public addresses, `localhost`, single-label and `.local`/`.internal` names, and URLs with a user name
   or password are refused. At every delivery the host is resolved again and the delivery is refused (status
-  `REFUSED`, never retried) when it resolves to a non-public address. Redirects are not followed.
+  `REFUSED`, never retried) when it resolves to a non-public address; otherwise the connection is opened to one of
+  the addresses just checked (TLS still verifies the certificate for your host name). Redirects are not followed.
 - Only events recorded after registration are delivered. At most 10 active webhooks per organisation.
 - Body: `{"id": <delivery id>, "type": "notice.changed", "seq": 42, "cursor": "...", "created_at": "...", "data": {...}}`;
   `data` is the same as the change feed's. Headers: `X-GovCareerOS-Event`, `X-GovCareerOS-Delivery`,

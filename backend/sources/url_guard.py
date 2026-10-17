@@ -8,21 +8,30 @@ loopback, link-local or otherwise non-public address, including after DNS resolu
 `install(client, default)` adds the check as an httpx request hook, which httpx also runs for
 each redirect hop. A request carries its source's policy in `extensions[POLICY]`; without one
 the client's default applies, and a request with neither is refused.
+
+`GuardedTransport` resolves each host name, refuses it when any address is non-public, and then
+connects to one of exactly those addresses (never to the name, which a second DNS answer could
+point inside: DNS rebinding). TLS still checks the certificate for the host name.
 """
 import asyncio
+import contextvars
 import ipaddress
 import socket
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Dict, List, Optional
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 
+import httpcore
 import httpx
 
 POLICY = "govcareeros.url_policy"
 
 class UrlRefused(httpx.RequestError):
     """The URL is outside what the source is allowed to fetch. Never retried or worked around."""
+
+class UnresolvedHost(httpx.ConnectError):
+    """The host name did not resolve (or resolved to nothing)."""
 
 def _host(url: str) -> str:
     return (urlparse(url).hostname or "").rstrip(".").lower()
@@ -99,23 +108,66 @@ async def _resolve(host: str, port: int) -> List[str]:
     infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
     return [info[4][0] for info in infos]
 
-class GuardedTransport(httpx.AsyncHTTPTransport):
-    """Refuses a connection when any address the host name resolves to is non-public."""
+# (host as connected, port) -> the addresses GuardedTransport checked for the request in progress (this task only)
+_CHECKED: contextvars.ContextVar[Dict[Tuple[str, int], List[str]]] = contextvars.ContextVar("url_guard_checked", default={})
 
-    def __init__(self, *args, resolve: Resolver = _resolve, **kwargs):
+class _PinnedBackend(httpcore.AsyncNetworkBackend):
+    """Opens a TCP connection only to an address checked for the request in progress, never to a host name, so
+    the name is not looked up a second time by the connection itself. TLS (SNI, certificate) and the Host header
+    still carry the host name: httpcore takes those from the request, not from the address connected to."""
+
+    def __init__(self, inner: Optional[httpcore.AsyncNetworkBackend] = None):
+        self._inner = inner or httpcore.AnyIOBackend()
+
+    async def connect_tcp(self, host: str, port: int, timeout: Optional[float] = None, local_address: Optional[str] = None,
+                          socket_options=None) -> httpcore.AsyncNetworkStream:
+        addrs = _CHECKED.get().get((host, port))
+        if not addrs:
+            raise UrlRefused(f"refused {host}:{port}: no checked address to connect to")
+        last: Optional[Exception] = None
+        for addr in addrs:
+            try:
+                return await self._inner.connect_tcp(addr, port, timeout=timeout, local_address=local_address,
+                                                     socket_options=socket_options)
+            except (httpcore.ConnectError, httpcore.ConnectTimeout) as e:
+                last = e
+        raise last
+
+    async def connect_unix_socket(self, path: str, timeout: Optional[float] = None, socket_options=None):
+        raise UrlRefused(f"refused unix socket {path}")
+
+    async def sleep(self, seconds: float) -> None:
+        await self._inner.sleep(seconds)
+
+class GuardedTransport(httpx.AsyncHTTPTransport):
+    """Refuses a connection when any address the host name resolves to is non-public, and connects only to one of
+    the addresses it checked. `network_backend` (tests) stands in for the network below that check."""
+
+    def __init__(self, *args, resolve: Resolver = _resolve, network_backend: Optional[httpcore.AsyncNetworkBackend] = None,
+                 **kwargs):
         super().__init__(*args, **kwargs)
         self._resolve = resolve
+        if not isinstance(self._pool, httpcore.AsyncConnectionPool) or not hasattr(self._pool, "_network_backend"):
+            raise RuntimeError("cannot pin connections to checked addresses with this httpx/httpcore")  # never unpinned
+        self._pool._network_backend = _PinnedBackend(network_backend)
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        host = request.url.host
+        host = request.url.raw_host.decode("ascii")  # as the connection is opened (an IDN in its xn-- form)
+        port = request.url.port or (443 if request.url.scheme == "https" else 80)
         try:
-            addrs = await self._resolve(host, request.url.port or (443 if request.url.scheme == "https" else 80))
+            addrs = await self._resolve(host, port)
         except OSError as e:
-            raise httpx.ConnectError(f"cannot resolve {host}: {e}", request=request) from e
+            raise UnresolvedHost(f"cannot resolve {host}: {e}", request=request) from e
+        if not addrs:
+            raise UnresolvedHost(f"cannot resolve {host}: no address", request=request)
         bad = [a for a in addrs if _non_public(a)]
         if bad:
             raise UrlRefused(f"refused {request.url}: {host} resolves to non-public {bad[0]}", request=request)
-        return await super().handle_async_request(request)
+        token = _CHECKED.set({**_CHECKED.get(), (host, port): list(addrs)})
+        try:
+            return await super().handle_async_request(request)
+        finally:
+            _CHECKED.reset(token)
 
 class Robots:
     """robots.txt per scheme+host, fetched through the same guarded client."""

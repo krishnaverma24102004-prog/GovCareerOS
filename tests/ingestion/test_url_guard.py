@@ -10,6 +10,7 @@ government page contains them.
 import json
 from pathlib import Path
 
+import httpcore
 import httpx
 import pytest
 from sqlalchemy import select
@@ -18,7 +19,7 @@ from govcareeros.backend.models import GovernmentSource, RawDocument, Recruitmen
 from govcareeros.backend.services.document_ingestion import run_upsc_pipeline
 from govcareeros.backend.services.extraction_drafts import draft_pending_notices
 from govcareeros.backend.services.source_discovery import _probe_url, discover_all
-from govcareeros.backend.sources import upsc
+from govcareeros.backend.sources import upsc, url_guard
 from govcareeros.backend.sources.generic_notices import PageFetcher, extract_notices
 from govcareeros.backend.sources.registry import SourceSpec
 from govcareeros.backend.sources.url_guard import GuardedTransport, UrlPolicy, UrlRefused
@@ -132,6 +133,47 @@ async def test_guarded_transport_refuses_names_resolving_to_private_addresses():
     async with httpx.AsyncClient(transport=GuardedTransport(resolve=resolve)) as client:
         with pytest.raises(UrlRefused, match="non-public 10.0.0.5"):
             await client.get(HOME + "vacancies")
+
+class _RecordingNet(httpcore.AsyncNetworkBackend):
+    """Stands in for the network below the guard: records the address each connection is opened to and the name
+    TLS is started for, and answers 200 "ok". Nothing is sent anywhere."""
+    def __init__(self):
+        self.connects, self.tls_names = [], []
+
+    async def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+        self.connects.append((host, port))
+        net = self
+
+        class Stream(httpcore.AsyncMockStream):
+            async def start_tls(self, ssl_context, server_hostname=None, timeout=None):
+                net.tls_names.append(server_hostname)
+                return self
+        return Stream([b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"])
+
+    async def sleep(self, seconds):
+        pass
+
+@pytest.mark.asyncio
+async def test_guarded_transport_connects_only_to_the_address_it_checked():
+    # Hand-built DNS rebinding: the first answer is public, every later one is loopback
+    answers = [["93.184.215.14"]]
+    async def resolve(host, port):
+        return answers.pop(0) if answers else ["127.0.0.1"]
+    net = _RecordingNet()
+    async with httpx.AsyncClient(transport=GuardedTransport(resolve=resolve, network_backend=net)) as client:
+        r = await client.get("https://ministry.example.gov.in/vacancies")
+    assert r.status_code == 200 and r.text == "ok"
+    assert net.connects == [("93.184.215.14", 443)]        # the address that was checked, not a second lookup
+    assert net.tls_names == ["ministry.example.gov.in"]    # the certificate is still checked for the name
+    assert r.request.headers["host"] == "ministry.example.gov.in"
+
+    # Every request is checked again; a connection is never opened without a checked address
+    async with httpx.AsyncClient(transport=GuardedTransport(resolve=resolve, network_backend=net)) as client:
+        with pytest.raises(UrlRefused, match="non-public 127.0.0.1"):
+            await client.get("https://ministry.example.gov.in/vacancies")
+    with pytest.raises(UrlRefused, match="no checked address"):
+        await url_guard._PinnedBackend(net).connect_tcp("ministry.example.gov.in", 443)
+    assert net.connects == [("93.184.215.14", 443)]
 
 def _upsc_portal(extra, seen):
     routes = {
