@@ -35,6 +35,7 @@ from govcareeros.backend.models.exam_version import ExamVersion
 from govcareeros.backend.models.user import ProfileVersion
 from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
+from govcareeros.backend.privacy import enforcement
 from govcareeros.backend.services.exam_corrigenda import DATE_FIELDS, _OLDEST, _stage_token
 
 # Exam date columns -> (change log field, label)
@@ -262,7 +263,8 @@ async def vacancy_current_evidence(session: AsyncSession, vacancy: Vacancy, name
 
 async def watched_targets(session: AsyncSession, user_id: uuid.UUID) -> Tuple[Dict[uuid.UUID, str], Dict[uuid.UUID, str]]:
     """(exam_id -> reason, vacancy_id -> reason): tracked applications (not withdrawn), and ELIGIBLE / CONDITIONAL
-    verdicts of the latest profile version (the latest verdict per vacancy, per exam post)."""
+    verdicts of the latest profile version (the latest verdict per vacancy, per exam post). The verdicts are
+    eligibility data: without active ELIGIBILITY_CHECK consent for that version they are not used (DPDP)."""
     exams: Dict[uuid.UUID, str] = {}
     vacancies: Dict[uuid.UUID, str] = {}
     for app in (await session.execute(select(Application).where(Application.user_id == user_id, Application.status != "WITHDRAWN"))).scalars():
@@ -273,7 +275,7 @@ async def watched_targets(session: AsyncSession, user_id: uuid.UUID) -> Tuple[Di
             vacancies[app.vacancy_id] = why
     version = (await session.execute(select(ProfileVersion).where(ProfileVersion.user_id == user_id)
                                       .order_by(ProfileVersion.version_number.desc()).limit(1))).scalar_one_or_none()
-    if version is None:
+    if version is None or not await enforcement.allowed_for_version(session, user_id, version.id):
         return exams, vacancies
     latest: Dict[Any, Tuple[Any, str]] = {}
     for r in (await session.execute(select(ExamEligibilityResult).where(ExamEligibilityResult.profile_version_id == version.id)

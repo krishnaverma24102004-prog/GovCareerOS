@@ -234,6 +234,27 @@ async def test_radar_and_digest_skip_a_user_who_withdrew(api, login, db_session)
     with pytest.raises(enforcement.ConsentRequired):
         await eligibility_engine.evaluate(db_session, user.id, uuid.UUID(v1), vacancy_id)
 
+@pytest.mark.asyncio
+async def test_change_watch_stops_using_verdicts_after_withdrawal(api, login, db_session):
+    """Official changes are alerted for vacancies the person is ELIGIBLE / CONDITIONAL for; after withdrawal those
+    verdicts (derived from category, DOB, disability) are no longer used to pick or explain what to watch."""
+    from govcareeros.backend.services import change_log
+    vacancy_id = await _law_officer(db_session)
+    h = await login("c8@test.invalid")
+    profile = {**PROFILE, "personal_info": {**PROFILE["personal_info"], "date_of_birth": "1993-06-01"},
+               "experience": [{"organization": "Test Chambers", "designation": "Legal Associate", "domain": "Legal",
+                               "start_date": "2017-01-01"}]}
+    v1 = (await api.put("/profile", json=profile, headers=h)).json()["version"]["id"]
+    r = await api.post("/eligibility", json={"profile_version_id": v1, "vacancy_id": str(vacancy_id)}, headers=h)
+    assert r.json()["status"] in ("ELIGIBLE", "CONDITIONAL"), r.text
+    user_id = (await db_session.execute(select(User.id).where(User.email == "c8@test.invalid"))).scalar_one()
+    _, watched = await change_log.watched_targets(db_session, user_id)
+    assert watched == {vacancy_id: f"profile v1 is {r.json()['status']} for it"}
+
+    await api.delete("/privacy/consents/ELIGIBILITY_CHECK", headers=h)
+    assert await change_log.watched_targets(db_session, user_id) == ({}, {})
+    assert await change_log.change_alerts(db_session, user_id) == []
+
 # ---------- age gate ----------
 
 @pytest.mark.asyncio
