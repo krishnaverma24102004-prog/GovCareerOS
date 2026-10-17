@@ -170,3 +170,55 @@ async def test_digest_api_is_per_user_and_never_emails(api, login, db_session, n
     ravi = await login("ravi@example.com")
     assert (await api.get("/digest/latest", headers=ravi)).status_code == 404
     assert (await api.get("/digest/latest")).status_code == 401
+
+@pytest.mark.asyncio
+async def test_send_digests_emails_only_with_alerts_consent_and_logs_no_address(api, login, db_session, no_smtp, monkeypatch, capsys):
+    """scripts/send_digests.py --send (the scheduler's weekly job with SCHEDULE_DIGEST_SEND=true). Test-only users;
+    the mailer is replaced, nothing is sent. Its output goes to the container log, outside the JSON redaction."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from govcareeros.backend.services import consent, mailer
+    from govcareeros.scripts import send_digests
+
+    await _ingest_advts(db_session)
+    for email in ("asha@example.com", "ravi@example.com", "meera@example.com"):
+        assert (await api.put("/profile", json=law_profile("1993-06-01"), headers=await login(email))).status_code == 201
+    users = {u.email: u for u in (await db_session.execute(select(User))).scalars()}
+    asha, ravi, meera = (users[e] for e in ("asha@example.com", "ravi@example.com", "meera@example.com"))
+    await consent.record_consent(db_session, asha.id, "ALERTS", ["email"], "test-notice-v1")
+    await consent.record_consent(db_session, meera.id, "ALERTS", ["email"], "test-notice-v1")
+    await consent.withdraw(db_session, meera.id, "ALERTS")
+    await db_session.commit()
+
+    sent = []
+    monkeypatch.setattr(mailer, "is_configured", lambda: True)
+    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html, timeout=30: sent.append(to))
+    class _Engine:
+        async def dispose(self):
+            pass
+    monkeypatch.setattr(send_digests, "AsyncSessionLocal", async_sessionmaker(db_session.bind, expire_on_commit=False, class_=AsyncSession))
+    monkeypatch.setattr(send_digests, "engine", _Engine())
+
+    # Only the user with an active ALERTS consent is emailed (none given, or withdrawn: digest file only)
+    assert await send_digests.main(send=True) == 0
+    assert sent == ["asha@example.com"]
+    out = capsys.readouterr().out
+    assert "@example.com" not in out
+    for user in (ravi, meera):
+        assert f"{user.id}:" in out
+    assert out.count("not emailed: no active ALERTS consent") == 2 and "3 digest(s) written, 1 emailed" in out
+    runs = (await db_session.execute(select(DigestRun).order_by(DigestRun.created_at))).scalars().all()
+    assert {r.user_id for r in runs if r.sent_at is not None} == {asha.id}
+
+    # A refused recipient: the SMTP error names the address, the printed line does not
+    def refuse(to, *a, **k):
+        raise smtplib.SMTPRecipientsRefused({to: (550, f"5.1.1 <{to}>: user unknown".encode())})
+    monkeypatch.setattr(mailer, "send", refuse)
+    assert await send_digests.main(send=True) == 1
+    out = capsys.readouterr().out
+    assert f"{asha.id}:" in out and "email FAILED: SMTPRecipientsRefused" in out and "@example.com" not in out
+
+    # run_all(send=True) keeps to the same rule
+    sent.clear()
+    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html, timeout=30: sent.append(to))
+    await digest_service.run_all(db_session, send=True)
+    assert sent == ["asha@example.com"]

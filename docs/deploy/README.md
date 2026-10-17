@@ -85,8 +85,13 @@ Inside a container `127.0.0.1` is the container itself: for an Ollama on the hos
 | Job | Default | Command |
 | --- | --- | --- |
 | `daily_job` | `SCHEDULE_DAILY_JOB=07:00` | `scripts/daily_job.py`: discover, UPSC, triage, drafts, radar (and digest files when `send_digests` is off) |
-| `send_digests` | `SCHEDULE_SEND_DIGESTS=mon 08:00` | `scripts/send_digests.py`; adds `--send` (email) only with `SCHEDULE_DIGEST_SEND=true` and SMTP settings |
+| `send_digests` | `SCHEDULE_SEND_DIGESTS=mon 08:00` | `scripts/send_digests.py`; adds `--send` (email) only with `SCHEDULE_DIGEST_SEND=true` and SMTP settings, and emails only users with an active `ALERTS` consent |
 | `triage` | `SCHEDULE_TRIAGE=` (off) | `scripts/triage_notices.py --apply`; the daily job already runs triage, so enable only for an extra pass |
+
+Email consent: `--send` emails a user only while they have an active `ALERTS` consent record
+(`backend/services/consent.py`); without one, or after it is withdrawn, the digest stays on the dashboard only.
+There is no consent screen or unsubscribe link yet, so until there is, `SCHEDULE_DIGEST_SEND=true` emails no one.
+The job's output names users by id, never by email address.
 
 A value is `HH:MM` (daily) or `mon HH:MM` (weekly); empty turns the job off. A digest covers what changed since
 the user's previous digest, so only one job writes digests: `send_digests` once a week while it is scheduled (the

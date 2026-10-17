@@ -54,7 +54,8 @@ class Settings(BaseSettings):
     SCHEDULE_DAILY_JOB: str = "07:00"
     SCHEDULE_SEND_DIGESTS: str = "mon 08:00"
     SCHEDULE_TRIAGE: str = ""
-    # The scheduled digest emails users only when true (and EMAIL_USERNAME / EMAIL_PASSWORD are set); else files only
+    # The scheduled digest emails users only when true (and EMAIL_USERNAME / EMAIL_PASSWORD are set), and then only users
+    # with an active ALERTS consent (services/digest.may_email); else files only
     SCHEDULE_DIGEST_SEND: bool = False
 
     STORAGE_PATH: str = str(PROJECT_ROOT / "storage")

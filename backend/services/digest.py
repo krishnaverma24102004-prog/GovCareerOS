@@ -18,7 +18,8 @@ VacancyRequirement (via EligibilityEvidence) or the sentences recorded with a no
 be cited is left out and listed in `omitted`; the digest never states anything it cannot cite.
 
 Files go to <storage>/digests/<user_id>/<IST date>.html (+ .txt, .json). Nothing is emailed from here
-unless send_run() is called explicitly.
+unless send_run() is called explicitly, and only to a user with an active ALERTS consent (services/consent.py):
+a user who never gave it, or withdrew it, still gets the digest on the dashboard but no email.
 """
 import asyncio
 import html
@@ -43,7 +44,7 @@ from govcareeros.backend.models.eligibility import EligibilityEvidence, Eligibil
 from govcareeros.backend.models.user import PersonalInfo, ProfileVersion, User
 from govcareeros.backend.models.vacancy import Vacancy, VacancyFieldProvenance, VacancyRequirement, VacancyVersion
 from govcareeros.backend.parsing.upsc_advertisement import IST
-from govcareeros.backend.services import change_log, mailer
+from govcareeros.backend.services import change_log, consent, mailer
 from govcareeros.backend.services.radar import AGE_HEADROOM_YEARS, _current_result, age_out_date
 
 DEFAULT_PERIOD = timedelta(days=7)
@@ -503,6 +504,12 @@ async def generate(session: AsyncSession, user: User, now: Optional[datetime] = 
     await session.flush()
     return digest, run
 
+# The consent purpose that covers emailing a user their digest
+EMAIL_CONSENT_PURPOSE = "ALERTS"
+
+async def may_email(session: AsyncSession, user_id: uuid.UUID) -> bool:
+    return await consent.active_consent(session, user_id, EMAIL_CONSENT_PURPOSE) is not None
+
 async def send_run(session: AsyncSession, run: DigestRun, to: str) -> None:
     """Email one stored digest. Raises mailer.MailerNotConfigured when SMTP credentials are not set."""
     subject = f"Your weekly government jobs digest: {run.item_count} item(s), {run.period_end.astimezone(IST).strftime('%d %b %Y')}"
@@ -513,14 +520,15 @@ async def send_run(session: AsyncSession, run: DigestRun, to: str) -> None:
     await session.flush()
 
 async def run_all(session: AsyncSession, now: Optional[datetime] = None, send: bool = False) -> List[DigestRun]:
-    """Digest for every active user with a profile. Emails only when send=True and the mailer is configured."""
+    """Digest for every active user with a profile. Emails only when send=True, the mailer is configured and the user
+    has an active ALERTS consent."""
     runs = []
     users = (await session.execute(select(User).where(User.is_active.is_(True)).order_by(User.email))).scalars().all()
     for user in users:
         if await latest_profile_version(session, user.id) is None:
             continue
         _, run = await generate(session, user, now)
-        if send:
+        if send and await may_email(session, user.id):
             await send_run(session, run, user.email)
         runs.append(run)
     return runs
