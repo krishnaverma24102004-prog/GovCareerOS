@@ -199,7 +199,13 @@ def test_scheduler_jobs_from_settings(monkeypatch):
     jobs = {j.name: j for j in scheduler.configured_jobs()}
     assert set(jobs) == {"daily_job", "send_digests"}  # triage is off by default: the daily job runs it
     assert jobs["daily_job"].argv[1].endswith("daily_job.py")
+    # the weekly job writes the digest, so the daily one does not (tests/ops/test_daily_job.py: the Monday sequence)
+    assert jobs["daily_job"].argv[2:] == ["--skip", "digest"]
     assert "--send" not in jobs["send_digests"].argv  # e-mail only when explicitly turned on
+    monkeypatch.setattr(settings, "SCHEDULE_SEND_DIGESTS", "")
+    jobs = {j.name: j for j in scheduler.configured_jobs()}
+    assert set(jobs) == {"daily_job"} and jobs["daily_job"].argv[2:] == []  # no weekly job: the daily job writes them
+    monkeypatch.setattr(settings, "SCHEDULE_SEND_DIGESTS", "mon 08:00")
 
     monkeypatch.setattr(settings, "SCHEDULE_DIGEST_SEND", True)
     monkeypatch.setattr(settings, "SCHEDULE_TRIAGE", "19:00")

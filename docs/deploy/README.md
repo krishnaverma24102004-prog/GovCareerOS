@@ -84,18 +84,20 @@ Inside a container `127.0.0.1` is the container itself: for an Ollama on the hos
 
 | Job | Default | Command |
 | --- | --- | --- |
-| `daily_job` | `SCHEDULE_DAILY_JOB=07:00` | `scripts/daily_job.py`: discover, UPSC, triage, drafts, radar, digest files |
+| `daily_job` | `SCHEDULE_DAILY_JOB=07:00` | `scripts/daily_job.py`: discover, UPSC, triage, drafts, radar (and digest files when `send_digests` is off) |
 | `send_digests` | `SCHEDULE_SEND_DIGESTS=mon 08:00` | `scripts/send_digests.py`; adds `--send` (email) only with `SCHEDULE_DIGEST_SEND=true` and SMTP settings |
 | `triage` | `SCHEDULE_TRIAGE=` (off) | `scripts/triage_notices.py --apply`; the daily job already runs triage, so enable only for an extra pass |
 
-A value is `HH:MM` (daily) or `mon HH:MM` (weekly); empty turns the job off. Runs missed while the container was
+A value is `HH:MM` (daily) or `mon HH:MM` (weekly); empty turns the job off. A digest covers what changed since
+the user's previous digest, so only one job writes digests: `send_digests` once a week while it is scheduled (the
+scheduler then runs the daily job with `--skip digest`), otherwise the daily job's digest step. Runs missed while the container was
 down are not caught up. The daily job keeps its own lock and its run log in `storage/logs/daily_job.jsonl`.
 
 Without the scheduler container, host cron works the same way:
 
 ```cron
 # m h dom mon dow  (server clock in UTC: 01:30 UTC = 07:00 IST)
-30 1 * * *  cd /srv/govcareeros && docker compose run --rm --no-deps scheduler python govcareeros/scripts/daily_job.py
+30 1 * * *  cd /srv/govcareeros && docker compose run --rm --no-deps scheduler python govcareeros/scripts/daily_job.py --skip digest
 30 2 * * 1  cd /srv/govcareeros && docker compose run --rm --no-deps scheduler python govcareeros/scripts/send_digests.py
 ```
 

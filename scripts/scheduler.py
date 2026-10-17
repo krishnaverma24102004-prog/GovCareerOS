@@ -3,7 +3,8 @@ A minimal in-container scheduler for the docker compose "scheduler" service (on 
 registers the daily job with Task Scheduler instead).
 
 Each job is one of the existing scripts, started as its own process at its configured time:
-  daily_job      scripts/daily_job.py            SCHEDULE_DAILY_JOB     (default "07:00")
+  daily_job      scripts/daily_job.py            SCHEDULE_DAILY_JOB     (default "07:00"); with --skip digest while
+                                                 send_digests is scheduled (see below)
   send_digests   scripts/send_digests.py         SCHEDULE_SEND_DIGESTS  (default "mon 08:00"); --send only when
                                                  SCHEDULE_DIGEST_SEND=true, otherwise digest files only
   triage         scripts/triage_notices.py --apply  SCHEDULE_TRIAGE     (default off: the daily job runs triage)
@@ -11,6 +12,10 @@ A time is "HH:MM" (every day) or "mon HH:MM" (weekly), at SCHEDULE_UTC_OFFSET (d
 DST, so a fixed offset is exact and the slim image needs no tz database). Jobs run one at a time, so they never
 overlap; a job still running when another is due delays it. A run missed while the container was down is not
 caught up (the daily job is idempotent and runs again the next day).
+
+A digest reports what changed since the user's previous digest. So the digest is written by one job only: by
+send_digests when it is scheduled (one digest a week, covering the week), otherwise by the daily job's digest step. If
+both wrote one, the Monday digest would cover the hour since the 07:00 run and never show the week's new matches.
 
     python govcareeros/scripts/scheduler.py            # run forever
     python govcareeros/scripts/scheduler.py --list     # print the schedule and next run times, then exit
@@ -65,7 +70,8 @@ def next_run(spec: str, after: datetime) -> datetime:
 def configured_jobs() -> List[Job]:
     py = sys.executable
     digests = [py, str(SCRIPTS / "send_digests.py")] + (["--send"] if settings.SCHEDULE_DIGEST_SEND else [])
-    jobs = [Job("daily_job", settings.SCHEDULE_DAILY_JOB, [py, str(SCRIPTS / "daily_job.py")]),
+    daily = [py, str(SCRIPTS / "daily_job.py")] + (["--skip", "digest"] if settings.SCHEDULE_SEND_DIGESTS.strip() else [])
+    jobs = [Job("daily_job", settings.SCHEDULE_DAILY_JOB, daily),
             Job("send_digests", settings.SCHEDULE_SEND_DIGESTS, digests),
             Job("triage", settings.SCHEDULE_TRIAGE, [py, str(SCRIPTS / "triage_notices.py"), "--apply"])]
     jobs = [j for j in jobs if j.spec.strip()]

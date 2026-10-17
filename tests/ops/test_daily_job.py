@@ -95,6 +95,34 @@ async def test_daily_job_radar_step_over_real_upsc_data(api, login, db_session):
     assert run_log.last_run()["status"] == "LOCKED" and len(run_log.read_runs(10)) == 3
 
 @pytest.mark.asyncio
+async def test_scheduled_monday_digest_keeps_the_weeks_matches(api, login, db_session):
+    """The compose scheduler starts the daily job at 07:00 and the weekly digest at mon 08:00. A digest reports what
+    changed since the user's previous digest, so if the daily job wrote one too, the 08:00 digest would cover a single
+    hour and never contain the week's new matches. Real UPSC Advt 11/2026 and 12/2026; argv as the scheduler builds it."""
+    from datetime import timedelta
+    from govcareeros.backend.services import digest
+    from govcareeros.scripts import scheduler
+
+    source = await get_or_create_source(db_session, upsc.UPSC_SOURCE)
+    for name in ("AdvtNo-11-2026-Engl-100926.pdf", "AdvtNo-12-2026-Engl-250926_0.pdf"):
+        await ingest_pdf_bytes(db_session, source, f"https://www.upsc.gov.in/sites/default/files/{name}", (UPSC / name).read_bytes())
+    await db_session.commit()
+    await api.put("/profile", json=law_profile("1993-06-01"), headers=await login("asha@example.com"))
+    factory = async_sessionmaker(db_session.bind, expire_on_commit=False, class_=AsyncSession)
+    jobs = {j.name: j for j in scheduler.configured_jobs()}
+    assert scheduler.next_run(jobs["daily_job"].spec, NOW) < scheduler.next_run(jobs["send_digests"].spec, NOW)
+
+    # 07:00 the daily job as scheduled (the steps that need the network or an LLM left out here)
+    local_only = ["--skip", "discover", "--skip", "upsc", "--skip", "drafts"]
+    assert await daily_job.main(list(jobs["daily_job"].argv[2:]) + local_only, session_factory=factory, now=NOW) == 0
+    # 08:00 send_digests (files only: no --send by default)
+    assert "--send" not in jobs["send_digests"].argv
+    runs = await digest.run_all(db_session, now=NOW + timedelta(hours=1))
+    await db_session.commit()
+    assert len(runs) == 1 and json.loads(runs[0].item_counts)["matches"] >= 1
+    assert len((await db_session.execute(select(digest.DigestRun))).scalars().all()) == 1
+
+@pytest.mark.asyncio
 async def test_admin_runs_is_reviewer_only(api, login, db_session, monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "STORAGE_PATH", str(tmp_path / "storage"))
     run_log.append_run({"run_id": "a", "steps": [{"name": "radar", "status": "error", "traceback": "Traceback ..."}]})
