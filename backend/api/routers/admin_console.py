@@ -139,7 +139,7 @@ class AuditPage(BaseModel):
     items: List[AuditRow]
 
 @router.get("/audit", response_model=AuditPage)
-async def audit_log(object_type: Optional[Literal["DRAFT", "NOTICE", "FACT", "USER", "SOURCE", "API_ORG", "API_KEY"]] = None,
+async def audit_log(object_type: Optional[Literal["DRAFT", "NOTICE", "FACT", "USER", "SOURCE", "API_ORG", "API_KEY", "API_WEBHOOK"]] = None,
                     object_id: Optional[uuid.UUID] = None, actor_id: Optional[uuid.UUID] = None,
                     action: Optional[str] = Query(None, max_length=40),
                     limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0, le=1_000_000),

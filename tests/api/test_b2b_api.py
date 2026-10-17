@@ -807,7 +807,8 @@ async def test_deactivated_orgs_and_disabled_webhooks_get_no_deliveries(api, adm
     assert (await api.post(f"/admin/api/webhooks/{first['id']}/disable", headers=member)).status_code == 403
     assert (await api.post(f"/admin/api/orgs/{org_id}/deactivate", headers=member)).status_code == 403
     listed = (await api.get(f"/admin/api/orgs/{org_id}/webhooks", headers=admin)).json()
-    assert [(w["url"], w["disabled_at"]) for w in listed] == [(HOOK_URL, None), ("https://two.example.net/hook", None)]
+    assert sorted((w["url"], w["disabled_at"]) for w in listed) == [("https://hooks.example.com/govcareeros", None),
+                                                                    ("https://two.example.net/hook", None)]
     r = await api.post(f"/admin/api/webhooks/{first['id']}/disable", headers=admin)
     assert r.status_code == 200 and r.json()["disabled_at"]
     client, wire = _client(["93.184.215.14"])
@@ -826,6 +827,8 @@ async def test_deactivated_orgs_and_disabled_webhooks_get_no_deliveries(api, adm
     assert statuses == ["CANCELLED", "DELIVERED"]
     audit = {(a.action, a.object_type) for a in (await db_session.execute(select(ReviewAuditLog))).scalars()}
     assert {("API_WEBHOOK_DISABLE", "API_WEBHOOK"), ("API_ORG_DEACTIVATE", "API_ORG")} <= audit
+    page = (await api.get("/admin/audit", params={"object_type": "API_WEBHOOK"}, headers=admin)).json()
+    assert [(a["action"], a["object_id"]) for a in page["items"]] == [("API_WEBHOOK_DISABLE", first["id"])]
 
 @pytest.mark.asyncio
 async def test_removed_webhook_and_earlier_events_are_not_delivered(api, new_key, db_session):
