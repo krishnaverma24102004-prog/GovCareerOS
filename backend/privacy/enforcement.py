@@ -129,7 +129,11 @@ def consent_clause(user_id_col, purposes: Iterable[str], profile_version_id_col=
             c.notice_version == notice.NOTICE_VERSION]
     if profile_version_id_col is not None:
         born_by = adult_born_by(today or date.today())
-        dob = select(PersonalInfo.date_of_birth).where(PersonalInfo.profile_version_id == profile_version_id_col).scalar_subquery()
+        # Correlated to the outer query's profile version, not to the consent_records EXISTS it sits in: auto-correlation
+        # only looks one level up, so without this the subquery read every version's DOB (Postgres: "more than one row
+        # returned by a subquery"; SQLite: silently the first row, i.e. someone else's DOB)
+        dob = (select(PersonalInfo.date_of_birth).where(PersonalInfo.profile_version_id == profile_version_id_col)
+               .correlate_except(PersonalInfo).scalar_subquery())
         cond.append(or_(dob.is_(None), dob <= datetime(born_by.year, born_by.month, born_by.day),
                         func.coalesce(func.trim(c.guardian_name), "") != ""))
     return exists().where(*cond)

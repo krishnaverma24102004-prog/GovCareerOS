@@ -200,6 +200,13 @@ def _outcome_statuses(outcomes: Sequence[rules.RuleOutcome], reqs: Sequence[rule
             out.setdefault(i, []).append(mapping[o.outcome])
     return {k: _worst(v) for k, v in out.items()}
 
+_CATEGORY_ORDER = ("UR", "GEN", "GENERAL", "EWS", "OBC", "SC", "ST", "PWBD", "ESM")
+
+def _category_rank(r) -> Tuple[int, str]:
+    v = _value(r)
+    cat = str(v.get("category") or "") if isinstance(v, dict) else ""
+    return (_CATEGORY_ORDER.index(cat.upper()) if cat.upper() in _CATEGORY_ORDER else len(_CATEGORY_ORDER), cat)
+
 def _eligibility_items(rows: Sequence, statuses: Dict[Any, str], urls: Dict[uuid.UUID, Optional[str]], default_url: Optional[str],
                        posts: Dict[uuid.UUID, ExamPost], personal: bool) -> List[Dict[str, Any]]:
     """One item per (post, requirement type, quote): e.g. the five category rows of one age-limit sentence are one item."""
@@ -212,10 +219,16 @@ def _eligibility_items(rows: Sequence, statuses: Dict[Any, str], urls: Dict[uuid
         post_id = getattr(r, "post_id", None)
         groups.setdefault((post_id, r.req_type, r.source_excerpt or str(r.id)), []).append(r)
 
+    # Rows of one notice sentence share page and insert time, so the database returns them in any order (Postgres
+    # does): order categories the way notices list them, not by row order
+    for group in groups.values():
+        group.sort(key=_category_rank)
+
     def sort_key(key):
         post_id, req_type, _ = key
         return (-1 if post_id is None else post_order.get(post_id, 10 ** 6),
-                order.index(req_type) if req_type in order else len(order), groups[key][0].source_page or 0)
+                order.index(req_type) if req_type in order else len(order), groups[key][0].source_page or 0,
+                _category_rank(groups[key][0]))
 
     items = []
     for key in sorted(groups, key=sort_key):
