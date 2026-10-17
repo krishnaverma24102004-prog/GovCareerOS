@@ -200,9 +200,10 @@ def check_reuse(profile: rules.ProfileSnapshot, by_kind: Dict[str, rules.Require
                     "this post", bar, evidence, "the same note keeps the ex-servicemen age relaxation" if v.get("age_relaxation_kept") else None)
     # RESERVATION_AVAILED: only a civil post secured through the ESM reservation counts
     lost = " and ".join(b.lower().replace("_", " ") for b in v.get("bars", ["RESERVATION"]))
-    if used is not True:
-        if used is False or secured is False:
-            return _out("ESM_RESERVATION_REUSE", OK, "no civil post secured through the ESM reservation", bar, evidence)
+    # "No civil post" settles it before any follow-up answer about that post is read
+    if secured is False or used is False:
+        return _out("ESM_RESERVATION_REUSE", OK, "no civil post secured through the ESM reservation", bar, evidence)
+    if used is None:
         return _out("ESM_RESERVATION_REUSE", CANNOT_DECIDE, "whether a civil post was secured through the ESM reservation is not stated", bar, evidence)
     groups = set(v.get("civil_post_groups") or [])
     if groups and group is None:

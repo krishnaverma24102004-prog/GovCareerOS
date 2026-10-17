@@ -39,6 +39,12 @@ const RELEASE_TYPES: [EsmReleaseType, string][] = [
   ["OTHER", "Other"],
 ];
 
+const CIVIL_POST_CLEARED: Partial<PersonalInfoFull> = {
+  esm_reservation_used: null,
+  esm_civil_post_group: null,
+  esm_undertaking_given: null,
+};
+
 type Tri = "" | "yes" | "no";
 const toTri = (v: boolean | null | undefined): Tri => (v == null ? "" : v ? "yes" : "no");
 const fromTri = (v: string): boolean | null => (v === "" ? null : v === "yes");
@@ -73,7 +79,9 @@ export function PersonalEditor({
   onChange: (v: PersonalInfoFull) => void;
   onReset: () => void;
 }) {
-  const set = <K extends keyof PersonalInfoFull>(k: K, v: PersonalInfoFull[K]) => onChange({ ...value, [k]: v });
+  // Answering anything but "yes" to the civil-post question clears its follow-ups, which the API rejects beside a "no"
+  const set = <K extends keyof PersonalInfoFull>(k: K, v: PersonalInfoFull[K]) =>
+    onChange({ ...value, [k]: v, ...(k === "esm_civil_post_secured" && v !== true ? CIVIL_POST_CLEARED : {}) });
   const err = (k: keyof PersonalInfoFull) => errors[`personal_info.${k}`];
 
   const text = (k: keyof PersonalInfoFull, label: string, kind: "text" | "date" | "number" | "textarea" = "text", wide = false) => (
@@ -170,7 +178,7 @@ export function PersonalEditor({
             {text("esm_release_date", "Released on (or expected end of engagement if still serving)", "date")}
             {choice("esm_release_type", "How you left the Armed Forces", RELEASE_TYPES)}
             {question("esm_civil_post_secured", "Since release, hold a regular civil post under the Central Govt?")}
-            {(value.esm_civil_post_secured || value.esm_reservation_used != null) && (
+            {value.esm_civil_post_secured === true && (
               <>
                 {question("esm_reservation_used", "Was that post secured through the ex-servicemen reservation?")}
                 {choice("esm_civil_post_group", "Group of that civil post", [["A", "Group A"], ["B", "Group B"], ["C", "Group C"], ["D", "Group D"]])}

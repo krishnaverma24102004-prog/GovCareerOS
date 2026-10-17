@@ -248,6 +248,14 @@ def test_ssc_reuse_bar_follows_the_2014_om_as_the_notice_quotes_it():
     assert reuse(esm_civil_post_secured=False).outcome == "OK"
     assert reuse().outcome == "CANNOT_DECIDE"
 
+def test_no_civil_post_settles_the_reuse_bar_whatever_the_follow_up_answers_say():
+    """'No civil post' outranks a stale 'secured through the ESM reservation' answer, on SSC and UPSC rows alike."""
+    stale = _person(esm_release_type="RETIRED_WITH_PENSION", esm_release_date=date(2015, 1, 1), esm_civil_post_secured=False,
+                    esm_reservation_used=True, esm_civil_post_group="C", esm_undertaking_given=False)
+    assert _section(stale)["ESM_RESERVATION_REUSE"].outcome == "OK"
+    closing = _upsc12().fields["application_deadline"].value.astimezone(IST).date()
+    assert {o.check: o for o in esm.check_esm(stale, _law_officer_rows(), closing, closing)}["ESM_RESERVATION_REUSE"].outcome == "OK"
+
 def test_upsc_reuse_bar_and_a_notice_without_one():
     parsed = _upsc12()
     closing = parsed.fields["application_deadline"].value.astimezone(IST).date()
@@ -296,6 +304,12 @@ async def test_exam_result_has_a_separate_esm_section(api, login, db_session):
     h = await login("esm-test@example.com")
     r = await api.put("/profile", json={"personal_info": {**ESM_PERSON, "esm_release_date": "2004-01-01"}, "education": TWELFTH}, headers=h)
     assert r.status_code == 422  # released before enrolment
+    # Answers about a civil post contradict "no civil post since release"
+    r = await api.put("/profile", json={"personal_info": {**ESM_PERSON, "esm_civil_post_secured": False}, "education": TWELFTH}, headers=h)
+    assert r.status_code == 422 and "esm_civil_post_secured" in r.text
+    no_post = {**ESM_PERSON, "esm_civil_post_secured": False, "esm_reservation_used": None, "esm_civil_post_group": None,
+               "esm_undertaking_given": None}
+    assert (await api.put("/profile", json={"personal_info": no_post, "education": TWELFTH}, headers=h)).status_code == 201
     profile = (await api.put("/profile", json={"personal_info": ESM_PERSON, "education": TWELFTH}, headers=h)).json()
     info = profile["personal_info"]
     assert (info["esm_release_date"], info["esm_release_type"], info["esm_civil_post_group"]) == ("2021-06-30", "RETIRED_WITH_PENSION", "C")
