@@ -46,7 +46,8 @@ function VacancyView({ id }: { id: string }) {
       }
       setVersionNumber(profile.version.version_number);
       try {
-        const q = `vacancy_id=${id}&profile_version_id=${profile.version.id}&limit=1`;
+        // Only a result the present engine gives for this vacancy as it now stands; an older one is evaluated again
+        const q = `vacancy_id=${id}&profile_version_id=${profile.version.id}&limit=1&current=true`;
         const [stored] = await api<Eligibility[]>(`/eligibility?${q}`);
         setElig(
           stored ??

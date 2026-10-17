@@ -365,7 +365,8 @@ async def test_exam_result_has_a_separate_esm_section(api, login, db_session):
 @pytest.mark.asyncio
 async def test_a_result_stored_before_the_esm_section_is_not_current(api, login, db_session, monkeypatch):
     """A decision stored by the engine before the ESM section (hard_eligibility/3: no ESM rows, service months only as
-    stated) must not be served as current once the section exists: gaps (and radar, by the same fingerprint) recompute."""
+    stated) must not be served as current once the section exists: gaps (and radar, by the same fingerprint) recompute,
+    and the vacancy page, which asks for the current result (current=true), evaluates again instead of showing it."""
     source = await get_or_create_source(db_session, upsc.UPSC_SOURCE)
     await ingest_pdf_bytes(db_session, source, f"https://www.upsc.gov.in/sites/default/files/{UPSC_12}", (FIXTURES / "upsc" / UPSC_12).read_bytes())
     await db_session.commit()
@@ -388,11 +389,19 @@ async def test_a_result_stored_before_the_esm_section_is_not_current(api, login,
     await db_session.commit()
     assert (await api.get(f"/eligibility/{old_id}", headers=h)).json()["esm_status"] is None
 
+    # The vacancy page's query: the stored history keeps the old result, the current one is not it
+    listed = f"/eligibility?vacancy_id={vacancy.id}&profile_version_id={version}&limit=1"
+    assert [r["id"] for r in (await api.get(listed, headers=h)).json()] == [old_id]
+    assert (await api.get(f"{listed}&current=true", headers=h)).json() == []
+
     gaps = (await api.get(f"/gaps?profile_version_id={version}&vacancy_id={vacancy.id}", headers=h)).json()
     assert gaps["eligibility_result_id"] != old_id
     fresh = (await api.get(f"/eligibility/{gaps['eligibility_result_id']}", headers=h)).json()
     assert fresh["engine_version"] == rules.ENGINE_VERSION and fresh["esm_status"] == "FAILS"
     assert [e["check_name"] for e in fresh["esm"]] == ["ESM_STATUS", "ESM_RELEASE", "ESM_AGE", "ESM_RESERVATION_REUSE"]
+    assert [r["id"] for r in (await api.get(f"{listed}&current=true", headers=h)).json()] == [fresh["id"]]
+    # Currency is judged against one vacancy's present requirements
+    assert (await api.get("/eligibility?current=true", headers=h)).status_code == 422
 
 @pytest.mark.asyncio
 async def test_vacancy_result_has_a_separate_esm_section_and_gaps_stay_current(api, login, db_session):
