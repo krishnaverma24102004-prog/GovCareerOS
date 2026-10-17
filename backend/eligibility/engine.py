@@ -89,6 +89,18 @@ def input_fingerprint(vacancy: Vacancy, reqs: List[rules.Requirement], as_of: Op
              *certificate_check.fingerprint_part(reqs, as_of)]
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
+def hard_outcomes(snapshot: rules.ProfileSnapshot, reqs: List[rules.Requirement], vacancy: Vacancy) -> List[rules.RuleOutcome]:
+    """The hard checks of one vacancy (no database, nothing stored); evaluate() stores them, other views only read them."""
+    # Indian notifications state dates in IST; the calendar date there is what counts
+    crucial_dt = vacancy.eligibility_crucial_date or vacancy.application_deadline
+    crucial = crucial_dt.astimezone(IST).date() if crucial_dt else None
+    outcomes = rules.evaluate(snapshot, reqs, crucial, vacancy.recruitment_mode)
+    if vacancy.eligibility_crucial_date is None and vacancy.application_deadline is not None:
+        outcomes.append(rules.RuleOutcome("CRUCIAL_DATE", "NOT_EVALUATED",
+                                          "the notice text used does not state a crucial date; the closing date was used for age and experience",
+                                          "-", f"closing date {crucial.isoformat()}"))
+    return outcomes
+
 async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id: uuid.UUID, vacancy_id: uuid.UUID) -> EligibilityResult:
     version = await session.get(ProfileVersion, profile_version_id)
     if version is None or version.user_id != user_id:
@@ -99,15 +111,8 @@ async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id
 
     snapshot = await load_profile_snapshot(session, profile_version_id)
     reqs = await load_requirements(session, vacancy_id)
-    # Indian notifications state dates in IST; the calendar date there is what counts
     crucial_dt = vacancy.eligibility_crucial_date or vacancy.application_deadline
-    crucial = crucial_dt.astimezone(IST).date() if crucial_dt else None
-
-    outcomes = rules.evaluate(snapshot, reqs, crucial, vacancy.recruitment_mode)
-    if vacancy.eligibility_crucial_date is None and vacancy.application_deadline is not None:
-        outcomes.append(rules.RuleOutcome("CRUCIAL_DATE", "NOT_EVALUATED",
-                                          "the notice text used does not state a crucial date; the closing date was used for age and experience",
-                                          "-", f"closing date {crucial.isoformat()}"))
+    outcomes = hard_outcomes(snapshot, reqs, vacancy)
     status, confidence = rules.overall_status(outcomes)
     # Separate section, after the verdict so it cannot change status/confidence (see certificate_check)
     closing = vacancy.application_deadline.astimezone(IST).date() if vacancy.application_deadline else None

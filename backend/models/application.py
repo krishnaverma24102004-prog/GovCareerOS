@@ -37,6 +37,17 @@ class ApplicationRequirement(Base, TimestampMixin):
     source_excerpt: Mapped[Optional[str]] = mapped_column(Text)
     parser_version: Mapped[str] = mapped_column(String(100))
 
+class ApplicationRequirementParse(Base, TimestampMixin):
+    """The deterministic parse the document's ApplicationRequirement rows come from: parser version and what it could not
+    find (e.g. "certificate clause not found: obc"), so a page built from the rows can say what is missing."""
+    __tablename__ = "application_requirement_parses"
+    __table_args__ = (UniqueConstraint("raw_document_id", name="uq_application_requirement_parses_raw_document_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    raw_document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("raw_documents.id", name="fk_application_requirement_parses_raw_document_id"))
+    parser_version: Mapped[str] = mapped_column(String(100))
+    warnings: Mapped[str] = mapped_column(Text, default="[]")  # JSON list of the parser's own warning strings
+
 class Application(Base, TimestampMixin):
     """A user's own application tracker entry, for a stored vacancy, a stored exam, or (free text) an exam not in the database."""
     __tablename__ = "applications"
