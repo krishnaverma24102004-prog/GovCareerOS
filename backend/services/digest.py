@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from govcareeros.backend.config.settings import settings
 from govcareeros.backend.eligibility import engine as eligibility_engine
 from govcareeros.backend.eligibility import rules
-from govcareeros.backend.privacy import enforcement
+from govcareeros.backend.privacy import enforcement, notice
 from govcareeros.backend.models.alert import UserAlert
 from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.digest import DigestRun
@@ -489,7 +489,9 @@ def run_file(run: DigestRun, suffix: str = ".html") -> Path:
     return (settings.storage_dir / run.file_path).with_suffix(suffix)
 
 async def generate(session: AsyncSession, user: User, now: Optional[datetime] = None, since: Optional[datetime] = None) -> Tuple[Digest, DigestRun]:
-    """Build the digest, write .html/.txt/.json and record a DigestRun. Does not send anything."""
+    """Build the digest, write .html/.txt/.json and record a DigestRun. Does not send anything.
+    Digests are the ALERTS purpose: without active ALERTS consent this raises enforcement.ConsentRequired (403)."""
+    await enforcement.require_for_user(session, user.id, notice.ALERTS)
     digest = await build_digest(session, user.id, now, since)
     rel = Path("digests") / str(user.id) / f"{digest.period_end.astimezone(IST).date().isoformat()}.html"
     path = settings.storage_dir / rel
@@ -506,7 +508,9 @@ async def generate(session: AsyncSession, user: User, now: Optional[datetime] = 
     return digest, run
 
 async def send_run(session: AsyncSession, run: DigestRun, to: str) -> None:
-    """Email one stored digest. Raises mailer.MailerNotConfigured when SMTP credentials are not set."""
+    """Email one stored digest. Raises mailer.MailerNotConfigured when SMTP credentials are not set, and
+    enforcement.ConsentRequired when the person's ALERTS consent is no longer active."""
+    await enforcement.require_for_user(session, run.user_id, notice.ALERTS)
     subject = f"Your weekly government jobs digest: {run.item_count} item(s), {run.period_end.astimezone(IST).strftime('%d %b %Y')}"
     await asyncio.to_thread(mailer.send, to, subject, run_file(run, ".txt").read_text(encoding="utf-8"),
                             run_file(run, ".html").read_text(encoding="utf-8"))
@@ -515,11 +519,12 @@ async def send_run(session: AsyncSession, run: DigestRun, to: str) -> None:
     await session.flush()
 
 async def run_all(session: AsyncSession, now: Optional[datetime] = None, send: bool = False) -> List[DigestRun]:
-    """Digest for every active user with a profile. Emails only when send=True and the mailer is configured."""
+    """Digest for every active user with a profile and active ALERTS consent (none is written or sent for anyone else).
+    Emails only when send=True and the mailer is configured."""
     runs = []
     users = (await session.execute(select(User).where(User.is_active.is_(True)).order_by(User.email))).scalars().all()
     for user in users:
-        if await latest_profile_version(session, user.id) is None:
+        if await latest_profile_version(session, user.id) is None or not await enforcement.allowed_for_user(session, user.id, notice.ALERTS):
             continue
         _, run = await generate(session, user, now)
         if send:

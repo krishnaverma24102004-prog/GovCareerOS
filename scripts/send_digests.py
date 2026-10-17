@@ -1,5 +1,6 @@
 """
-Weekly job: write a cited digest for every active user with a profile; email it only with --send.
+Weekly job: write a cited digest for every active user with a profile and active ALERTS consent; email it only with
+--send.
 
     $env:PYTHONPATH="C:\\Users\\krishna"
     python govcareeros/scripts/send_digests.py          # write storage/digests/<user_id>/<date>.html (+ .txt, .json)

@@ -87,18 +87,22 @@ async def api(db_session):
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
         yield client
 
+# What the signup consent screen records when the person ticks eligibility checks, alerts/digests and resumes
+DEFAULT_CONSENTS = ("ELIGIBILITY_CHECK", "ALERTS", "RESUME")
+
 @pytest.fixture
 def login(api):
-    """Register + log in a user; returns the Authorization header. Like the signup screen, it then gives ELIGIBILITY_CHECK
-    consent through the API (consent=False skips that, for tests of consent itself)."""
+    """Register + log in a user; returns the Authorization header. Like the signup screen with those purposes ticked,
+    it then gives the DEFAULT_CONSENTS through the API. consent=False gives none (tests of consent itself); a list of
+    purposes gives just those."""
     async def _login(email, password="correct-horse-battery", consent=True):
         r = await api.post("/auth/register", json={"email": email, "password": password, "full_name": email.split("@")[0]})
         assert r.status_code == 201, r.text
         r = await api.post("/auth/login", json={"email": email, "password": password})
         assert r.status_code == 200, r.text
         headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
-        if consent:
-            await give_consent_api(api, headers)
+        for purpose in (DEFAULT_CONSENTS if consent is True else consent or ()):
+            await give_consent_api(api, headers, purpose)
         return headers
     return _login
 

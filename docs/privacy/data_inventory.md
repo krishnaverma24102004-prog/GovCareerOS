@@ -67,8 +67,12 @@ relevance, resume builder) refuses; the radar and digest skip the person; the ap
 results are kept and remain visible and exportable to the person; nothing is deleted silently. To delete, the person
 clears the fields or erases the account.
 
-ALERTS, RESUME and OPERATOR_ASSISTED_APPLICATION consents are recorded and withdrawable, but not yet enforced in
-the alert sending, resume and operator flows.
+ALERTS consent is required for every alert and digest: without it the radar still keeps eligibility results current
+(under ELIGIBILITY_CHECK) but writes no alert, `digest.run_all` / `scripts/send_digests.py` write and send no digest,
+`POST /digest/generate` and `digest.send_run` refuse with 403 `CONSENT_REQUIRED`.
+
+RESUME and OPERATOR_ASSISTED_APPLICATION consents are recorded and withdrawable, but not yet enforced in the resume
+and operator flows.
 
 ## Under 18
 

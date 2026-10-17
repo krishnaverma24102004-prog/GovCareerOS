@@ -309,6 +309,43 @@ async def test_reviewers_see_a_minors_claims_only_under_guardian_consent(api, lo
     await db_session.commit()
     assert (await api.get("/review/facts", headers=reviewer)).json()["total"] == 0
 
+LAW_PROFILE_AT_LIMIT = {**PROFILE, "personal_info": {**PROFILE["personal_info"], "date_of_birth": "1993-06-01"},
+                        "experience": [{"organization": "Test Chambers", "designation": "Legal Associate", "domain": "Legal",
+                                        "start_date": "2017-01-01"}]}
+BEFORE_CLOSING = datetime(2026, 10, 1, tzinfo=timezone.utc)   # Advt 12/2026 closes 16 Oct 2026
+
+@pytest.mark.asyncio
+async def test_alerts_and_digests_need_alerts_consent(api, login, db_session, monkeypatch):
+    from govcareeros.backend.services import digest, mailer, radar
+    await _law_officer(db_session)
+    h = await login("c10@test.invalid", consent=["ELIGIBILITY_CHECK"])
+    assert (await api.put("/profile", json=LAW_PROFILE_AT_LIMIT, headers=h)).status_code == 201
+    user_id = (await db_session.execute(select(User.id).where(User.email == "c10@test.invalid"))).scalar_one()
+    sent = []
+    monkeypatch.setattr(mailer, "send", lambda to, *a, **k: sent.append(to))   # no real email
+
+    # No ALERTS consent: results are still kept current, but nothing is alerted, written as a digest or emailed
+    run = await radar.run_radar(db_session, now=BEFORE_CLOSING, user_ids=[user_id])
+    assert run.evaluations >= 1 and run.alerts_created == {}
+    assert (await api.get("/alerts", headers=h)).json() == []
+    assert await digest.run_all(db_session, now=BEFORE_CLOSING, send=True) == [] and sent == []
+    r = await api.post("/digest/generate", headers=h)
+    assert r.status_code == 403 and r.json()["detail"]["purpose"] == "ALERTS"
+
+    # With ALERTS consent: alerted, and the digest is written and sent
+    assert (await _consent(api, h, purpose="ALERTS")).status_code == 201
+    run = await radar.run_radar(db_session, now=BEFORE_CLOSING, user_ids=[user_id])
+    assert run.alerts_created.get("NEW_MATCH", 0) >= 1
+    runs = await digest.run_all(db_session, now=BEFORE_CLOSING, send=True)
+    assert [x.user_id for x in runs] == [user_id] and sent == ["c10@test.invalid"]
+
+    # Withdrawn: no further digest or email, not even for a digest written earlier
+    assert (await api.delete("/privacy/consents/ALERTS", headers=h)).json()["withdrawn"] == 1
+    assert await digest.run_all(db_session, now=BEFORE_CLOSING, send=True) == [] and sent == ["c10@test.invalid"]
+    with pytest.raises(enforcement.ConsentRequired):
+        await digest.send_run(db_session, runs[0], "c10@test.invalid")
+    assert sent == ["c10@test.invalid"]
+
 # ---------- age gate ----------
 
 @pytest.mark.asyncio
@@ -468,7 +505,7 @@ def test_crypto_refuses_missing_wrong_or_tampered_keys(monkeypatch, field_encryp
 @pytest.mark.asyncio
 async def test_export_returns_all_the_users_data_decrypted(api, login, db_session):
     vacancy_id = await _law_officer(db_session)
-    h = await login("exp@test.invalid")
+    h = await login("exp@test.invalid", consent=["ELIGIBILITY_CHECK"])
     v1 = (await api.put("/profile", json=PROFILE, headers=h)).json()["version"]["id"]
     await api.post("/eligibility", json={"profile_version_id": v1, "vacancy_id": str(vacancy_id)}, headers=h)
     other = await login("other@test.invalid")
@@ -492,7 +529,7 @@ async def test_export_returns_all_the_users_data_decrypted(api, login, db_sessio
 @pytest.mark.asyncio
 async def test_erase_closes_the_account_then_the_due_erase_deletes_the_data(api, login, db_session):
     vacancy_id = await _law_officer(db_session)
-    h = await login("erase@test.invalid")
+    h = await login("erase@test.invalid", consent=["ELIGIBILITY_CHECK"])
     await _consent(api, h, purpose="ALERTS")
     v1 = (await api.put("/profile", json=PROFILE, headers=h)).json()["version"]["id"]
     await api.post("/eligibility", json={"profile_version_id": v1, "vacancy_id": str(vacancy_id)}, headers=h)

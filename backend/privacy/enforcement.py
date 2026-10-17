@@ -16,7 +16,7 @@ from sqlalchemy import and_, exists, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.models.consent import ConsentRecord
-from govcareeros.backend.models.user import PersonalInfo
+from govcareeros.backend.models.user import PersonalInfo, ProfileVersion
 from govcareeros.backend.privacy import notice
 from govcareeros.backend.services.consent import active_consent
 
@@ -152,6 +152,21 @@ async def version_date_of_birth(session: AsyncSession, profile_version_id: uuid.
 async def require_for_version(session: AsyncSession, user_id: uuid.UUID, profile_version_id: uuid.UUID) -> None:
     """Eligibility processing of one profile version: active consent, and guardian consent if that version is a minor's."""
     await require_consent(session, user_id, notice.ELIGIBILITY_CHECK, await version_date_of_birth(session, profile_version_id))
+
+async def require_for_user(session: AsyncSession, user_id: uuid.UUID, purpose: str, items: Iterable[str] = ()) -> None:
+    """Processing for `purpose` that is not tied to one profile version (alerts, digests): active consent, and guardian
+    consent if the latest profile version is a minor's."""
+    latest = (await session.execute(select(ProfileVersion.id).where(ProfileVersion.user_id == user_id)
+                                    .order_by(ProfileVersion.version_number.desc()).limit(1))).scalar_one_or_none()
+    dob = await version_date_of_birth(session, latest) if latest else None
+    await require_consent(session, user_id, purpose, dob, items)
+
+async def allowed_for_user(session: AsyncSession, user_id: uuid.UUID, purpose: str) -> bool:
+    try:
+        await require_for_user(session, user_id, purpose)
+    except ConsentRequired:
+        return False
+    return True
 
 async def allowed_for_version(session: AsyncSession, user_id: uuid.UUID, profile_version_id: uuid.UUID) -> bool:
     try:
