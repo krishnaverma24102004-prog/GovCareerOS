@@ -20,6 +20,10 @@ Personal statuses come from the existing deterministic code, never an LLM:
     UNKNOWN -> UNKNOWN, NOT_REQUIRED -> no status; fee EXEMPT / PAY -> OK (the detail says which), UNKNOWN -> UNKNOWN.
   - dates, uploads, photo_id and portal apply to everyone: no status.
 
+Page status: CLOSED when an official notice cancelled it; NOT_YET_OPEN before the application window opens (the record's
+application_start, else the notice's stated opening date); OPEN until the closing date, CLOSED after it; UNKNOWN when
+no closing date is known.
+
 Labels are Hinglish; quotes stay in the notice's own English.
 """
 import html
@@ -144,12 +148,14 @@ async def _urls(session: AsyncSession, ids: Iterable[Optional[uuid.UUID]]) -> Di
     ids = {i for i in ids if i}
     return dict((await session.execute(select(RawDocument.id, RawDocument.url).where(RawDocument.id.in_(ids)))).all()) if ids else {}
 
-def _status(deadline: Optional[datetime], cancelled: bool, now: datetime) -> str:
+def _status(start: Optional[datetime], deadline: Optional[datetime], cancelled: bool, now: datetime) -> str:
     if cancelled:
         return "CLOSED"
+    if start is not None and now < start:
+        return "NOT_YET_OPEN"
     if deadline is None:
         return "UNKNOWN"
-    return "OPEN" if now.astimezone(IST) <= deadline.astimezone(IST) else "CLOSED"
+    return "OPEN" if now <= deadline else "CLOSED"
 
 # ---------- eligibility ----------
 
@@ -351,7 +357,8 @@ def _sections(rows: Sequence[ApplicationRequirement], cite, checklist: Optional[
 # ---------- assembly ----------
 
 async def _common(session: AsyncSession, *, kind: str, record, title: str, organization: Optional[str], advt: Optional[str],
-                  deadline: Optional[datetime], cancelled: bool, rows: List[ApplicationRequirement], eligibility: List[Dict[str, Any]],
+                  start: Optional[datetime], deadline: Optional[datetime], cancelled: bool, rows: List[ApplicationRequirement],
+                  eligibility: List[Dict[str, Any]],
                   checklist: Optional[Dict[str, Any]], cert_outcomes, deadline_ev: Optional[change_log.Evidence],
                   attribution_out, now: Optional[datetime]) -> Dict[str, Any]:
     urls = await _urls(session, [r.raw_document_id for r in rows] + [record.raw_document_id])
@@ -381,11 +388,17 @@ async def _common(session: AsyncSession, *, kind: str, record, title: str, organ
     if cancelled:
         warnings.append(f"this {kind} was cancelled by an official notice")
 
+    if start is None:
+        # The record's own opening date first (as parsed with the notice); else the one the general instructions state
+        stated_start = next((_value(r)["at"] for r in rows if r.req_type == "KEY_DATE" and r.code == "APPLICATION_START"), None)
+        start = datetime.fromisoformat(stated_start) if stated_start else None
+        start = start if start is None or start.tzinfo else start.replace(tzinfo=IST)
+
     sections = _sections(rows, cite, checklist, cert_outcomes, deadline_item, eligibility)
     return {
         "kind": kind, "id": str(record.id), "title": title, "organization": organization, "advertisement_number": advt,
-        "document_url": document_url, "status": _status(deadline, cancelled, now or datetime.now(timezone.utc)),
-        "deadline": deadline.isoformat() if deadline else None,
+        "document_url": document_url, "status": _status(start, deadline, cancelled, now or datetime.now(timezone.utc)),
+        "application_start": start.isoformat() if start else None, "deadline": deadline.isoformat() if deadline else None,
         "sections": [{"key": k, "title": t, "items": sections[k]} for k, t in SECTIONS],
         "warnings": warnings, "disclaimer": DISCLAIMER, "attribution": attribution_out,
     }
@@ -420,7 +433,8 @@ async def vacancy_page(session: AsyncSession, vacancy_id: uuid.UUID, user_id: Op
     _, deadline_ev = await change_log.vacancy_current_evidence(session, vacancy, "application_deadline")
     return await _common(
         session, kind="vacancy", record=vacancy, title=vacancy.post_name, organization=vacancy.organization,
-        advt=vacancy.advertisement_number, deadline=vacancy.application_deadline, cancelled=vacancy.status == "CANCELLED",
+        advt=vacancy.advertisement_number, start=vacancy.application_start, deadline=vacancy.application_deadline,
+        cancelled=vacancy.status == "CANCELLED",
         rows=rows, eligibility=eligibility, checklist=checklist, cert_outcomes=cert_outcomes, deadline_ev=deadline_ev,
         attribution_out=(await attribution.for_vacancies(session, [vacancy]))[0], now=now)
 
@@ -457,7 +471,7 @@ async def exam_page(session: AsyncSession, exam_id: uuid.UUID, user_id: Optional
     _, deadline_ev = await change_log.exam_current_evidence(session, exam, "application_end")
     return await _common(
         session, kind="exam", record=exam, title=exam.name, organization=exam.conducting_body, advt=exam.external_ref,
-        deadline=exam.application_end, cancelled=exam.status == "CANCELLED", rows=rows, eligibility=eligibility,
+        start=exam.application_start, deadline=exam.application_end, cancelled=exam.status == "CANCELLED", rows=rows, eligibility=eligibility,
         checklist=checklist, cert_outcomes=cert_outcomes, deadline_ev=deadline_ev,
         attribution_out=(await attribution.for_exams(session, [exam]))[0], now=now)
 
@@ -465,13 +479,14 @@ async def exam_page(session: AsyncSession, exam_id: uuid.UUID, user_id: Optional
 
 _STATUS_LABELS = {OK: "Theek hai", FAILS: "Yogya nahi", NEEDS_DOCUMENT: "Document chahiye", CANNOT_DECIDE: "Tay nahi ho saka",
                   UNKNOWN: "Profile mein jaankari nahi"}
-_PAGE_STATUS = {"OPEN": "Aavedan khula hai", "CLOSED": "Aavedan band ho chuka hai", "UNKNOWN": "Aavedan ki sthiti pata nahi"}
+_PAGE_STATUS = {"OPEN": "Aavedan khula hai", "CLOSED": "Aavedan band ho chuka hai", "NOT_YET_OPEN": "Aavedan abhi shuru nahi hua",
+                "UNKNOWN": "Aavedan ki sthiti pata nahi"}
 _CSS = """
 :root{--fg:#1d1d1f;--muted:#5f6368;--line:#d9d9de;--bg:#fff;--ok:#1e7a3a;--bad:#b3261e;--warn:#8a5a00;--info:#2a5db0}
 *{box-sizing:border-box}body{margin:0;padding:24px 16px;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:860px;margin:0 auto}h1{font-size:1.5rem;margin:0 0 4px}h2{font-size:1.1rem;margin:28px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--line)}
 .meta{color:var(--muted);margin:0 0 12px}.pill{display:inline-block;padding:2px 10px;border-radius:999px;border:1px solid currentColor;font-size:.85rem;font-weight:600}
-.OPEN{color:var(--ok)}.CLOSED{color:var(--bad)}.UNKNOWN{color:var(--muted)}
+.OPEN{color:var(--ok)}.CLOSED{color:var(--bad)}.NOT_YET_OPEN{color:var(--warn)}.UNKNOWN{color:var(--muted)}
 ul.items{list-style:none;margin:0;padding:0}li.item{padding:10px 0;border-bottom:1px solid var(--line);break-inside:avoid}
 .label{font-weight:600}.detail{margin:2px 0}.s-OK{color:var(--ok)}.s-FAILS{color:var(--bad)}.s-NEEDS_DOCUMENT{color:var(--warn)}
 .s-CANNOT_DECIDE{color:var(--warn)}.s-UNKNOWN{color:var(--muted)}blockquote{margin:6px 0 0;padding:4px 10px;border-left:3px solid var(--line);color:var(--muted);font-size:.9rem}
@@ -490,11 +505,12 @@ def _link(url: Optional[str], page: Optional[int]) -> Optional[str]:
 
 def render_html(page: Dict[str, Any]) -> str:
     """The same data as the JSON, as one self-contained printable page (no scripts, no external files)."""
-    deadline = _ist(page["deadline"])
+    deadline, opens = _ist(page["deadline"]), _ist(page.get("application_start"))
     head = [f"<h1>{_e(page['title'])}</h1>",
             "<p class=meta>" + " · ".join(_e(x) for x in (page.get("organization"), f"Advt / File: {page['advertisement_number']}"
                                                         if page.get("advertisement_number") else None) if x) + "</p>",
             f"<p><span class=\"pill {_e(page['status'])}\">{_e(_PAGE_STATUS[page['status']])}</span>"
+            + (f" &nbsp;Aavedan shuru: <strong>{_e(opens)}</strong>" if opens and page["status"] == "NOT_YET_OPEN" else "")
             + (f" &nbsp;Antim tithi: <strong>{_e(deadline)}</strong>" if deadline else "") + "</p>"]
     doc = _link(page.get("document_url"), None)
     if doc:

@@ -239,6 +239,13 @@ async def test_ssc_chsl_2026_page(api, db_session):
 
     assert (await apply_ready.exam_page(db_session, exam.id, now=BEFORE_CLOSING))["status"] == "OPEN"
     assert (await apply_ready.exam_page(db_session, exam.id, now=datetime(2026, 10, 7, 23, 1, tzinfo=IST)))["status"] == "CLOSED"
+    # Applications open on 07.09.2026: before that the page does not say "open"
+    before = await apply_ready.exam_page(db_session, exam.id, now=datetime(2026, 9, 1, 12, 0, tzinfo=IST))
+    assert before["status"] == "NOT_YET_OPEN" and datetime.fromisoformat(before["application_start"]) == datetime(2026, 9, 7, tzinfo=IST)
+    printable = apply_ready.render_html(before)
+    assert "Aavedan abhi shuru nahi hua" in printable and "Aavedan shuru: <strong>07 Sep 2026</strong>" in printable
+    assert "Aavedan khula hai" not in printable
+    assert (await apply_ready.exam_page(db_session, exam.id, now=datetime(2026, 9, 7, 0, 0, tzinfo=IST)))["status"] == "OPEN"
 
 @pytest.mark.asyncio
 async def test_ssc_je_2026_page(api, login, db_session):

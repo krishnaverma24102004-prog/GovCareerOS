@@ -42,7 +42,9 @@ class ApplyReadyOut(BaseModel):
     organization: Optional[str]
     advertisement_number: Optional[str]
     document_url: Optional[str]
-    status: Literal["OPEN", "CLOSED", "UNKNOWN"]
+    # NOT_YET_OPEN: before the application window opens (application_start)
+    status: Literal["OPEN", "CLOSED", "NOT_YET_OPEN", "UNKNOWN"]
+    application_start: Optional[datetime]
     deadline: Optional[datetime]
     sections: List[SectionOut]
     warnings: List[str]
