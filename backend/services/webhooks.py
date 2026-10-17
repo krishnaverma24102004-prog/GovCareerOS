@@ -27,7 +27,7 @@ import re
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import httpx
@@ -212,8 +212,11 @@ async def _post(client: httpx.AsyncClient, url: str, body: bytes, headers: Dict[
     async with client.stream("POST", url, content=body, headers=headers) as resp:
         return resp
 
-async def _attempt(client: httpx.AsyncClient, d: WebhookDelivery, hook: Webhook, event: ApiEvent, now: datetime) -> str:
-    """Send one claimed delivery and record its outcome on `d`; the count it falls under."""
+async def _attempt(client: httpx.AsyncClient, d: WebhookDelivery, hook: Webhook, event: ApiEvent,
+                   clock: Callable[[], datetime]) -> str:
+    """Send one claimed delivery and record its outcome on `d`; the count it falls under. Signed with the time it is
+    sent (not the batch's start), so it is fresh for the receiver's replay check however long the batch takes."""
+    now = d.last_attempt_at = clock()
     reason = url_refusal(hook.url)
     if reason:
         d.status, d.next_attempt_at, d.error = "REFUSED", None, reason
@@ -242,13 +245,18 @@ async def _attempt(client: httpx.AsyncClient, d: WebhookDelivery, hook: Webhook,
     return "FAILED" if d.status == "FAILED" else "RETRY"
 
 async def deliver_due(session: AsyncSession, client: Optional[httpx.AsyncClient] = None, now: Optional[datetime] = None,
-                      limit: int = 200) -> Dict[str, int]:
+                      limit: int = 200, clock: Optional[Callable[[], datetime]] = None) -> Dict[str, int]:
     """Send the PENDING deliveries whose time has come, one at a time. Counts by outcome.
 
     Each delivery is claimed (committed) before it is sent and its outcome committed right after, so dispatchers
     running at the same time never send one delivery twice, and nothing sent is sent again because a later one
-    failed. Each attempt has TIMEOUT_SECONDS in all; the answer's body is not read."""
-    now = now or datetime.now(timezone.utc)
+    failed. Each attempt has TIMEOUT_SECONDS in all; the answer's body is not read.
+
+    `now` decides what is due. `clock` gives the time of each attempt: its signature timestamp, last_attempt_at,
+    delivered_at and the start of its backoff. It is the wall clock, or `now` itself when a caller (a test) sets `now`."""
+    if clock is None:
+        clock = (lambda: now) if now is not None else (lambda: datetime.now(timezone.utc))
+    now = now or clock()
     due = (await session.execute(
         select(WebhookDelivery.id).where(WebhookDelivery.status == "PENDING", WebhookDelivery.next_attempt_at <= now)
         .order_by(WebhookDelivery.next_attempt_at, WebhookDelivery.event_seq).limit(limit))).scalars().all()
@@ -257,13 +265,13 @@ async def deliver_due(session: AsyncSession, client: Optional[httpx.AsyncClient]
     client = client or make_client()
     try:
         for delivery_id in due:
-            if not await _claim(session, delivery_id, now, now):
+            if not await _claim(session, delivery_id, now, clock()):
                 continue
             d, hook, event = (await session.execute(
                 select(WebhookDelivery, Webhook, ApiEvent).join(Webhook, Webhook.id == WebhookDelivery.webhook_id)
                 .join(ApiEvent, ApiEvent.seq == WebhookDelivery.event_seq).where(WebhookDelivery.id == delivery_id)
                 .execution_options(populate_existing=True))).one()
-            counts[await _attempt(client, d, hook, event, now)] += 1
+            counts[await _attempt(client, d, hook, event, clock)] += 1
             await session.commit()
     finally:
         if owns:

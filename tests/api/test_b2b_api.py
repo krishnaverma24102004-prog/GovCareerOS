@@ -657,6 +657,40 @@ async def test_slow_or_endless_receivers_do_not_hold_up_delivery(api, new_key, d
     assert by_hook[ids[1]].status == by_hook[ids[2]].status == "DELIVERED"
 
 @pytest.mark.asyncio
+async def test_each_delivery_is_signed_when_it_is_sent(api, new_key, db_session):
+    """A slow batch: every receiver takes 200 s (on a test clock). A delivery late in the batch is signed when it
+    goes out, so it passes the 300 s replay check that a signature from the batch's start would fail."""
+    key, _, _ = await new_key(["webhooks:manage"])
+    urls = (HOOK_URL, "https://two.example.net/hook", "https://three.example.net/hook")
+    secrets = {}
+    for u in urls:
+        secrets[httpx.URL(u).host] = (await api.post("/api/v1/webhooks", json={"url": u}, headers={"X-API-Key": key})).json()["secret"]
+    await cgl_exam(db_session)
+    await b2b_events.collect(db_session)
+    t0 = datetime(2026, 10, 6, 6, 0, tzinfo=timezone.utc)
+    assert await webhooks.enqueue(db_session, now=t0) == 3
+    await db_session.commit()
+
+    clock = [t0]
+    arrivals = []
+
+    def route(request):
+        arrivals.append((request, clock[0]))
+        clock[0] += timedelta(seconds=200)
+        return httpx.Response(200)
+    client, wire = _client(["93.184.215.14"], route=route)
+    async with client:
+        assert (await webhooks.deliver_due(db_session, client, now=t0, clock=lambda: clock[0]))["DELIVERED"] == 3
+    assert [arrived for _, arrived in arrivals] == [t0, t0 + timedelta(seconds=200), t0 + timedelta(seconds=400)]
+    for request, arrived in arrivals:
+        header = request.headers["X-GovCareerOS-Signature"]
+        assert header.startswith(f"t={int(arrived.timestamp())},")
+        assert webhooks.verify_signature(secrets[request.url.host], header, request.content, now=arrived.timestamp())
+    last = (await db_session.execute(select(WebhookDelivery).where(
+        WebhookDelivery.id == uuid.UUID(arrivals[-1][0].headers["X-GovCareerOS-Delivery"])))).scalar_one()
+    assert last.last_attempt_at == last.delivered_at == t0 + timedelta(seconds=400)
+
+@pytest.mark.asyncio
 async def test_overlapping_dispatchers_never_send_a_delivery_twice(api, new_key, db_session):
     await _three_hooks(api, new_key, db_session, (HOOK_URL, "https://two.example.net/hook", "https://three.example.net/hook"))
     other = async_sessionmaker(db_session.bind, expire_on_commit=False, class_=AsyncSession)()
