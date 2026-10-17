@@ -12,7 +12,8 @@ class ReviewAuditLog(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", name="fk_review_audit_log_actor_id_users"), index=True)
-    # e.g. DRAFT_APPROVE, DRAFT_REJECT, NOTICE_SKIP, NOTICE_NOT_REQUIRED, NOTICE_REQUEUE, FACT_VERIFY, FACT_REJECT, REVIEWER_GRANT
+    # e.g. DRAFT_APPROVE, DRAFT_REJECT, NOTICE_SKIP, NOTICE_NOT_REQUIRED, NOTICE_REQUEUE, FACT_VERIFY, FACT_REJECT, REVIEWER_GRANT,
+    # FACT_CARRY_OVER (a profile save carried a decision to an unchanged certificate; actor = the saving user)
     action: Mapped[str] = mapped_column(String(40), index=True)
     # DRAFT, NOTICE, FACT, USER
     object_type: Mapped[str] = mapped_column(String(20))

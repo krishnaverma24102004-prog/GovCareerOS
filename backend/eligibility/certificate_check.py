@@ -15,6 +15,9 @@ Certificate section of an eligibility result (vacancy or exam), kept apart from 
     if the hard verdict relied on a category relaxation, it must then be re-checked as UR. OK with
     `verified` false is the candidate's own word until a reviewer verifies the certificate.
   * No CERTIFICATE rows extracted for the notice -> no section (nothing is assumed about certificates).
+  * The section is judged on today's date in IST (as_of: whether a wrong certificate can still be replaced before
+    the closing date). When the notice has CERTIFICATE rows, that date is part of the result's input fingerprint
+    (fingerprint_part), so a stored result is reused only on the day it was judged and a re-run is reproducible.
 """
 import uuid
 from dataclasses import dataclass
@@ -28,6 +31,7 @@ from govcareeros.backend.eligibility import certificates, rules
 from govcareeros.backend.eligibility.certificate_types import CertificateKind, CertificateRequirement, HeldCertificate
 from govcareeros.backend.models.fact import Fact
 from govcareeros.backend.models.user import ReservationCertificate
+from govcareeros.backend.parsing.upsc_advertisement import IST
 from govcareeros.backend.services.profile_service import CERTIFICATE_PREDICATE, CERTIFICATE_SUBJECT, certificate_fact_value
 
 CHECK = "CERTIFICATE"
@@ -92,6 +96,13 @@ def claim_for(kind: CertificateKind, profile: rules.ProfileSnapshot, held: Dict[
         return None if flag is None else (kind.value if flag else "NONE")
     # The profile records no domicile claim; holding a domicile certificate is the only sign of one
     return CertificateKind.DOMICILE.value if held.get(kind) else None
+
+def today() -> date:
+    return datetime.now(IST).date()
+
+def fingerprint_part(reqs: Sequence[rules.Requirement], as_of: Optional[date]) -> List[str]:
+    """The as_of date, for the input fingerprint of a result whose notice has CERTIFICATE rows; nothing otherwise."""
+    return [f"certificates as of {(as_of or today()).isoformat()}"] if any(r.req_type == REQ_TYPE for r in reqs) else []
 
 def check_certificates(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Requirement],
                        held: Dict[CertificateKind, List[HeldRecord]], closing: Optional[date],

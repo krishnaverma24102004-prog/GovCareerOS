@@ -1,5 +1,5 @@
 """
-Builds AttributionOut for vacancies, exams and exam versions in a few batched queries (never one per row).
+Builds AttributionOut for vacancies, exams, exam versions and deputation circulars in a few batched queries (never one per row).
 Everything comes from stored rows: the source registry entry, the RawDocument and the field provenance.
 """
 import uuid
@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.models.artifact import RawDocument
+from govcareeros.backend.models.deputation import DeputationCircular
 from govcareeros.backend.models.exam import Exam, ExamFieldProvenance
 from govcareeros.backend.models.exam_version import ExamVersion
 from govcareeros.backend.models.notice import RecruitmentNotice
@@ -73,3 +74,14 @@ async def for_exam_versions(session: AsyncSession, exam: Exam, versions: Sequenc
     # A version's document is the corrigendum/notice itself; which of its pages is cited lives in `details`
     found_on = await _notice_pages(session, (v.notice_id for v in versions))
     return await _build(session, [_Ref(exam.source_id, v.raw_document_id, found_on.get(v.notice_id), None) for v in versions])
+
+async def for_deputation_circulars(session: AsyncSession, rows: Sequence[DeputationCircular]) -> List[Optional[AttributionOut]]:
+    # The circular is its whole document; the listing page is the one a RecruitmentNotice found it on, if any
+    doc_ids = [r.raw_document_id for r in rows]
+    sources = dict((await session.execute(
+        select(RawDocument.id, RawDocument.source_id).where(RawDocument.id.in_(doc_ids)))).all()) if doc_ids else {}
+    found_on = dict((await session.execute(
+        select(RecruitmentNotice.raw_document_id, RecruitmentNotice.found_on_url).where(
+            RecruitmentNotice.raw_document_id.in_(doc_ids)))).all()) if doc_ids else {}
+    return await _build(session, [_Ref(sources.get(r.raw_document_id), r.raw_document_id, found_on.get(r.raw_document_id), None)
+                                  for r in rows])

@@ -32,7 +32,7 @@ import hashlib
 import re
 import uuid
 from dataclasses import replace
-from datetime import date, datetime, timezone
+from datetime import date, timezone
 from typing import List, Optional, Sequence, Tuple
 
 from sqlalchemy import select
@@ -260,9 +260,10 @@ def check_exam_education(profile: rules.ProfileSnapshot, reqs: Sequence[rules.Re
 def _day(dt) -> Optional[date]:
     return dt.astimezone(IST).date() if dt else None
 
-def input_fingerprint(exam: Exam, post_id, reqs: List[rules.Requirement]) -> str:
+def input_fingerprint(exam: Exam, post_id, reqs: List[rules.Requirement], as_of: Optional[date] = None) -> str:
     parts = [ENGINE_VERSION, str(post_id or "-"), *(d.astimezone(timezone.utc).isoformat() if d else "-" for d in
-             (exam.age_crucial_date, exam.education_cutoff_date, exam.application_end)), *sorted(str(r.id) for r in reqs)]
+             (exam.age_crucial_date, exam.education_cutoff_date, exam.application_end)), *sorted(str(r.id) for r in reqs),
+             *certificate_check.fingerprint_part(reqs, as_of)]
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
 _STATUS_RANK = {"ELIGIBLE": 4, "CONDITIONAL": 3, "MANUAL_REVIEW": 2, "INELIGIBLE": 1}
@@ -330,12 +331,13 @@ async def evaluate_exam(session: AsyncSession, user_id: uuid.UUID, profile_versi
                                           "-", f"closing date {closing.isoformat()}"))
     status, confidence = rules.overall_status(outcomes)
     # Separate section, after the verdict so it cannot change status/confidence (see certificate_check)
+    as_of = certificate_check.today()
     outcomes += certificate_check.check_certificates(snapshot, reqs, await certificate_check.load_held(session, profile_version_id),
-                                                     closing, datetime.now(IST).date())
+                                                     closing, as_of)
     result = ExamEligibilityResult(
         id=uuid.uuid4(), user_id=user_id, exam_id=exam_id, post_id=post_id, profile_version_id=profile_version_id,
         engine_version=ENGINE_VERSION, crucial_date=exam.age_crucial_date or exam.application_end, status=status,
-        confidence=confidence, input_fingerprint=input_fingerprint(exam, post_id, reqs),
+        confidence=confidence, input_fingerprint=input_fingerprint(exam, post_id, reqs, as_of),
     )
     session.add(result)
     for o in outcomes:
