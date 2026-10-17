@@ -76,6 +76,10 @@ async def verify_notice(
     ocr: bool = Form(True, description="read up to a few scanned pages of the PDF by OCR (slower)"),
     session: AsyncSession = Depends(get_session),
 ):
+    return await run_check(session, text, url, file, ocr)
+
+async def run_check(session: AsyncSession, text: Optional[str], url: Optional[str], file: Optional[UploadFile], ocr: bool) -> VerifyOut:
+    """The check itself; also served to API-key holders as POST /api/v1/verify."""
     pdf = None  # status codes as numbers: their Starlette constant names changed across versions
     if file is not None and file.filename:
         pdf = await file.read(notice_verifier.MAX_PDF_BYTES + 1)

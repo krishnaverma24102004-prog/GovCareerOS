@@ -23,3 +23,4 @@ from govcareeros.backend.models.exam_version import ExamVersion
 from govcareeros.backend.models.consent import ConsentRecord
 from govcareeros.backend.models.deputation import DeputationCircular
 from govcareeros.backend.models.operator import OperatorReport, ClaimToken, BillingPrice, LedgerEntry
+from govcareeros.backend.models.b2b import ApiOrg, ApiKey, ApiUsage, ApiEvent, Webhook, WebhookDelivery

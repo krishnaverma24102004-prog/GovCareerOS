@@ -15,7 +15,7 @@ class ReviewAuditLog(Base):
     # e.g. DRAFT_APPROVE, DRAFT_REJECT, NOTICE_SKIP, NOTICE_NOT_REQUIRED, NOTICE_REQUEUE, FACT_VERIFY, FACT_REJECT, REVIEWER_GRANT,
     # FACT_CARRY_OVER (a profile save carried a decision to an unchanged certificate; actor = the saving user)
     action: Mapped[str] = mapped_column(String(40), index=True)
-    # DRAFT, NOTICE, FACT, USER
+    # DRAFT, NOTICE, FACT, USER, SOURCE, API_ORG, API_KEY, API_WEBHOOK
     object_type: Mapped[str] = mapped_column(String(20))
     object_id: Mapped[uuid.UUID] = mapped_column()
     note: Mapped[Optional[str]] = mapped_column(Text)

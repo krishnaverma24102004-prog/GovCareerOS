@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     PRIVACY_GRIEVANCE_CONTACT: str = ""
     # Days between an erasure request and the hard erase (the person may cancel by contacting the grievance officer)
     ERASURE_GRACE_DAYS: int = 30
+    # B2B API (/api/v1): requests per minute per key when the key sets none. In-process token bucket (one per API
+    # process), so N worker processes allow up to N times this; see backend/services/api_keys.py
+    B2B_RATE_LIMIT_PER_MINUTE: int = 60
 
     @property
     def storage_dir(self) -> Path:

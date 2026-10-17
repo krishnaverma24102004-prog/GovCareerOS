@@ -1,5 +1,5 @@
 """
-Builds AttributionOut for vacancies, exams, exam versions and deputation circulars in a few batched queries (never one per row).
+Builds AttributionOut for vacancies, exams, exam versions, notices and deputation circulars in a few batched queries (never one per row).
 Everything comes from stored rows: the source registry entry, the RawDocument and the field provenance.
 """
 import uuid
@@ -85,3 +85,8 @@ async def for_deputation_circulars(session: AsyncSession, rows: Sequence[Deputat
             RecruitmentNotice.raw_document_id.in_(doc_ids)))).all()) if doc_ids else {}
     return await _build(session, [_Ref(sources.get(r.raw_document_id), r.raw_document_id, found_on.get(r.raw_document_id), None)
                                   for r in rows])
+
+async def for_notices(session: AsyncSession, notices: Sequence[RecruitmentNotice]) -> List[Optional[AttributionOut]]:
+    """A notice link: the page it was found on, and its document once downloaded (else document_url is the link itself)."""
+    built = await _build(session, [_Ref(n.source_id, n.raw_document_id, n.found_on_url, None) for n in notices])
+    return [a.model_copy(update={"document_url": a.document_url or n.url}) if a else None for n, a in zip(notices, built)]

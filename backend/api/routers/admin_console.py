@@ -172,7 +172,7 @@ async def set_reuse_policy(source_id: uuid.UUID, body: ReusePolicyIn, user: User
     if source is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "source not found")
     if body.reuse_level != "UNKNOWN" and body.copyright_policy_url is None:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "a reuse level needs the copyright_policy_url it was read from")
+        raise HTTPException(422, "a reuse level needs the copyright_policy_url it was read from")
     before = {"reuse_level": source.reuse_level, "copyright_policy_url": source.copyright_policy_url}
     source.reuse_level = body.reuse_level
     source.copyright_policy_url = body.copyright_policy_url
@@ -200,7 +200,7 @@ class AuditPage(BaseModel):
     items: List[AuditRow]
 
 @router.get("/audit", response_model=AuditPage)
-async def audit_log(object_type: Optional[Literal["DRAFT", "NOTICE", "FACT", "USER", "SOURCE"]] = None,
+async def audit_log(object_type: Optional[Literal["DRAFT", "NOTICE", "FACT", "USER", "SOURCE", "API_ORG", "API_KEY", "API_WEBHOOK"]] = None,
                     object_id: Optional[uuid.UUID] = None, actor_id: Optional[uuid.UUID] = None,
                     action: Optional[str] = Query(None, max_length=40),
                     limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0, le=1_000_000),
