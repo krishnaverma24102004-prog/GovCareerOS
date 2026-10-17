@@ -31,9 +31,10 @@ from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 
 from govcareeros.backend.documents.pdf_text import PageText
+from govcareeros.backend.parsing.esm_clauses import parse_esm_clauses
 from govcareeros.backend.parsing.upsc_advertisement import IST, ParsedField, ParsedRequirement, Provenance
 
-PARSER_VERSION = "ssc_exam_notice/2"
+PARSER_VERSION = "ssc_exam_notice/3"  # /2: CAPF running-text layout (lehar3/ssc-capf); /3: + ESM_RULE rows (parsing/esm_clauses.py)
 CONDUCTING_BODY = "Staff Selection Commission"
 
 # Conventional SSC short codes; a label for display and matching, not a fact taken from the notice
@@ -505,6 +506,8 @@ def parse_exam_notice(pages: List[PageText]) -> ParsedExam:
             p.requirements += _post_age_rows(p, limits[p.post_key], years, cited)
         elif limits:
             warnings.append(f"no age limit stated for post {p.post_name}")
+    # Ex-servicemen status, release, crucial-date and re-use clauses (ESM_RULE rows, eligibility/esm.py)
+    reqs += parse_esm_clauses(text, doc.prov, warnings)
 
     m = _EDU_HEAD_RE.search(text)
     closing_head = None if m else _EDU_HEAD_CLOSING_RE.search(text)

@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from govcareeros.backend.documents.pdf_text import PageText
 from govcareeros.backend.parsing.recruitment_mode import detect_recruitment_mode, govt_service_requirement
 
-PARSER_VERSION = "upsc_advertisement/4"
+PARSER_VERSION = "upsc_advertisement/5"  # /5: ESM_RULE row for the p.22 NOTE (parsing/esm_clauses.py)
 IST = timezone(timedelta(hours=5, minutes=30))
 
 _UNITS = {
@@ -264,6 +264,9 @@ def _parse_general_rules(doc: _PagedText, warnings: List[str]) -> List[ParsedReq
         }, False, doc.prov(m.start(), m.end(), "Concessions & Relaxations")))
     else:
         warnings.append("ex-servicemen age relaxation not found")
+    # The NOTE after the ex-servicemen relaxation: no ESM reservation once a Central Govt civil post is held
+    from govcareeros.backend.parsing.esm_clauses import parse_esm_clauses  # esm_clauses imports this module
+    rules += parse_esm_clauses(text, doc.prov, warnings)
 
     m = _CGS_RE.search(text)
     if m:

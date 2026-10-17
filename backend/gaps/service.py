@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from govcareeros.backend.eligibility import engine as eligibility_engine, rules
+from govcareeros.backend.eligibility import engine as eligibility_engine, esm, rules
 from govcareeros.backend.gaps.engine import ENGINE_VERSION, compute_gaps
 from govcareeros.backend.models.eligibility import EligibilityResult, MatchScore, SkillGap
 from govcareeros.backend.models.user import ProfileVersion, Skill
@@ -29,8 +29,9 @@ from govcareeros.backend.parsing.upsc_advertisement import IST
 from govcareeros.backend.relevance import scoring, service as relevance_service
 
 def _signature(rows) -> List[Tuple[str, str, str]]:
-    # Certificate rows are a separate section (eligibility.certificate_check) that gaps do not explain
-    return sorted((r[0], r[1], str(r[2]) if r[2] else "") for r in rows if r[0] not in ("CRUCIAL_DATE", "CERTIFICATE"))
+    # Certificate and ex-servicemen rows are separate sections (eligibility.certificate_check / esm) that gaps do not explain
+    return sorted((r[0], r[1], str(r[2]) if r[2] else "") for r in rows
+                  if r[0] not in ("CRUCIAL_DATE", "CERTIFICATE") and not esm.is_esm_check(r[0]))
 
 async def _current_result(session: AsyncSession, user_id, profile_version_id, vacancy: Vacancy,
                           reqs: List[rules.Requirement]) -> Optional[EligibilityResult]:

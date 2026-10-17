@@ -23,7 +23,9 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from govcareeros.backend.parsing.upsc_advertisement import words_to_number
 
-ENGINE_VERSION = "hard_eligibility/3"
+# Part of every input fingerprint, so a newer engine makes stored results stale (gaps, radar and digest recompute).
+# /4: ex-servicemen section (eligibility/esm.py) stored with the result; ESM service months from enrolment/release dates
+ENGINE_VERSION = "hard_eligibility/4"
 
 # ---------- plain inputs ----------
 
@@ -67,6 +69,18 @@ class ProfileSnapshot:
     current_level_regular_since: Optional[date] = None
     organisation_cadre: Optional[str] = None
     last_deputation_end: Optional[date] = None
+    # Ex-servicemen / Agniveer (eligibility/esm.py); release date is expected, not actual, while STILL_SERVING
+    esm_service_branch: Optional[str] = None
+    esm_enrolment_date: Optional[date] = None
+    esm_release_date: Optional[date] = None
+    esm_release_type: Optional[str] = None
+    esm_rank: Optional[str] = None
+    esm_civil_post_secured: Optional[bool] = None
+    esm_civil_post_government: Optional[str] = None
+    esm_reservation_used: Optional[bool] = None
+    esm_civil_post_group: Optional[str] = None
+    esm_undertaking_given: Optional[bool] = None
+    is_agniveer: Optional[bool] = None
 
 @dataclass
 class Requirement:
@@ -74,6 +88,7 @@ class Requirement:
     req_type: str
     value: object  # dict for AGE_MAX / AGE_RELAXATION / RESERVATION, text otherwise
     source_page: Optional[int] = None
+    source_quote: Optional[str] = None  # the notice's own words for the row (shown by the ESM section)
 
 @dataclass
 class RuleOutcome:
@@ -189,6 +204,34 @@ class RelaxationOption:
     note: Optional[str] = None
     missing: Optional[str] = None  # profile field that would settle an UNKNOWN option
 
+def military_service_months(profile: ProfileSnapshot, until: Optional[date]) -> Optional[int]:
+    """Armed Forces service as the profile states it, else completed months from enrolment to release, counted no
+    further than `until`. Without a release date the service runs on to `until` only for a candidate STILL_SERVING;
+    for anyone else it is unknown (None), never assumed to have lasted up to the crucial date."""
+    if profile.armed_forces_service_months is not None:
+        return profile.armed_forces_service_months
+    start, end = profile.esm_enrolment_date, profile.esm_release_date
+    if end is None and profile.esm_release_type == "STILL_SERVING":
+        end = until
+    if start is None or end is None:
+        return None
+    if until is not None and end > until:
+        end = until
+    return max(0, (end.year - start.year) * 12 + end.month - start.month - (end.day < start.day))
+
+def attested_service(profile: ProfileSnapshot, until: Optional[date], need: int) -> Tuple[str, str]:
+    """`need` months' continuous service after attestation (UPSC Advt 12/2026 p.21) -> (OK | NO | UNKNOWN, evidence).
+    Attestation follows recruit training, so months counted from the enrolment date only bound that service from
+    above: below `need` they settle NO, otherwise only the service months the profile states do."""
+    stated = profile.armed_forces_service_months
+    if stated is not None:
+        return ("OK", f"{stated} months service") if stated >= need else ("NO", f"{stated} months service < {need}")
+    bound = military_service_months(profile, until)
+    if bound is not None and bound < need:
+        return "NO", f"{bound} months from enrolment < {need}, so service after attestation is less too"
+    return "UNKNOWN", "armed forces service after attestation not stated" + (
+        f" ({bound} months from enrolment include recruit training before attestation)" if bound is not None else "")
+
 def _service_years(start: Optional[date], until: date) -> Optional[float]:
     return None if start is None else (until - start).days / 365.25
 
@@ -235,20 +278,20 @@ def relaxation_options(profile: ProfileSnapshot, reqs: Sequence[Requirement], ca
     exsm = general.get("EX_SERVICEMEN")
     if exsm:
         need = exsm.value.get("min_service_months_after_attestation")
+        served, served_text = attested_service(profile, crucial, need) if need else ("OK", None)
         if profile.is_ex_serviceman is False:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO", "profile: not an ex-serviceman", exsm.source_page))
         elif profile.is_ex_serviceman is None:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "ex-serviceman status not stated", exsm.source_page,
                                             missing="is_ex_serviceman"))
-        elif need and profile.armed_forces_service_months is None:
-            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", "armed forces service months not stated", exsm.source_page,
+        elif served == "UNKNOWN":
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "UNKNOWN", served_text, exsm.source_page,
                                             missing="armed_forces_service_months"))
-        elif need and profile.armed_forces_service_months < need:
-            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO",
-                                            f"{profile.armed_forces_service_months} months service < {need}", exsm.source_page))
+        elif served == "NO":
+            options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "NO", served_text, exsm.source_page))
         else:
             options.append(RelaxationOption("EX_SERVICEMEN", exsm.value["years"], "OK",
-                                            f"ex-serviceman, {profile.armed_forces_service_months} months service", exsm.source_page,
+                                            "ex-serviceman" + (f", {served_text}" if served_text else ""), exsm.source_page,
                                             "needs a release certificate from the Defence Forces"))
 
     cgs = general.get("CENTRAL_GOVT_SERVANT")

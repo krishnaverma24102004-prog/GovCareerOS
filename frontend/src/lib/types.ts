@@ -169,6 +169,9 @@ export interface Eligibility {
   crucial_date: string | null;
   created_at: string;
   evidence: EligibilityEvidence[];
+  /** Ex-servicemen / Agniveer section (never counted in status); empty when the profile claims neither */
+  esm?: EligibilityEvidence[];
+  esm_status?: string | null;
 }
 
 export interface Relevance {

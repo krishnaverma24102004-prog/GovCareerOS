@@ -4,7 +4,7 @@
  * is sent when it changes, because a sent section replaces the stored one.
  */
 import type { Citizenship } from "@/lib/types";
-import type { PersonalInfoFull } from "@/lib/types-profile-editor";
+import type { EsmBranch, EsmReleaseType, PersonalInfoFull } from "@/lib/types-profile-editor";
 
 import { Field, FieldMessages, TextInput, inputClass, type FieldErrors } from "./fields";
 
@@ -19,6 +19,33 @@ const CITIZENSHIP: [Citizenship, string][] = [
 
 const CATEGORIES = ["UR", "EWS", "OBC", "SC", "ST"];
 
+const BRANCHES: [EsmBranch, string][] = [
+  ["ARMY", "Army"],
+  ["NAVY", "Navy"],
+  ["AIR_FORCE", "Air Force"],
+  ["TERRITORIAL_ARMY", "Territorial Army"],
+];
+// The first five are the release routes the notices' definition of "ex-serviceman" lists
+const RELEASE_TYPES: [EsmReleaseType, string][] = [
+  ["RETIRED_WITH_PENSION", "Retired / relieved / discharged after earning pension"],
+  ["MEDICAL_DISABILITY_PENSION", "Relieved on medical grounds with medical/disability pension"],
+  ["REDUCTION_IN_ESTABLISHMENT", "Released as a result of reduction in establishment"],
+  ["COMPLETED_ENGAGEMENT_GRATUITY", "Released after the term of engagement, with gratuity"],
+  ["RECRUIT_BOARDED_OUT_MEDICAL", "Ex-recruit boarded out on medical grounds with disability pension"],
+  ["OWN_REQUEST_WITHOUT_PENSION", "Left at own request without pension"],
+  ["DISMISSED", "Dismissed"],
+  ["DISCHARGED_MISCONDUCT_INEFFICIENCY", "Discharged for misconduct or inefficiency"],
+  ["STILL_SERVING", "Still serving (give the expected release date)"],
+  ["OTHER", "Other"],
+];
+
+const CIVIL_POST_CLEARED: Partial<PersonalInfoFull> = {
+  esm_civil_post_government: null,
+  esm_reservation_used: null,
+  esm_civil_post_group: null,
+  esm_undertaking_given: null,
+};
+
 type Tri = "" | "yes" | "no";
 const toTri = (v: boolean | null | undefined): Tri => (v == null ? "" : v ? "yes" : "no");
 const fromTri = (v: string): boolean | null => (v === "" ? null : v === "yes");
@@ -29,7 +56,16 @@ const numOrRaw = (v: string): number | string | null => {
   return Number.isFinite(n) ? n : v;
 };
 
-type BoolKey = "is_pwbd" | "is_ex_serviceman" | "is_central_govt_employee" | "is_state_govt_employee";
+type BoolKey =
+  | "is_pwbd"
+  | "is_ex_serviceman"
+  | "is_central_govt_employee"
+  | "is_state_govt_employee"
+  | "esm_civil_post_secured"
+  | "esm_reservation_used"
+  | "esm_undertaking_given"
+  | "is_agniveer";
+type ChoiceKey = "esm_service_branch" | "esm_release_type" | "esm_civil_post_government" | "esm_civil_post_group";
 
 export function PersonalEditor({
   value,
@@ -44,7 +80,9 @@ export function PersonalEditor({
   onChange: (v: PersonalInfoFull) => void;
   onReset: () => void;
 }) {
-  const set = <K extends keyof PersonalInfoFull>(k: K, v: PersonalInfoFull[K]) => onChange({ ...value, [k]: v });
+  // Answering anything but "yes" to the civil-post question clears its follow-ups, which the API rejects beside a "no"
+  const set = <K extends keyof PersonalInfoFull>(k: K, v: PersonalInfoFull[K]) =>
+    onChange({ ...value, [k]: v, ...(k === "esm_civil_post_secured" && v !== true ? CIVIL_POST_CLEARED : {}) });
   const err = (k: keyof PersonalInfoFull) => errors[`personal_info.${k}`];
 
   const text = (k: keyof PersonalInfoFull, label: string, kind: "text" | "date" | "number" | "textarea" = "text", wide = false) => (
@@ -66,6 +104,21 @@ export function PersonalEditor({
       </select>
     </Field>
   );
+
+  const choice = (k: ChoiceKey, label: string, options: [string, string][]) => (
+    <Field label={label} errors={err(k)}>
+      <select className={inputClass(!!err(k)?.length)} value={value[k] ?? ""} onChange={(e) => set(k, (e.target.value || null) as never)}>
+        <option value="">Not answered</option>
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+  const esmShown =
+    !!value.is_ex_serviceman || !!value.esm_release_type || !!value.esm_release_date || !!err("esm_release_date") || !!err("esm_release_type");
 
   return (
     <fieldset className="space-y-4 rounded border border-slate-200 bg-white p-4">
@@ -117,7 +170,26 @@ export function PersonalEditor({
           text("disability_types", "Disability sub-category codes (e.g. OL or LV,HH)")}
         {question("is_ex_serviceman", "Ex-serviceman?")}
         {(value.is_ex_serviceman || value.armed_forces_service_months != null || err("armed_forces_service_months")) &&
-          text("armed_forces_service_months", "Armed forces service (months)", "number")}
+          text("armed_forces_service_months", "Armed forces service in months (UPSC: service after attestation, needed as stated; if empty, SSC counts from the dates below)", "number")}
+        {esmShown && (
+          <>
+            {choice("esm_service_branch", "Service branch", BRANCHES)}
+            {text("esm_rank", "Rank")}
+            {text("esm_enrolment_date", "Enrolled on", "date")}
+            {text("esm_release_date", "Released on (or expected end of engagement if still serving)", "date")}
+            {choice("esm_release_type", "How you left the Armed Forces", RELEASE_TYPES)}
+            {question("esm_civil_post_secured", "Since release, have you secured a regular civil post under a Government (Central or State), even one you have since left?")}
+            {value.esm_civil_post_secured === true && (
+              <>
+                {choice("esm_civil_post_government", "Under which Government?", [["CENTRAL", "Central Government"], ["STATE", "State Government"]])}
+                {question("esm_reservation_used", "Was that post secured through the ex-servicemen reservation?")}
+                {choice("esm_civil_post_group", "Group of that civil post", [["A", "Group A"], ["B", "Group B"], ["C", "Group C"], ["D", "Group D"]])}
+                {question("esm_undertaking_given", "On joining, gave the employer a self-declaration of earlier applications (DoP&T OM 14.08.2014)?")}
+              </>
+            )}
+          </>
+        )}
+        {question("is_agniveer", "Served as an Agniveer (Agnipath scheme)?")}
         {question("is_central_govt_employee", "Central Government employee?")}
         {(value.is_central_govt_employee || value.central_govt_service_start || err("central_govt_service_start")) &&
           text("central_govt_service_start", "Continuous Central Govt service since", "date")}

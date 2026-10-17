@@ -62,6 +62,25 @@ class PersonalInfo(Base, TimestampMixin):
     citizenship_status: Mapped[Optional[str]] = mapped_column(String(50))
     is_ex_serviceman: Mapped[Optional[bool]] = mapped_column(Boolean)
     armed_forces_service_months: Mapped[Optional[int]] = mapped_column(Integer)
+    # Ex-servicemen (eligibility/esm.py); None = not stated. Branch: ARMY, NAVY, AIR_FORCE, TERRITORIAL_ARMY.
+    # Release date is the actual one, or the expected end of the term of engagement while still serving.
+    esm_service_branch: Mapped[Optional[str]] = mapped_column(String(30))
+    esm_enrolment_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    esm_release_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    # schemas.profile.ESM_RELEASE_TYPES, e.g. RETIRED_WITH_PENSION, COMPLETED_ENGAGEMENT_GRATUITY, STILL_SERVING
+    esm_release_type: Mapped[Optional[str]] = mapped_column(String(40))
+    esm_rank: Mapped[Optional[str]] = mapped_column(String(100))
+    # Since release: has secured a regular civil post under a Government, whether or not still held (the notices' "have
+    # already secured"); under which Government (CENTRAL / STATE); whether that post was secured through the ESM
+    # reservation, its Group (A-D), and whether the self-declaration of earlier applications (DoP&T OM 36034/1/2014,
+    # 14.08.2014) was given to that employer on joining
+    esm_civil_post_secured: Mapped[Optional[bool]] = mapped_column(Boolean)
+    esm_civil_post_government: Mapped[Optional[str]] = mapped_column(String(10))
+    esm_reservation_used: Mapped[Optional[bool]] = mapped_column(Boolean)
+    esm_civil_post_group: Mapped[Optional[str]] = mapped_column(String(1))
+    esm_undertaking_given: Mapped[Optional[bool]] = mapped_column(Boolean)
+    # Served as an Agniveer (Agnipath scheme); no captured notice states a provision for them yet
+    is_agniveer: Mapped[Optional[bool]] = mapped_column(Boolean)
     is_central_govt_employee: Mapped[Optional[bool]] = mapped_column(Boolean)
     central_govt_service_start: Mapped[Optional[datetime]] = mapped_column(DateTime)
     # Deputation posts are open only to serving government officers; None = not stated

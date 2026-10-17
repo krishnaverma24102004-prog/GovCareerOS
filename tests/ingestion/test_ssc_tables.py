@@ -128,7 +128,7 @@ def test_je_table_repeats_header_splits_cells_across_pages_and_merges_organisati
 def test_parse_exam_pdf_gives_each_post_its_own_age_and_education_rows():
     body = (SSC / JE).read_bytes()
     parsed = parse_exam_pdf(body, extract_pages(body, ocr=False))
-    assert parsed.parser_version == "ssc_exam_notice/2+ssc_tables/1" and parsed.warnings == []
+    assert parsed.parser_version == "ssc_exam_notice/3+ssc_tables/1" and parsed.warnings == []
     cpwd = next(p for p in parsed.posts if p.post_name == "JE (C)" and p.department == "Central Public Works Department (CPWD)")
     ages = {r.value["category"]: r for r in cpwd.requirements if r.req_type == "AGE_MAX"}
     # "Up to 32 years" + "born not earlier than 02.08.1994 and not later than 01.08.2008" on 01.08.2026

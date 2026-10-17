@@ -7,6 +7,8 @@ AGE_MAX and EDUCATION rows; corrigenda already applied to the exam (services/exa
 re-applied after a re-parse. A re-parse with a newer parser keeps the exam id, replaces
 field provenance, updates posts in place and supersedes (never deletes) requirement rows. A notice
 whose deterministic parse lacks the core fields is left for the LLM draft path (MANUAL_REVIEW).
+The pipeline only downloads notices it has not seen, so an exam stored by an older parser is parsed again from its
+stored PDF (reparse_stale_exams), which is how rows a newer parser adds reach exams already in the database.
 What a stored exam's notice asks of applicants (certificates, uploads, fee, documents, key dates) is parsed by
 parsing/ssc_application.py into ApplicationRequirement rows for the same document (services/application_prep.py).
 """
@@ -14,18 +16,20 @@ import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, List, Optional
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govcareeros.backend.documents.pdf_text import extract_pages
+from govcareeros.backend.models.artifact import RawDocument
 from govcareeros.backend.models.exam import Exam, ExamFieldProvenance, ExamPost, ExamRequirement
 from govcareeros.backend.models.notice import RecruitmentNotice
 from govcareeros.backend.models.source import GovernmentSource
 from govcareeros.backend.parsing.ssc_application import parse_ssc_application_info
-from govcareeros.backend.parsing.ssc_exam_notice import CONDUCTING_BODY, ParsedExam, exam_code_for
-from govcareeros.backend.parsing.ssc_tables import norm, parse_exam_pdf
+from govcareeros.backend.parsing.ssc_exam_notice import CONDUCTING_BODY, PARSER_VERSION, ParsedExam, exam_code_for
+from govcareeros.backend.parsing.ssc_tables import TABLES_VERSION, norm, parse_exam_pdf
 from govcareeros.backend.services.application_prep import store_application_requirements
 from govcareeros.backend.services.exam_corrigenda import apply_exam_versions, ingest_corrigendum_pdf, refresh_education_summary
 from govcareeros.backend.services.exam_drafts import create_exam_draft
@@ -146,6 +150,34 @@ async def ingest_exam_pdf(session: AsyncSession, source: GovernmentSource, url: 
         notice.raw_document_id, notice.review_status = raw.id, "MANUAL_REVIEW"
     return result
 
+def parsed_by_older_parser(parser_version: Optional[str]) -> bool:
+    """`ssc_exam_notice/N` or `ssc_exam_notice/N+ssc_tables/M` (parse_exam_pdf) from a parser older than the current one.
+    An exam approved from an LLM draft ("llm:...", services/exam_drafts.py) is a reviewer's decision and never re-parsed."""
+    base, _, tables = (parser_version or "").partition("+")
+    if not base.startswith(PARSER_VERSION.split("/")[0] + "/"):
+        return False
+    return base != PARSER_VERSION or bool(tables and tables != TABLES_VERSION)
+
+async def reparse_stale_exams(session: AsyncSession, source: GovernmentSource, errors: List[str]) -> List[ExamIngestionResult]:
+    """Exams stored by an older parser, parsed again from the notice PDF kept at RawDocument.storage_path: same exam id,
+    old requirement rows superseded (store_parsed_exam). Each exam in its own savepoint."""
+    results = []
+    exams = (await session.execute(select(Exam).where(Exam.source_id == source.id, Exam.raw_document_id.is_not(None)))).scalars().all()
+    for exam in exams:
+        if not parsed_by_older_parser(exam.parser_version):
+            continue
+        raw = await session.get(RawDocument, exam.raw_document_id)
+        path = Path(raw.storage_path) if raw is not None and raw.storage_path else None
+        if path is None or not path.is_file():
+            errors.append(f"exam {exam.id}: stored notice PDF not found; not re-parsed")
+            continue
+        try:
+            async with session.begin_nested():
+                results.append(await ingest_exam_pdf(session, source, raw.url, path.read_bytes()))
+        except Exception as e:  # one bad PDF must not stop the others
+            errors.append(f"exam {exam.id}: re-parse failed: {type(e).__name__}: {e}")
+    return results
+
 async def run_ssc_pipeline(session: AsyncSession, fetcher, pages: int = 1, limit: int = 5, provider=None, first_page: int = 1) -> dict:
     """Notice board -> RecruitmentNotice rows -> exam notices (PDF) -> Exam rows. Each PDF in its own savepoint.
     With an LLM provider, a notice the parser cannot read becomes a review draft (services/exam_drafts.py)."""
@@ -171,9 +203,10 @@ async def run_ssc_pipeline(session: AsyncSession, fetcher, pages: int = 1, limit
             errors.append(f"{notice.url}: {e}")
         except Exception as e:  # one bad PDF must not stop the others
             errors.append(f"{notice.url}: {type(e).__name__}: {e}")
+    reparsed = await reparse_stale_exams(session, source, errors)
     corrigenda = await _apply_pending_corrigenda(session, source, fetcher, limit, errors)
     await session.flush()
-    return {"probe": summary, "exams": results, "drafts": drafts, "corrigenda": corrigenda, "errors": errors}
+    return {"probe": summary, "exams": results, "reparsed": reparsed, "drafts": drafts, "corrigenda": corrigenda, "errors": errors}
 
 async def _apply_pending_corrigenda(session: AsyncSession, source: GovernmentSource, fetcher, limit: int, errors: List[str]) -> list:
     """Corrigenda/addenda whose title names a stored exam, and schedule notices (their titles rarely name the exam)."""

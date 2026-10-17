@@ -2,9 +2,16 @@ import uuid
 from datetime import date, datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 _MAX_AGE_YEARS = 100
+# How the candidate left the Armed Forces; the first five are the routes the notices' ESM definition lists
+ESM_RELEASE_TYPES = ("RETIRED_WITH_PENSION", "MEDICAL_DISABILITY_PENSION", "REDUCTION_IN_ESTABLISHMENT", "COMPLETED_ENGAGEMENT_GRATUITY",
+                     "RECRUIT_BOARDED_OUT_MEDICAL", "OWN_REQUEST_WITHOUT_PENSION", "DISMISSED", "DISCHARGED_MISCONDUCT_INEFFICIENCY",
+                     "STILL_SERVING", "OTHER")
+
+# Questions about the civil post secured after release; only asked when esm_civil_post_secured is true
+CIVIL_POST_FOLLOW_UPS = ("esm_civil_post_government", "esm_reservation_used", "esm_civil_post_group", "esm_undertaking_given")
 
 class _In(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -22,7 +29,19 @@ class PersonalInfoIn(_In):
     disability_types: Optional[str] = Field(None, description="notification sub-category codes, e.g. 'OL' or 'LV,HH'")
     citizenship_status: Optional[Literal["INDIAN_CITIZEN", "NEPAL_SUBJECT", "BHUTAN_SUBJECT", "TIBETAN_REFUGEE_PRE_1962", "PIO_MIGRANT", "OTHER"]] = None
     is_ex_serviceman: Optional[bool] = None
-    armed_forces_service_months: Optional[int] = Field(None, ge=0)
+    armed_forces_service_months: Optional[int] = Field(None, ge=0, description="years of service, in months (UPSC's relaxation reads it as service after attestation); when null, derived from the enrolment and release dates (to the crucial date only while STILL_SERVING), which UPSC's after-attestation condition cannot use")
+    esm_service_branch: Optional[Literal["ARMY", "NAVY", "AIR_FORCE", "TERRITORIAL_ARMY"]] = None
+    esm_enrolment_date: Optional[date] = None
+    esm_release_date: Optional[date] = Field(None, description="release/discharge date; while still serving, the expected end of the term of engagement")
+    esm_release_type: Optional[Literal[ESM_RELEASE_TYPES]] = None
+    esm_rank: Optional[str] = Field(None, max_length=100)
+    esm_civil_post_secured: Optional[bool] = Field(None, description="since release, has secured a regular civil post under a Government "
+                                                   "(Central or State), whether or not still held: the notices' 'have already secured'")
+    esm_civil_post_government: Optional[Literal["CENTRAL", "STATE"]] = Field(None, description="the Government that civil post is under")
+    esm_reservation_used: Optional[bool] = Field(None, description="that civil post was secured through the ex-servicemen reservation")
+    esm_civil_post_group: Optional[Literal["A", "B", "C", "D"]] = None
+    esm_undertaking_given: Optional[bool] = Field(None, description="gave that employer, on joining, the self-declaration of earlier applications (DoP&T OM 14.08.2014)")
+    is_agniveer: Optional[bool] = None
     is_central_govt_employee: Optional[bool] = None
     central_govt_service_start: Optional[date] = None
     is_state_govt_employee: Optional[bool] = None
@@ -44,6 +63,21 @@ class PersonalInfoIn(_In):
         if v is not None and not date(today.year - _MAX_AGE_YEARS, 1, 1) <= v <= today:
             raise ValueError(f"date of birth must lie between {today.year - _MAX_AGE_YEARS}-01-01 and today")
         return v
+
+    @model_validator(mode="after")
+    def _release_after_enrolment(self):
+        if self.esm_enrolment_date and self.esm_release_date and self.esm_release_date < self.esm_enrolment_date:
+            raise ValueError("esm_release_date must not be before esm_enrolment_date")
+        return self
+
+    @model_validator(mode="after")
+    def _civil_post_answers_agree(self):
+        # The follow-up answers describe a civil post; with "no civil post" they would be read against the candidate
+        if self.esm_civil_post_secured is False:
+            stated = [k for k in CIVIL_POST_FOLLOW_UPS if getattr(self, k) is not None]
+            if stated:
+                raise ValueError(f"esm_civil_post_secured is false, so {', '.join(stated)} must be empty")
+        return self
 
 class EducationIn(_In):
     degree: str
@@ -131,7 +165,8 @@ class ProfileIn(_In):
 class PersonalInfoOut(PersonalInfoIn, _Out):
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
-    @field_validator("date_of_birth", "central_govt_service_start", "current_level_regular_since", "last_deputation_end", mode="before")
+    @field_validator("date_of_birth", "central_govt_service_start", "current_level_regular_since", "last_deputation_end",
+                     "esm_enrolment_date", "esm_release_date", mode="before")
     @classmethod
     def _dt_to_date(cls, v):
         return v.date() if isinstance(v, datetime) else v

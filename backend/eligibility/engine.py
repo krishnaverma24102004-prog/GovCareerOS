@@ -4,7 +4,8 @@ Runs hard eligibility for (profile_version_id, vacancy_id) and stores the decisi
 Reads only rows that belong to the given ProfileVersion, which are never modified after
 creation, so re-running for an old version reproduces the old decision. (The certificate section also reads
 reviewer decisions on the version's certificate Facts and today's date, which is then part of the input
-fingerprint; see certificate_check.)
+fingerprint; see certificate_check. The ex-servicemen section, eligibility/esm.py, is stored after the verdict
+in the same way.)
 """
 import hashlib
 import json
@@ -16,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from govcareeros.backend.eligibility import certificate_check, rules
+from govcareeros.backend.eligibility import certificate_check, esm, rules
 from govcareeros.backend.models.eligibility import EligibilityEvidence, EligibilityResult
 from govcareeros.backend.models.user import Certification, Education, Experience, PersonalInfo, ProfileVersion
 from govcareeros.backend.models.vacancy import Vacancy, VacancyRequirement
@@ -24,7 +25,7 @@ from govcareeros.backend.parsing.upsc_advertisement import IST
 
 # Requirement types whose value column holds JSON
 JSON_REQUIREMENTS = {"AGE_MAX", "AGE_RELAXATION", "RESERVATION", "AGE_RELAXATION_RULE", "CITIZENSHIP", "PWBD_SUITABILITY", "GOVT_SERVICE",
-                     "CERTIFICATE"}
+                     "CERTIFICATE", "ESM_RULE"}
 
 class EligibilityInputError(ValueError):
     pass
@@ -57,6 +58,17 @@ async def load_profile_snapshot(session: AsyncSession, profile_version_id: uuid.
         current_level_regular_since=rules.to_date(info.current_level_regular_since) if info else None,
         organisation_cadre=info.organisation_cadre if info else None,
         last_deputation_end=rules.to_date(info.last_deputation_end) if info else None,
+        esm_service_branch=info.esm_service_branch if info else None,
+        esm_enrolment_date=rules.to_date(info.esm_enrolment_date) if info else None,
+        esm_release_date=rules.to_date(info.esm_release_date) if info else None,
+        esm_release_type=info.esm_release_type if info else None,
+        esm_rank=info.esm_rank if info else None,
+        esm_civil_post_secured=info.esm_civil_post_secured if info else None,
+        esm_civil_post_government=info.esm_civil_post_government if info else None,
+        esm_reservation_used=info.esm_reservation_used if info else None,
+        esm_civil_post_group=info.esm_civil_post_group if info else None,
+        esm_undertaking_given=info.esm_undertaking_given if info else None,
+        is_agniveer=info.is_agniveer if info else None,
         education=[rules.EducationEntry(e.degree, e.specialization, e.education_level, rules.to_date(e.end_date), e.equivalence)
                    for e in await rows(Education)],
         experience=[rules.ExperienceEntry(e.organization, e.designation, e.domain, e.responsibilities,
@@ -78,7 +90,7 @@ def requirement_value(r) -> object:
 async def load_requirements(session: AsyncSession, vacancy_id: uuid.UUID) -> List[rules.Requirement]:
     res = await session.execute(select(VacancyRequirement).where(
         VacancyRequirement.vacancy_id == vacancy_id, VacancyRequirement.superseded_at.is_(None)))
-    return [rules.Requirement(r.id, r.req_type, requirement_value(r), r.source_page) for r in res.scalars()]
+    return [rules.Requirement(r.id, r.req_type, requirement_value(r), r.source_page, r.source_excerpt) for r in res.scalars()]
 
 def input_fingerprint(vacancy: Vacancy, reqs: List[rules.Requirement], as_of: Optional[date] = None) -> str:
     """Identifies the vacancy-side inputs of a decision; requirement rows are never edited in place, only superseded.
@@ -119,6 +131,8 @@ async def evaluate(session: AsyncSession, user_id: uuid.UUID, profile_version_id
     as_of = certificate_check.today()
     outcomes += certificate_check.check_certificates(snapshot, reqs, await certificate_check.load_held(session, profile_version_id),
                                                      closing, as_of)
+    crucial = crucial_dt.astimezone(IST).date() if crucial_dt else None
+    outcomes += esm.check_esm(snapshot, reqs, closing, crucial)
 
     result = EligibilityResult(
         id=uuid.uuid4(), user_id=user_id, vacancy_id=vacancy_id, profile_version_id=profile_version_id,

@@ -6,6 +6,20 @@
  */
 import type { Citizenship, VersionSummary } from "@/lib/types";
 
+export type EsmBranch = "ARMY" | "NAVY" | "AIR_FORCE" | "TERRITORIAL_ARMY";
+/** backend schemas/profile.py ESM_RELEASE_TYPES */
+export type EsmReleaseType =
+  | "RETIRED_WITH_PENSION"
+  | "MEDICAL_DISABILITY_PENSION"
+  | "REDUCTION_IN_ESTABLISHMENT"
+  | "COMPLETED_ENGAGEMENT_GRATUITY"
+  | "RECRUIT_BOARDED_OUT_MEDICAL"
+  | "OWN_REQUEST_WITHOUT_PENSION"
+  | "DISMISSED"
+  | "DISCHARGED_MISCONDUCT_INEFFICIENCY"
+  | "STILL_SERVING"
+  | "OTHER";
+
 export interface PersonalInfoFull {
   full_name?: string | null;
   date_of_birth?: string | null;
@@ -17,6 +31,17 @@ export interface PersonalInfoFull {
   citizenship_status?: Citizenship | null;
   is_ex_serviceman?: boolean | null;
   armed_forces_service_months?: number | null;
+  esm_service_branch?: EsmBranch | null;
+  esm_enrolment_date?: string | null;
+  esm_release_date?: string | null;
+  esm_release_type?: EsmReleaseType | null;
+  esm_rank?: string | null;
+  esm_civil_post_secured?: boolean | null;
+  esm_civil_post_government?: "CENTRAL" | "STATE" | null;
+  esm_reservation_used?: boolean | null;
+  esm_civil_post_group?: "A" | "B" | "C" | "D" | null;
+  esm_undertaking_given?: boolean | null;
+  is_agniveer?: boolean | null;
   is_central_govt_employee?: boolean | null;
   central_govt_service_start?: string | null;
   is_state_govt_employee?: boolean | null;
