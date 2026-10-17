@@ -229,7 +229,8 @@ def attested_service(profile: ProfileSnapshot, until: Optional[date], need: int)
     bound = military_service_months(profile, until)
     if bound is not None and bound < need:
         return "NO", f"{bound} months from enrolment < {need}, so service after attestation is less too"
-    return "UNKNOWN", "armed forces service after attestation not stated" +         (f" ({bound} months from enrolment include recruit training before attestation)" if bound is not None else "")
+    return "UNKNOWN", "armed forces service after attestation not stated" + (
+        f" ({bound} months from enrolment include recruit training before attestation)" if bound is not None else "")
 
 def _service_years(start: Optional[date], until: date) -> Optional[float]:
     return None if start is None else (until - start).days / 365.25
