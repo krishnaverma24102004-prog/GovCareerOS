@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 from typing import AsyncIterator, Optional
 
@@ -32,13 +33,17 @@ async def current_user(
         raise unauthorized
     return await _token_user(session, creds, unauthorized)
 
-async def optional_user(
+async def profile_owner(
+    profile_version_id: Optional[uuid.UUID] = None,
     creds: HTTPAuthorizationCredentials = Depends(_bearer),
     session: AsyncSession = Depends(get_session),
 ) -> Optional[User]:
-    """Public pages that add the caller's own data when logged in: no token is anonymous, a bad token is still a 401."""
-    if creds is None:
+    """Public pages that add the caller's own data when asked to (?profile_version_id=). Without it the page is public
+    and any token is ignored, so an expired one cannot hide it; with it, a missing or bad token is a 401."""
+    if profile_version_id is None:
         return None
+    if creds is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "log in to see your own status", headers={"WWW-Authenticate": "Bearer"})
     return await current_user(creds, session)
 
 async def _token_user(session: AsyncSession, creds: HTTPAuthorizationCredentials, unauthorized: HTTPException) -> User:

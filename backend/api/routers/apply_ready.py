@@ -1,6 +1,7 @@
 """
 Apply-ready pages (services/apply_ready.py): public. With a bearer token and ?profile_version_id= of that user, items
-also carry the candidate's own status; another user's profile version is a 404, a profile version without a token a 401.
+also carry the candidate's own status; another user's profile version is a 404, a profile version without a valid token
+a 401. Without ?profile_version_id= a token is not looked at.
 """
 import uuid
 from datetime import datetime
@@ -11,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from govcareeros.backend.api.deps import get_session, optional_user
+from govcareeros.backend.api.deps import get_session, profile_owner
 from govcareeros.backend.models.user import User
 from govcareeros.backend.schemas.attribution import AttributionOut
 from govcareeros.backend.services import apply_ready
@@ -52,8 +53,7 @@ class ApplyReadyOut(BaseModel):
     attribution: Optional[AttributionOut]
 
 async def _page(build, record_id: uuid.UUID, profile_version_id: Optional[uuid.UUID], user: Optional[User], session: AsyncSession) -> dict:
-    if profile_version_id is not None and user is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "log in to see your own status", headers={"WWW-Authenticate": "Bearer"})
+    # profile_owner has already made a profile_version_id without a valid token a 401
     try:
         return await build(session, record_id, user.id if user and profile_version_id else None, profile_version_id)
     except PrepInputError as e:
@@ -65,20 +65,20 @@ def _html(page: dict) -> HTMLResponse:
 # The .html routes come first: "{id}.html" would otherwise match the JSON route and fail UUID validation
 @router.get("/vacancies/{vacancy_id}.html", response_class=HTMLResponse)
 async def vacancy_html(vacancy_id: uuid.UUID, profile_version_id: Optional[uuid.UUID] = None,
-                       user: Optional[User] = Depends(optional_user), session: AsyncSession = Depends(get_session)):
+                       user: Optional[User] = Depends(profile_owner), session: AsyncSession = Depends(get_session)):
     return _html(await _page(apply_ready.vacancy_page, vacancy_id, profile_version_id, user, session))
 
 @router.get("/exams/{exam_id}.html", response_class=HTMLResponse)
 async def exam_html(exam_id: uuid.UUID, profile_version_id: Optional[uuid.UUID] = None,
-                    user: Optional[User] = Depends(optional_user), session: AsyncSession = Depends(get_session)):
+                    user: Optional[User] = Depends(profile_owner), session: AsyncSession = Depends(get_session)):
     return _html(await _page(apply_ready.exam_page, exam_id, profile_version_id, user, session))
 
 @router.get("/vacancies/{vacancy_id}", response_model=ApplyReadyOut)
 async def vacancy(vacancy_id: uuid.UUID, profile_version_id: Optional[uuid.UUID] = None,
-                  user: Optional[User] = Depends(optional_user), session: AsyncSession = Depends(get_session)):
+                  user: Optional[User] = Depends(profile_owner), session: AsyncSession = Depends(get_session)):
     return await _page(apply_ready.vacancy_page, vacancy_id, profile_version_id, user, session)
 
 @router.get("/exams/{exam_id}", response_model=ApplyReadyOut)
 async def exam(exam_id: uuid.UUID, profile_version_id: Optional[uuid.UUID] = None,
-               user: Optional[User] = Depends(optional_user), session: AsyncSession = Depends(get_session)):
+               user: Optional[User] = Depends(profile_owner), session: AsyncSession = Depends(get_session)):
     return await _page(apply_ready.exam_page, exam_id, profile_version_id, user, session)

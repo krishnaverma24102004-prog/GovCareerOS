@@ -199,7 +199,11 @@ async def test_upsc_advt_12_personalised(api, login, db_session):
     assert (await api.get(url)).status_code == 401
     assert (await api.get(url, headers={"Authorization": "Bearer not-a-token"})).status_code == 401
     assert (await api.get(url, headers=priya)).status_code == 404
-    assert (await api.get(f"/apply-ready/vacancies/{vacancy_id}", headers={"Authorization": "Bearer not-a-token"})).status_code == 401
+    # No personal view asked for: the page is public and a stale or bad token is not looked at
+    r = await api.get(f"/apply-ready/vacancies/{vacancy_id}", headers={"Authorization": "Bearer not-a-token"})
+    assert r.status_code == 200, r.text
+    assert all(it["status"] is None for sec in r.json()["sections"] for it in sec["items"])
+    assert (await api.get(f"/apply-ready/vacancies/{vacancy_id}.html", headers={"Authorization": "Bearer not-a-token"})).status_code == 200
     assert (await api.get("/apply-ready/vacancies/00000000-0000-0000-0000-000000000000")).status_code == 404
 
 @pytest.mark.asyncio
