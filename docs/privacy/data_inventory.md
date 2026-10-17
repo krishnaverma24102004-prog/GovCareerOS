@@ -71,8 +71,12 @@ ALERTS consent is required for every alert and digest: without it the radar stil
 (under ELIGIBILITY_CHECK) but writes no alert, `digest.run_all` / `scripts/send_digests.py` write and send no digest,
 `POST /digest/generate` and `digest.send_run` refuse with 403 `CONSENT_REQUIRED`.
 
-RESUME and OPERATOR_ASSISTED_APPLICATION consents are recorded and withdrawable, but not yet enforced in the resume
-and operator flows.
+RESUME consent is required to build a resume (`backend/resume/builder.py`, 403 `CONSENT_REQUIRED` otherwise); a
+resume quotes only the items the RESUME purpose lists (name and contact, education, experience, skills/projects), so
+date of birth and nationality are never put on it. A resume tailored to a vacancy also needs ELIGIBILITY_CHECK.
+
+OPERATOR_ASSISTED_APPLICATION consent is recorded and withdrawable; no flow on this branch processes data under it
+(the operator console must check it before it does).
 
 ## Under 18
 

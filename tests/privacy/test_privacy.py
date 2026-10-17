@@ -346,6 +346,34 @@ async def test_alerts_and_digests_need_alerts_consent(api, login, db_session, mo
         await digest.send_run(db_session, runs[0], "c10@test.invalid")
     assert sent == ["c10@test.invalid"]
 
+@pytest.mark.asyncio
+async def test_resume_needs_resume_consent_and_quotes_only_resume_items(api, login, db_session):
+    from govcareeros.backend.models.fact import Fact
+    from govcareeros.backend.models.resume import Resume
+    h = await login("c11@test.invalid", consent=["ELIGIBILITY_CHECK"])
+    v1 = (await api.put("/profile", json=PROFILE, headers=h)).json()["version"]["id"]
+    facts_before = len((await api.get("/profile/facts", headers=h)).json())
+
+    r = await api.post("/resume", json={"profile_version_id": v1}, headers=h)
+    assert r.status_code == 403 and r.json()["detail"]["purpose"] == "RESUME" and r.json()["detail"]["code"] == "CONSENT_REQUIRED"
+    assert (await db_session.execute(select(Resume))).first() is None
+    assert len((await api.get("/profile/facts", headers=h)).json()) == facts_before   # nothing read into new claims
+
+    # RESUME consent, ELIGIBILITY_CHECK withdrawn: the resume quotes name/contact, education, experience, skills only
+    assert (await _consent(api, h, purpose="RESUME")).status_code == 201
+    await api.delete("/privacy/consents/ELIGIBILITY_CHECK", headers=h)
+    r = await api.post("/resume", json={"profile_version_id": v1}, headers=h)
+    assert r.status_code == 201, r.text
+    claims = r.json()["claims"]
+    assert {c["field"] for c in claims} == {"full_name", "degree", "institution", "end_date"}
+    assert not {"1995-03-10", "Indian"} & {c["text"] for c in claims}
+    predicates = (await db_session.execute(select(Fact.predicate).where(Fact.profile_version_id == uuid.UUID(v1)))).scalars().all()
+    assert "date_of_birth" not in predicates and "nationality" not in predicates
+    assert {"date_of_birth", "citizenship_status"}.isdisjoint(notice.data_items("RESUME"))
+
+    await api.delete("/privacy/consents/RESUME", headers=h)
+    assert (await api.post("/resume", json={"profile_version_id": v1}, headers=h)).status_code == 403
+
 # ---------- age gate ----------
 
 @pytest.mark.asyncio
