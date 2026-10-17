@@ -1,4 +1,6 @@
 fastapi>=0.115
+# Form / File parameters (POST /verify); FastAPI checks for it when the route is defined, so the app does not start without it
+python-multipart>=0.0.9
 uvicorn>=0.30
 SQLAlchemy>=2.0
 alembic>=1.13

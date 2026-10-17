@@ -1,6 +1,6 @@
 from pathlib import Path
-from typing import Optional
-from pydantic import SecretStr
+from typing import List, Optional
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=PROJECT_ROOT / ".env", extra="ignore")
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/govcareeros"
+    # Optional: the database password on its own, any characters (docker-compose.yml passes POSTGRES_PASSWORD here).
+    # It replaces the password in DATABASE_URL, escaped, so "@", ":", "/" or "%41" in it cannot change the URL
+    DATABASE_PASSWORD: str = ""
     TEST_DATABASE_URL: Optional[str] = None
     DB_ECHO: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -34,8 +37,30 @@ class Settings(BaseSettings):
     EMAIL_USERNAME: str = ""
     EMAIL_PASSWORD: str = ""
 
-    # The only browser origin allowed to call the API (the local Next.js dashboard)
+    # The browser origin allowed to call the API (the local Next.js dashboard)
     FRONTEND_ORIGIN: str = "http://localhost:3000"
+    # Production: further allowed origins, comma-separated (e.g. "https://govcareeros.example,https://www.govcareeros.example").
+    # Explicit origins only: "*" is refused at startup
+    FRONTEND_ORIGINS: str = ""
+
+    # Largest request body accepted by any route without its own limit (the notice check allows a 10 MB PDF)
+    MAX_REQUEST_BYTES: int = 1024 * 1024
+    # Strict-Transport-Security max-age, sent only on https requests; 0 = never. Behind a TLS-terminating proxy run
+    # uvicorn with --proxy-headers so the request scheme is the client's (docs/deploy/README.md)
+    HSTS_SECONDS: int = 31_536_000
+    # "text" (default, local) or "json": one JSON object per line on stdout, secrets redacted (config/log_setup.py)
+    LOG_FORMAT: str = "text"
+    LOG_LEVEL: str = "INFO"
+
+    # docker compose scheduler (scripts/scheduler.py): "HH:MM" daily or "mon HH:MM" weekly, at SCHEDULE_UTC_OFFSET;
+    # empty = job off. Triage already runs as a step of the daily job, so its own entry is off by default
+    SCHEDULE_UTC_OFFSET: str = "+05:30"
+    SCHEDULE_DAILY_JOB: str = "07:00"
+    SCHEDULE_SEND_DIGESTS: str = "mon 08:00"
+    SCHEDULE_TRIAGE: str = ""
+    # The scheduled digest emails users only when true (and EMAIL_USERNAME / EMAIL_PASSWORD are set), and then only users
+    # with an active ALERTS consent (services/digest.may_email); else files only
+    SCHEDULE_DIGEST_SEND: bool = False
 
     STORAGE_PATH: str = str(PROJECT_ROOT / "storage")
     PLAYWRIGHT_HEADLESS: bool = True
@@ -62,6 +87,19 @@ class Settings(BaseSettings):
     # B2B API (/api/v1): requests per minute per key when the key sets none. In-process token bucket (one per API
     # process), so N worker processes allow up to N times this; see backend/services/api_keys.py
     B2B_RATE_LIMIT_PER_MINUTE: int = 60
+    @model_validator(mode="after")
+    def _database_password(self) -> "Settings":
+        if self.DATABASE_PASSWORD:
+            from sqlalchemy.engine import make_url
+            self.DATABASE_URL = make_url(self.DATABASE_URL).set(password=self.DATABASE_PASSWORD).render_as_string(hide_password=False)
+        return self
+
+    @property
+    def cors_origins(self) -> List[str]:
+        origins = [o.strip().rstrip("/") for o in [self.FRONTEND_ORIGIN, *self.FRONTEND_ORIGINS.split(",")] if o.strip()]
+        if "*" in origins:
+            raise ValueError('FRONTEND_ORIGIN(S) must list explicit origins, not "*"')
+        return list(dict.fromkeys(origins))
 
     @property
     def storage_dir(self) -> Path:

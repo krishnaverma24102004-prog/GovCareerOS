@@ -1,0 +1,104 @@
+# GovCareerOS production stack: PostgreSQL 17, a one-shot migration, the API, the dashboard and the job scheduler.
+# (docker/docker-compose.yml is the separate local-development database.) Guide: docs/deploy/README.md
+#
+#   docker compose up -d --build
+#
+# Settings come from the environment / a .env file next to this file (variable names: docs/deploy/README.md).
+# The .env is read at run time only; it is never copied into an image. API and dashboard listen on 127.0.0.1:
+# put a TLS reverse proxy (Caddy / nginx) in front of them on a server.
+name: govcareeros
+
+x-app: &app
+  image: govcareeros-api:local
+  env_file:
+    - path: .env
+      required: false
+  environment: &app-env
+    # Overrides any DATABASE_URL in .env (which may point at a local development database). The password goes
+    # separately (any characters): settings puts it into the URL escaped, so "@", ":", "/" or "%" cannot break it
+    DATABASE_URL: postgresql+asyncpg://govcareeros@postgres:5432/govcareeros
+    DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    STORAGE_PATH: /data/storage
+    LOG_FORMAT: ${LOG_FORMAT:-json}
+  volumes:
+    - storage:/data/storage
+  extra_hosts:
+    # lets OLLAMA_URL=http://host.docker.internal:11434 reach an Ollama running on the host
+    - "host.docker.internal:host-gateway"
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: govcareeros
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: govcareeros
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U govcareeros -d govcareeros"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    # no published port: only the other services reach it. For psql: docker compose exec postgres psql -U govcareeros
+
+  migrate:
+    <<: *app
+    build:
+      context: .
+      args:
+        INSTALL_PLAYWRIGHT: ${INSTALL_PLAYWRIGHT:-0}
+        INSTALL_OCR: ${INSTALL_OCR:-1}
+    command: ["alembic", "-c", "govcareeros/alembic.ini", "upgrade", "head"]
+    restart: "no"
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    environment:
+      <<: *app-env
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      # the reverse proxy's address(es) whose X-Forwarded-Proto / -For are trusted; the port is only on 127.0.0.1
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  scheduler:
+    <<: *app
+    command: ["python", "govcareeros/scripts/scheduler.py"]
+    # tini as PID 1: passes docker stop's SIGTERM to scheduler.py, which stops the running job (the daily job then
+    # logs the run and releases its lock) and exits; it also reaps orphaned browser processes
+    init: true
+    stop_grace_period: 60s
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    image: govcareeros-web:local
+    build:
+      context: ./frontend
+      args:
+        # the API's address as the user's browser sees it (baked into the bundle at build time)
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  storage:
