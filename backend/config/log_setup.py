@@ -15,6 +15,13 @@ from govcareeros.backend.config.redaction import configured_secrets, redact
 
 # Loggers that install their own handlers; they are routed to the root JSON handler instead
 _OWN_HANDLERS = ("uvicorn", "uvicorn.error", "uvicorn.access", "alembic")
+# A message longer than this is cut (after redaction, so a cut never leaves half a secret behind unredacted)
+MAX_MESSAGE_CHARS = 8192
+
+def _cap(text: str) -> str:
+    if len(text) <= MAX_MESSAGE_CHARS:
+        return text
+    return f"{text[:MAX_MESSAGE_CHARS]}... [{len(text) - MAX_MESSAGE_CHARS} more characters cut]"
 
 class JsonFormatter(logging.Formatter):
     def __init__(self, secrets: Optional[List[str]] = None):
@@ -26,7 +33,7 @@ class JsonFormatter(logging.Formatter):
             "ts": datetime.fromtimestamp(record.created, timezone.utc).isoformat(timespec="milliseconds"),
             "level": record.levelname,
             "logger": record.name,
-            "msg": redact(record.getMessage(), self.secrets),
+            "msg": _cap(redact(record.getMessage(), self.secrets)),
         }
         if record.exc_info:
             entry["exc"] = redact(self.formatException(record.exc_info), self.secrets)

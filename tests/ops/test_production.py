@@ -8,6 +8,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -137,6 +138,29 @@ def test_redact_hides_secrets_keeps_the_rest():
     assert redact("GET /vacancies?page=2 200") == "GET /vacancies?page=2 200"
     # the network recorder's header redaction uses the same names
     assert RequestRecorder().sanitize_headers({"Cookie": "a=b", "Accept": "text/html"}) == {"Cookie": REDACTED, "Accept": "text/html"}
+
+def test_redact_stays_linear_on_long_hostile_input():
+    """Every access-log line passes through redact() on the API's event loop, and an anonymous client chooses the
+    request path (h11 accepts a 16 KB request head). An unanchored key pattern took ~46 s on 16,000 word characters."""
+    hostile = ["a" * 16000, "a." * 8000, "-" * 16000, "token" * 3200, "token." * 2700, "token" + " " * 16000,
+               "x://" + "u" * 16000, "x://u:" + "p" * 16000, "ab://cd:" * 2000, "Bearer " * 2300, '"token"' * 2000]
+    for text in hostile:
+        started = time.perf_counter()
+        redact(text)
+        assert time.perf_counter() - started < 1.0, f"redact() is slow on {text[:12]!r} x {len(text)}"
+    # a secret after a long path is still found
+    assert redact("GET /" + "a" * 16000 + "?token=s3cr3t-test HTTP/1.1").endswith(f"a?token={REDACTED} HTTP/1.1")
+
+def test_json_formatter_caps_long_messages_after_redacting():
+    secret = "test-only-secret-0123456789"
+    fmt = log_setup.JsonFormatter(secrets=[secret])
+    # the configured secret straddles the cut: cutting first would leave its first 8 characters in the log
+    text = "a" * (log_setup.MAX_MESSAGE_CHARS - 9) + " " + secret + " tail"
+    record = logging.LogRecord("govcareeros.test", logging.INFO, __file__, 1, "%s", (text,), None)
+    msg = json.loads(fmt.format(record))["msg"]
+    assert msg.startswith("aaa") and msg.endswith("more characters cut]")
+    assert len(msg) < log_setup.MAX_MESSAGE_CHARS + 50
+    assert "test-onl" not in msg and "[REDACTE" in msg
 
 def test_json_formatter_redacts_message_and_traceback():
     fmt = log_setup.JsonFormatter(secrets=["test-only-key-987654"])
