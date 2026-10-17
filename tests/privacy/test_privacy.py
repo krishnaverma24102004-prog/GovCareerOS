@@ -153,6 +153,44 @@ async def test_withdrawal_stops_processing_without_deleting_history(api, login, 
     assert r.json()["personal_info"]["category"] is None
 
 @pytest.mark.asyncio
+async def test_consent_under_an_older_notice_version_is_not_carried_over(api, login, db_session, monkeypatch):
+    vacancy_id = await _law_officer(db_session)
+    h = await login("c5@test.invalid")
+    v1 = (await api.put("/profile", json=PROFILE, headers=h)).json()["version"]["id"]
+    user_id = (await db_session.execute(select(User.id).where(User.email == "c5@test.invalid"))).scalar_one()
+
+    # The notice changes (a new version): the consent given under the old one is listed as outdated ...
+    monkeypatch.setattr(notice, "NOTICE_VERSION", "2099-01-01.1")
+    listed = (await api.get("/privacy/consents", headers=h)).json()
+    assert listed["outdated"] == ["ELIGIBILITY_CHECK"]
+    # ... and no longer allows storing or processing eligibility data
+    r = await api.patch("/profile", json={"personal_info": {"full_name": "Test Candidate", "category": "SC"}}, headers=h)
+    assert r.status_code == 403, r.text
+    d = r.json()["detail"]
+    assert d["code"] == "CONSENT_OUTDATED" and d["notice_version"] == "2099-01-01.1" and "POST /privacy/consents" in d["action"]
+    r = await api.post("/eligibility", json={"profile_version_id": v1, "vacancy_id": str(vacancy_id)}, headers=h)
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "CONSENT_OUTDATED"
+    assert not await enforcement.has_consent(db_session, user_id)
+    # Consenting again under the new version restores it
+    assert (await _consent(api, h)).status_code == 201
+    r = await api.post("/eligibility", json={"profile_version_id": v1, "vacancy_id": str(vacancy_id)}, headers=h)
+    assert r.status_code == 201, r.text
+
+@pytest.mark.asyncio
+async def test_consent_that_does_not_list_a_data_item_does_not_cover_it(api, login, db_session):
+    h = await login("c6@test.invalid", consent=False)
+    user_id = (await db_session.execute(select(User.id).where(User.email == "c6@test.invalid"))).scalar_one()
+    from govcareeros.backend.services.consent import record_consent
+    # A record (current version) whose items leave out certificates, e.g. written by an older build of the notice
+    await record_consent(db_session, user_id, "ELIGIBILITY_CHECK", ["category", "date_of_birth"], notice.NOTICE_VERSION)
+    await db_session.commit()
+    assert (await api.put("/profile", json={"personal_info": {"full_name": "T", "category": "OBC"}}, headers=h)).status_code == 201
+    r = await api.put("/profile", json={"personal_info": {"full_name": "T"},
+                                        "reservation_certificates": [{"kind": "OBC_NCL", "issue_date": "2026-04-01"}]}, headers=h)
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "CONSENT_OUTDATED"
+    assert r.json()["detail"]["data_items"] == ["certificates"]
+
+@pytest.mark.asyncio
 async def test_radar_and_digest_skip_a_user_who_withdrew(api, login, db_session):
     from govcareeros.backend.services import digest, radar
     vacancy_id = await _law_officer(db_session)

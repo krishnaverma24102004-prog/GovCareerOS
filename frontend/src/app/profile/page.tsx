@@ -61,7 +61,8 @@ function ProfileWorkspace() {
   useEffect(() => {
     load();
     api<Consents>("/privacy/consents")
-      .then((c) => setConsented(c.active.includes(ELIGIBILITY_CHECK)))
+      // A consent given under an older notice version no longer counts (the API answers CONSENT_OUTDATED)
+      .then((c) => setConsented(c.active.includes(ELIGIBILITY_CHECK) && !c.outdated.includes(ELIGIBILITY_CHECK)))
       .catch(() => setConsented(null));
   }, [load]);
 
@@ -86,7 +87,7 @@ function ProfileWorkspace() {
       {consented === false && (
         <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           Category, date of birth, disability, certificates and government service details can be saved only with your consent
-          for eligibility checks.{" "}
+          for eligibility checks under the current notice.{" "}
           <Link href="/privacy/consent" className="underline">
             Read the notice and give consent
           </Link>
