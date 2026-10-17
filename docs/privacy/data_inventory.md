@@ -61,11 +61,16 @@ What field encryption does not hide, so a dump without the key is still treated 
 ## Withdrawal (`DELETE /privacy/consents/{purpose}`)
 
 ELIGIBILITY_CHECK withdrawal is enforced in `backend/privacy/enforcement.py`: profile saves that would store (or
-carry over) category, DOB, gender, citizenship/nationality, disability, certificates or service details return 403
-`CONSENT_REQUIRED`; every eligibility computation (`engine.load_profile_snapshot`, so API runs, radar, digest, gaps,
-relevance, resume builder) refuses; the radar and digest skip the person; the application checklist refuses. Stored data and past
-results are kept and remain visible and exportable to the person; nothing is deleted silently. To delete, the person
-clears the fields or erases the account.
+carry over) category, DOB, gender, citizenship/nationality, disability, certificates or service details, and
+free-form claims (`POST /profile/facts`, evidence for them) about those items, return 403 `CONSENT_REQUIRED`; every
+eligibility computation (`engine.load_profile_snapshot`, so API runs, radar, digest, gaps, relevance, tailored
+resumes) refuses; the radar and digest skip the person, and change alerts stop using their verdicts; the application
+checklist refuses; reviewers no longer see or decide their claims (`/review/facts`). Stored data and past results
+are kept and remain visible and exportable to the person; nothing is deleted silently. To delete, the person clears
+the fields or erases the account.
+
+A consent counts only under the notice version it was given for: after a new `NOTICE_VERSION` (or for a data item
+the consent did not list) every check above answers 403 `CONSENT_OUTDATED` until the person consents again.
 
 ALERTS consent is required for every alert and digest: without it the radar still keeps eligibility results current
 (under ELIGIBILITY_CHECK) but writes no alert, `digest.run_all` / `scripts/send_digests.py` write and send no digest,
