@@ -35,6 +35,20 @@ SENSITIVE_PERSONAL_FIELDS: Dict[str, str] = {
     "last_deputation_end": "service_details",
 }
 
+# A profile claim (Fact) about one of these predicates, or any claim under the certificates subject, states an
+# ELIGIBILITY_CHECK item; the predicate is also matched on the notice item keys and "caste" (free-form facts)
+_CERTIFICATE_SUBJECT = "reservation_certificates"
+_FACT_PREDICATE_ITEMS: Dict[str, str] = {**SENSITIVE_PERSONAL_FIELDS, "caste": "category", "disability": "disability",
+                                         "ex_serviceman": "ex_serviceman", "service_details": "service_details",
+                                         "certificate": "certificates", "certificates": "certificates"}
+
+def fact_items(subject: str, predicate: str) -> List[str]:
+    """The ELIGIBILITY_CHECK data items a claim with this subject/predicate states ([] for e.g. education/degree)."""
+    items = {_FACT_PREDICATE_ITEMS[p] for p in ((predicate or "").strip().lower(),) if p in _FACT_PREDICATE_ITEMS}
+    if (subject or "").strip().lower() == _CERTIFICATE_SUBJECT:
+        items.add("certificates")
+    return sorted(items)
+
 class ConsentRequired(Exception):
     """Processing refused for want of consent. `detail` is what the API returns with the 403."""
 

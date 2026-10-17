@@ -133,6 +133,28 @@ async def test_profile_refuses_eligibility_data_without_consent(api, login):
     assert r.json()["personal_info"]["category"] == "OBC"
 
 @pytest.mark.asyncio
+async def test_free_form_claims_of_eligibility_data_need_consent(api, login):
+    h = await login("c7@test.invalid", consent=False)
+    assert (await api.put("/profile", json={"personal_info": {"full_name": "T"}}, headers=h)).status_code == 201
+    for subject, predicate, value in (("personal_info", "category", "SC"), ("personal_info", "Caste", "SC"),
+                                      ("personal_info", "is_pwbd", "yes"), ("reservation_certificates", "certificate", "SC certificate")):
+        r = await api.post("/profile/facts", json={"subject": subject, "predicate": predicate, "value": value}, headers=h)
+        assert r.status_code == 403 and r.json()["detail"]["code"] == "CONSENT_REQUIRED", (predicate, r.text)
+    assert (await api.get("/profile/facts", headers=h)).json() == []
+    # A claim outside the purpose needs no ELIGIBILITY_CHECK consent
+    r = await api.post("/profile/facts", json={"subject": "education", "predicate": "degree", "value": "LL.B."}, headers=h)
+    assert r.status_code == 201, r.text
+
+    assert (await _consent(api, h)).status_code == 201
+    r = await api.post("/profile/facts", json={"subject": "personal_info", "predicate": "category", "value": "SC"}, headers=h)
+    assert r.status_code == 201, r.text
+    fact_id = r.json()["id"]
+    await api.delete("/privacy/consents/ELIGIBILITY_CHECK", headers=h)
+    # Evidence for that claim is that data too: refused after withdrawal
+    r = await api.post(f"/profile/facts/{fact_id}/evidence", json={"evidence_type": "DOCUMENT", "source": "caste certificate"}, headers=h)
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "CONSENT_REQUIRED"
+
+@pytest.mark.asyncio
 async def test_withdrawal_stops_processing_without_deleting_history(api, login, db_session):
     vacancy_id = await _law_officer(db_session)
     h = await login("c3@test.invalid")

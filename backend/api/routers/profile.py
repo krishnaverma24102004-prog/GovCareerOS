@@ -108,11 +108,20 @@ async def list_facts(
     res = await session.execute(select(Fact).where(Fact.profile_version_id == version.id).order_by(Fact.created_at))
     return res.scalars().all()
 
+async def _require_consent_for_fact(session: AsyncSession, user: User, version_id: uuid.UUID, subject: str, predicate: str) -> None:
+    """A claim about category/caste, DOB, disability, a certificate, service details etc. is that data: storing it (or
+    evidence for it) needs ELIGIBILITY_CHECK consent, as the same field in PUT /profile does."""
+    items = enforcement.fact_items(subject, predicate)
+    if items:
+        await enforcement.require_consent(session, user.id, notice.ELIGIBILITY_CHECK,
+                                          await enforcement.version_date_of_birth(session, version_id), items)
+
 @router.post("/facts", response_model=FactOut, status_code=status.HTTP_201_CREATED)
 async def create_fact(body: FactIn, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
     latest = await ProfileRepository(session).latest_version(user.id)
     if latest is None:
         raise _not_found("profile")
+    await _require_consent_for_fact(session, user, latest.id, body.subject, body.predicate)
     fact = await FactRepository(session).create_fact(latest.id, body.subject, body.predicate, body.value)
     await session.refresh(fact)
     return fact
@@ -141,7 +150,8 @@ async def list_evidence(fact_id: uuid.UUID, user: User = Depends(current_user), 
 
 @router.post("/facts/{fact_id}/evidence", response_model=EvidenceOut, status_code=status.HTTP_201_CREATED)
 async def add_evidence(fact_id: uuid.UUID, body: EvidenceIn, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
-    await _owned_fact(session, user, fact_id)
+    fact = await _owned_fact(session, user, fact_id)
+    await _require_consent_for_fact(session, user, fact.profile_version_id, fact.subject, fact.predicate)
     if body.raw_document_id and await session.get(RawDocument, body.raw_document_id) is None:
         raise _not_found("raw document")
     evidence = await FactRepository(session).add_evidence(fact_id, body.evidence_type, body.raw_document_id, body.source)
