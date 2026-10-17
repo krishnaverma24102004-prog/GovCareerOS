@@ -6,6 +6,7 @@ not needed). Every key, password and address here is a test-only value made up f
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -315,6 +316,41 @@ def test_images_never_contain_env_files():
     assert "USER node" in web and ".next/standalone" in web and "NEXT_OUTPUT=standalone" in web
     for dockerfile in (api, web):
         assert not [l for l in dockerfile.splitlines() if l.startswith(("COPY", "ADD")) and ".env" in l]
+
+# ---------- dashboard headers (frontend/next.config.ts, evaluated by node) ----------
+
+def _next_config_headers(env, config=ROOT / "frontend" / "next.config.ts"):
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    script = ("import(require('url').pathToFileURL(process.argv[1]).href).then(m => m.default.headers())"
+              ".then(h => console.log('HEADERS ' + JSON.stringify(h)))")
+    out = subprocess.run([node, "-e", script, str(config)], env={**os.environ, **env}, capture_output=True, text=True,
+                         encoding="utf-8", timeout=60)
+    if "ERR_UNKNOWN_FILE_EXTENSION" in out.stderr:
+        pytest.skip("this node cannot load TypeScript directly (needs 22.18 or later)")
+    assert out.returncode == 0, out.stderr[-2000:]
+    return json.loads(next(l for l in out.stdout.splitlines() if l.startswith("HEADERS "))[8:])
+
+def test_dashboard_sends_hsts_over_https_and_a_csp_in_production(tmp_path):
+    """Users log in on the dashboard, a sibling host of the API: the API's HSTS does not cover it, and the bearer
+    token lives in sessionStorage. Caddy adds neither header by default."""
+    rules = _next_config_headers({"NODE_ENV": "production", "NEXT_PUBLIC_API_URL": "https://api.govcareeros.test/"})
+    every = [r for r in rules if "has" not in r]
+    assert [r["source"] for r in every] == ["/:path*"]
+    headers = {h["key"]: h["value"] for h in every[0]["headers"]}
+    assert headers["X-Frame-Options"] == "DENY" and headers["X-Content-Type-Options"] == "nosniff"
+    csp = dict(d.split(" ", 1) for d in headers["Content-Security-Policy"].split("; "))
+    assert csp["default-src"] == "'self'" and csp["connect-src"] == "'self' https://api.govcareeros.test"
+    assert csp["object-src"] == csp["frame-ancestors"] == "'none'" and csp["base-uri"] == csp["form-action"] == "'self'"
+    assert "'unsafe-eval'" not in headers["Content-Security-Policy"]
+    # HSTS on requests that came over https (X-Forwarded-Proto from the TLS proxy), never on plain http
+    [https] = [r for r in rules if "has" in r]
+    assert https["source"] == "/:path*" and https["has"] == [{"type": "header", "key": "x-forwarded-proto", "value": "https"}]
+    assert https["headers"] == [{"key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains"}]
+    # next dev: no CSP (fast refresh needs eval and a websocket) and no HSTS
+    dev = _next_config_headers({"NODE_ENV": "development"})
+    assert len(dev) == 1 and "Content-Security-Policy" not in json.dumps(dev) and "Strict-Transport" not in json.dumps(dev)
 
 # ---------- the API image's dependency set ----------
 

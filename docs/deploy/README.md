@@ -178,7 +178,9 @@ Alembic by hand: `docker compose run --rm migrate alembic -c govcareeros/alembic
    Caddy connects through Docker's port mapping, so the API sees the Docker bridge gateway as the client; set
    `FORWARDED_ALLOW_IPS` to that address (`docker network inspect govcareeros_default`, "Gateway") or leave the
    compose default `*` as long as port 8080 is reachable only from the host. HSTS is then sent on every https
-   response.
+   response: by the API, and by the dashboard on requests the proxy marks `X-Forwarded-Proto: https` (Caddy and
+   nginx `proxy_set_header X-Forwarded-Proto $scheme` do). The dashboard's production build also sends a
+   Content-Security-Policy whose `connect-src` is the site and `NEXT_PUBLIC_API_URL` only.
 5. `docker compose up -d --build`, then check `https://api.example.org/health` and the dashboard.
 6. Daily backups (section 4) from cron, copied off the machine; `docker compose logs` for the JSON logs
    (tokens, passwords, API keys and the database password are redacted from log lines; treat the logs as
